@@ -1,0 +1,22 @@
+30.11.2017
+When adding functionality to load and plot maps I inverted the typical data 
+structure from (m x n x 1) to (1 x m x n). Consequently, all other 
+postprocessing routines are broken.
+
+4.12.2017
+The ability to plot both maps and cuts makes everything super complicated.
+In combination with multiple z values for cuts this becomes unfeasible - this 
+feature should thus be dropped.
+
+5.12.2017
+Features and fixes needed:
+* energy scale in map mode
+X DONE Fermi level adjustment for cuts
+X DONE cut2 ypadding
+* integration range selector for maps
+
+11.12.2017
+The comment from 4.12.2017 does not seem justified anymore.
+
+23.01.2018
+Fermi background subtraction somehow broken.
