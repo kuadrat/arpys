@@ -1,6 +1,45 @@
 import h5py
 import numpy as np
+import pickle
 import pyfits
+
+class Dataloader_Pickle() :
+    """ Load data that has been saved using python's `pickle` module. Usually 
+    this will be just rare arrays, so determin the shape and such from the 
+    array itself. """
+
+    def load_data(self, filename) :
+        # Print a warning
+        import warnings
+        warnings.warn('Pickle dataloader is in experimental stage.')
+
+        # Open the file and get a handle for it
+        with open(filename, 'rb') as f :
+            filedata = pickle.load(f)
+
+        # Check if we are dealing with an array
+        if type(filedata) != np.ndarray :
+            raise TypeError
+
+        # Get the dimensions of the array
+        shape = filedata.shape
+        x = shape[0]
+        y = shape[1]
+
+        # Create x and y scales from shape
+        xscale = np.arange(x)
+        yscale = np.arange(y)
+
+        # Bring the data in the right shape
+        data = filedata.reshape(1, x, y)
+
+        # Create and return the datadict
+        res = {
+                'data': data,
+                'xscale': yscale,
+                'yscale': xscale
+        }
+        return res
 
 class Dataloader_ALS() :
     """ Object that allows loading and saving of ARPES data from the  
@@ -65,18 +104,10 @@ class Dataloader_ALS() :
             xscale = None
             yscale = None
 
-        # Make up some arbitrary labels
-        xlabel = 'X'
-        ylabel = 'Y'
-        zlabel = 'Z'
-
         res = {
                'data': data,
                'xscale': xscale,
-               'yscale': yscale,
-               'xlabel': xlabel,
-               'ylabel': ylabel,
-               'zlabel': zlabel
+               'yscale': yscale
               }
         return res
     
@@ -175,11 +206,6 @@ class Dataloader_PSI() :
         # Extract the actual dataset
         h5_data = self.datfile['Electron Analyzer/Image Data']
 
-        # Labels of the data
-        xlabel = 'k'
-        ylabel = 'E'
-        zlabel = 'tilt'
-
         # Convert to array and make 3 dimensional if necessary
         data = np.array(h5_data)
         shape = data.shape
@@ -213,10 +239,7 @@ class Dataloader_PSI() :
         res = {
                'data': data,
                'xscale': xscale,
-               'yscale': yscale,
-               'xlabel': xlabel,
-               'ylabel': ylabel,
-               'zlabel': zlabel
+               'yscale': yscale
               }
 
         return res

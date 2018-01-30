@@ -31,7 +31,8 @@ CM_SLIDER_RESOLUTION = 99
 
 # Data loader objects
 DATALOADERS = { 'PSI' : Dataloader_PSI(),
-                 'ALS' : Dataloader_ALS() }
+                'ALS' : Dataloader_ALS(),
+                'Pickle': Dataloader_Pickle() }
 
 # Postprocessing functions dicts
 MAP = { 'map' : None }
@@ -416,7 +417,6 @@ class Gui :
 
         # Try to load the data with the given dataloader
         try :
-            #self.data, self.xlabel, self.ylabel, self.zlabel = \
             datadict = \
             self.dataloaders[dataloader].load_data(self.filepath.get())
         except Exception as e :
@@ -427,9 +427,6 @@ class Gui :
 
         # Extract the fields from the datadict
         self.data = datadict['data']
-        self.xlabel = datadict['xlabel']
-        self.ylabel = datadict['ylabel']
-        self.zlabel = datadict['zlabel']
         self.xscale = datadict['xscale']
         self.yscale = datadict['yscale']
 
@@ -462,7 +459,7 @@ class Gui :
         # Make a map if necessary
         if self.map.get() != 'Off' :
             integrate = 5
-            self.pp_data = pp.make_slice(self.pp_data, 0, z, integrate=integrate)
+            self.pp_data = pp.make_slice(self.pp_data, d=0, i=z, integrate=integrate)
             #self.pp_data = pp.make_map(self.pp_data, z, integrate=integrate)
             
             # Need to reshape
@@ -488,28 +485,37 @@ class Gui :
         for ax in ['cut1', 'cut2'] :
             self.axes[ax].clear()
 
-        # Set z depending on whether we deal with a map or not
-        if self.map.get() != 'Off' :
-            z = 0
-        else :
-            z = self.z.get()
-
         # Get the right xscale/yscale information
         xscale, yscale = self.get_xy_scales()
 
-        # Plot the x cut in the upper left
-        xcut = self.pp_data[z, self.yind, :]
-        self.axes['cut1'].plot(xscale, xcut, **cut_kwargs)
+        # Set z depending on whether we deal with a map or not
+        if self.map.get() != 'Off' :
+            # Create a copy of the original map (3D) data
+            data = self.data.copy()
+            # Slice and dice it
+            xcut = pp.make_slice(data, d=1, i=self.yind, integrate=1)
+            ycut = pp.make_slice(data, d=2, i=self.xind, integrate=1)
 
-        # Plot the y cut in the lower right
-        ycut = self.pp_data[z, :, self.xind]
-        self.axes['cut2'].plot(ycut, yscale, **cut_kwargs)
+            # Plot x cut in upper left
+            self.axes['cut1'].pcolormesh(xcut)
+            # Plot y cut in lower right
+            self.axes['cut2'].pcolormesh(ycut)
+        else :
+            z = self.z.get()
+            xcut = self.pp_data[z, self.yind, :]
+            ycut = self.pp_data[z, :, self.xind]
 
-        # Make sure the cut goes over the full range of the plot
-        #self.axes['cut2'].set_ymargin(0) # For some reason this doesn't work
-        ymin = min(yscale)
-        ymax = max(yscale)
-        self.axes['cut2'].set_ylim([ymin, ymax])
+            # Plot the x cut in the upper left
+            self.axes['cut1'].plot(xscale, xcut, **cut_kwargs)
+
+            # Plot the y cut in the lower right
+            self.axes['cut2'].plot(ycut, yscale, **cut_kwargs)
+
+            # Make sure the cut goes over the full range of the plot
+            #self.axes['cut2'].set_ymargin(0) # For some reason this doesn't work
+            ymin = min(yscale)
+            ymax = max(yscale)
+            self.axes['cut2'].set_ylim([ymin, ymax])
 
     def plot_data(self, event=None, *args, **kwargs) :
         """ Update the colormap range and (re)plot the data. """

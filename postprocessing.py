@@ -324,21 +324,24 @@ def subtract_bg_fermi(data, n=10, ef=None, ef_index=None) :
         l = shape[0]
         m = shape[1]
 
-    if ef == None and ef_index == None :
-        # Loop over every k
-        for k in range(l) :
-            edc = data[k,:]
+    if ef_index == None :
+    # TODO elif ef:
+        if ef == None :
+            ef_index = 0
 
-            # Order the values in the edc by magnitude
-            ordered = sorted(edc)
+    # Loop over every k
+    for k in range(l) :
+        edc = data[k,ef_index:]
 
-            # Average over the first (smallest) n points to get the bg
-            bg = np.mean(ordered[:n])
+        # Order the values in the edc by magnitude
+        ordered = sorted(edc)
 
-            # Subtract the background (this updates the data array in place)
-            edc -= bg
+        # Average over the first (smallest) n points to get the bg
+        bg = np.mean(ordered[:n])
+
+        # Subtract the background (this updates the data array in place)
+        edc -= bg
          
-    # TODO elif :
     return data
 
 @array_input
@@ -360,13 +363,23 @@ def subtract_bg_matt(data, n=5) :
     -------
     res         : np.array; bg-subtracted  version of input data in same shape
     """
-    # Determine the number of energies l
+    # Reshape input
     shape = data.shape
-    l = shape[1] if len(shape)==3 else shape[0]
+    if len(shape)==3 :
+        l = shape[1] 
+        m = shape[2]
+        data = data.reshape([l,m])
+    else :
+        l = shape[0]
+        m = shape[1]
+
+# Determine the number of energies l
+#    shape = data.shape
+#    l = shape[1] if len(shape)==3 else shape[0]
 
     # Loop over every energy
     for e in range(l) :
-        mdc = data[0, e, :]
+        mdc = data[e, :]
 
         # Order the values in the mdc by magnitude
         ordered = sorted(mdc)
