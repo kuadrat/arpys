@@ -306,10 +306,10 @@ class Dataloader_PSI(Dataloader) :
             ylims = attributes['Axis0.Scale']
             elims = ylims
 
-        # Construct x, y and energy scale
-        xscale = np.linspace(xlims[0], xlims[1], y)
-        yscale = np.linspace(ylims[0], ylims[1], x)
-        energies = np.linspace(elims[0], elims[1], N_E)
+        # Construct x, y and energy scale (x/ylims[1] contains the step size)
+        xscale = self.make_scale(xlims, y)
+        yscale = self.make_scale(ylims, x)
+        energies = self.make_scale(elims, N_E)
 
         # Extract some data for ang2k conversion
         metadata = self.datfile['Other Instruments']
@@ -332,6 +332,15 @@ class Dataloader_PSI(Dataloader) :
               }
 
         return res
+
+    def make_scale(self, limits, nstep) :
+        """ Helper function to construct numbers starting from limits[0] 
+        and going in steps of limits[1] for nstep steps.
+        """
+        start = limits[0]
+        step = limits[1]
+        end = start + (nstep+1)*step
+        return np.linspace(start, end, nstep)
 
 # +-------+ #
 # | Tools | # ==================================================================

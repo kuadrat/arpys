@@ -617,15 +617,41 @@ def zero_crossings(x, direction=1) :
 def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124, 
                shift=0, lattice_constant=1, degrees=True) :
     """ Convert the angular information you get from beamline data into 
-    proper k-space coordinates using the formula:
-        pass
+    proper k-space coordinates (in units of pi/a, a being the lattice 
+    constant) using the formula:
 
+        k_x = c1 * sqrt(hv - e*phi + E_B) * sin(theta_a + theta_m)
+        k_x = c1 * sqrt(hv - e*phi + E_B) * sin(phi_a + phi_m)
 
+    with:
+             c1 : numeric constant
+             hv : photon energy (eV)
+          e*phi : work function (eV)
+            E_B : electron binding energy (eV)
+        theta_a : in-plane angle along analyzer slit
+        theta_m : in-plane manipulator angle
+          phi_a : angle along analyzer slit in vertical configuration
+          phi_m : tilt (?)
+
+    Confer the sheet 'Electron momentum calculations' from ADDRESS beamline 
+    for more information on the used notation.
+        
     Parameters
     ----------
     angles      : 1D array; angles (in degree) to be converted into k space
-                  (currently equal theta_m
-        pass
+                  (currently equal theta_a)
+    theta       : float; corresponds to theta_m 
+    phi         : float; corresponds to phi_m
+    hv          : float; photon energy in eV
+    E_B         : float; binding energy of electrons in eV
+    work_func   : float; corresponds to e*phi (eV)
+    c1          : float; numeric constant. Shouldn't really be changed 
+    shift       : float; shift in units of `angle` to get zero at right 
+                  position 
+    lattice_constant    
+                : float; lattice constant a in Angstrom used to convert to 
+                units of pi/a
+    degrees     : bool; allows giving the angles in either degrees or radians
     """
     # Precalculate the prefactor (*lattice_constant to get lattice constant 
     # units)
@@ -651,4 +677,3 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
     return kx, ky
 
 
-     
