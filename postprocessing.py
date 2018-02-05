@@ -610,6 +610,45 @@ def zero_crossings(x, direction=1) :
 
     return crossings
 
+# +------------------------------------------------+ #
+# | Conversion from angular coordinates to k space | # =========================
+# +------------------------------------------------+ #
+
+def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124, 
+               shift=0, lattice_constant=1, degrees=True) :
+    """ Convert the angular information you get from beamline data into 
+    proper k-space coordinates using the formula:
+        pass
+
+
+    Parameters
+    ----------
+    angles      : 1D array; angles (in degree) to be converted into k space
+                  (currently equal theta_m
+        pass
+    """
+    # Precalculate the prefactor (*lattice_constant to get lattice constant 
+    # units)
+    prefactor = c1 * np.sqrt(hv - work_func + E_b) * lattice_constant / np.pi
+
+    # Apply a shift to the angles
+    angles += shift
+
+    # Convert all angles from degrees to radians
+    if degrees :
+        conversion = np.pi/180
+        # Leave the original array unchanged
+        angles = angles.copy()
+        angles *= conversion
+        theta *= conversion
+        phi *= conversion
+
+    # kx and ky in inverse Angstrom or lattice constant units if 
+    # lattice_constant!=1
+    kx = prefactor * np.sin((theta + angles))
+    ky = prefactor * np.sin(phi) 
+
+    return kx, ky
 
 
      

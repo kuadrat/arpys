@@ -7,45 +7,41 @@ from scipy.ndimage.filters import laplace
 import dataloaders as dl
 import postprocessing as pp
 
-#filename = '../als_sample/20160618_00116.fits'
-#
+#filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00414.fits'
+#filename = '/home/kevin/Documents/qmap/experiments/2017_12_ALS/LSCO22/20171217_00006.fits'
+
 #als = dl.Dataloader_ALS()
-#d = als.load_data(filename)
-#data = d['data']
-#
-#xscale = d['xscale']
-#yscale = d['yscale']
-#
-#plt.pcolormesh(xscale, yscale, data[0,:,:])
-#plt.show()
+#datadict = als.load_data(filename)
 
-l, m, n = (10, 20, 10)
-x = np.arange(l)
-y = np.arange(m)
-z = np.random.rand(n)
-data = np.zeros((l, m, n))
+datadict = dl.load_data(filename)
 
-for i in range(l) :
-    for j in range(m) :
-        for k in range(n) :
-            data[i, j, k] = x[i] * np.sin(4*np.pi/m * y[j]) + 10*z[k]
+data = datadict['data']
+xscale = datadict['xscale']
+yscale = datadict['yscale']
+angles = datadict['angles']
+theta = datadict['theta']
+phi = datadict['phi']
+hv = datadict['hv']
+E_b = datadict['E_b']
 
-#plt.figure()
-#plt.pcolormesh(y, x, data[:,:,0])
-#
-#plt.figure()
-#plt.pcolormesh(y, x, data[:,:,-1])
+for key, val in datadict.items() :
+    if key in ['theta', 'phi', 'hv', 'E_b'] :
+        print('{} {}'.format(key, val))
+        
+kx, ky = pp.angle_to_k(angles, theta, phi, hv, E_b, lattice_constant=3.78, 
+                       shift=0, degrees=True)
 
-fig, axarray = plt.subplots(3)
 
-s0 = pp.make_slice(data, 0, 5)
-axarray[0].pcolormesh(s0)
+fig, (ax0, ax1, ax2) = plt.subplots(3)
 
-s1 = pp.make_slice(data, 1, 5)
-axarray[1].pcolormesh(s1)
+ax0.plot(angles, kx)
+ax1.pcolormesh(xscale, yscale, data[0], vmin=0, vmax=data[0].max(), 
+               cmap='plasma_r')
+ax2.pcolormesh(kx, yscale, data[0], vmin=0, vmax=data[0].max(), 
+               cmap='plasma_r')
 
-s2 = pp.make_slice(data, 2, 5)
-axarray[2].pcolormesh(s2)
-
+p = np.sqrt(2)
+ax2.set_xticks([-p, 0, p])
+ax2.set_xticklabels(['-pi,-pi', '0,0', 'pi,pi'])
 
 plt.show()

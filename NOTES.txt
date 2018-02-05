@@ -9,7 +9,7 @@ In combination with multiple z values for cuts this becomes unfeasible - this
 feature should thus be dropped.
 
 5.12.2017
-Features and fixes needed:
+TODO:
 * energy scale in map mode
 X DONE Fermi level adjustment for cuts
 X DONE cut2 ypadding
@@ -20,3 +20,7 @@ The comment from 4.12.2017 does not seem justified anymore.
 
 23.01.2018
 Fermi background subtraction somehow broken.
+
+31.01.2018
+TODO:
+* Have all dataloaders load angles->k conversion metadata
