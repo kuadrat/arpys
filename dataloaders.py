@@ -234,6 +234,9 @@ class Dataloader_PSI(Dataloader) :
     beamline at PSI which is in hd5 format. 
     """
     name = 'PSI'
+    # Number of cuts that need to be present to assume the data as a map 
+    # instead of a series of cuts
+    min_cuts_for_map = 10
 
     def __init__(self, filename=None) :
         pass
@@ -247,48 +250,63 @@ class Dataloader_PSI(Dataloader) :
         """ Extract and return the actual 'data', i.e. the recorded map/cut. 
         Also return labels which provide some indications what the data means.
         """
-        self.load_file(filename)
-
-        # Extract the actual dataset
-        h5_data = self.datfile['Electron Analyzer/Image Data']
-
-        # Convert to array and make 3 dimensional if necessary
-        data = np.array(h5_data)
-        shape = data.shape
-        # Case map
-        if len(shape) == 3 :
-            x = shape[1]
-            y = shape[2]
-            N_E = shape[0]
-        # Case cut
-        else :
-            x = shape[0]
-            y = shape[1]
-            # Make data 3D
-            data = data.reshape(1, x, y)
-            N_E = y
-
-        # Get x and y axis scales
         # Note: x and y are a bit confusing here as the hd5 file has a 
         # different notion of zero'th and first dimension as numpy and then 
         # later pcolormesh introduces yet another layer of confusion. The way 
         # it is written now, though hard to read, turns out to do the right 
         # thing and leads to readable code from after this point.
+
+        self.load_file(filename)
+
+        # Extract the actual dataset and some metadata
+        h5_data = self.datfile['Electron Analyzer/Image Data']
         attributes = h5_data.attrs
 
-        # Get the x and y limits so we can construct proper x and y axis labels
-        # Special case if we are dealing with a map (3 dimensional data)
+        # Convert to array and make 3 dimensional if necessary
+        data = np.array(h5_data)
+        shape = data.shape
+        # How the data needs to be arranged depends on the scan type: cut, 
+        # map, hv scan or a sequence of cuts
+        # Case cut
+        if len(shape) == 2 :
+            x = shape[0]
+            y = shape[1]
+            # Make data 3D
+            data = data.reshape(1, x, y)
+            N_E = y
+            # Extract the limits
+            xlims = attributes['Axis1.Scale']
+            ylims = attributes['Axis0.Scale']
+            elims = ylims
+        # shape[2] should hold the number of cuts. If it is reasonably large, 
+        # we have a map. Otherwise just a sequence of cuts.
         # Case map
-        if 'Axis2.Scale' in attributes :
+        elif shape[2] > self.min_cuts_for_map :
+            x = shape[1]
+            y = shape[2]
+            N_E = shape[0]
+            # Extract the limits
             xlims = attributes['Axis2.Scale']
             ylims = attributes['Axis1.Scale']
             elims = attributes['Axis0.Scale']
-        # Case cut
+        # Case sequence of cuts
         else :
+            x = shape[0]
+            y = shape[1]
+            N_E = y
+            z = shape[2]
+            # Reshape data
+            new_data = np.zeros([z, x, y])
+            for i in range(z) :
+                cut = data[:,:,i]
+                new_data[i] = cut
+            data = new_data
+            # Extract the limits
             xlims = attributes['Axis1.Scale']
             ylims = attributes['Axis0.Scale']
             elims = ylims
 
+        # Construct x, y and energy scale
         xscale = np.linspace(xlims[0], xlims[1], y)
         yscale = np.linspace(ylims[0], ylims[1], x)
         energies = np.linspace(elims[0], elims[1], N_E)
@@ -314,6 +332,10 @@ class Dataloader_PSI(Dataloader) :
               }
 
         return res
+
+# +-------+ #
+# | Tools | # ==================================================================
+# +-------+ #
 
 # List containing all reasonably defined dataloaders
 all_dls = [
