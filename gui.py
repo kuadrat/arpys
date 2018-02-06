@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter.filedialog import askopenfilename
 
 from dataloaders import *
+import dataloaders as dl
 import postprocessing as pp
 import kustom.plotting as kplot
 
@@ -28,11 +29,6 @@ SLIDER_LENGTH = 200
 
 # Number of entries allowed in colormap sliders (starts from 0)
 CM_SLIDER_RESOLUTION = 99
-
-# Data loader objects
-DATALOADERS = { 'PSI' : Dataloader_PSI(),
-                'ALS' : Dataloader_ALS(),
-                'Pickle': Dataloader_Pickle() }
 
 # Postprocessing functions dicts
 MAP = { 'map' : None }
@@ -92,25 +88,20 @@ class Gui :
     """
     data = STARTUP_DATA
     pp_data = STARTUP_DATA.copy()
-    dataloaders = DATALOADERS
     cmaps = CMAPS
     xscale = None
     yscale = None
     cursor_xy = None
 
-    def __init__(self, master, filename=None, dataloader='PSI') :
+    def __init__(self, master, filename=None) :
         """ This init function mostly just calls all 'real' initialization 
         functions where the actual work is outsourced to. """
         # Create the main container/window
         frame = tk.Frame(master)
 
-        # Set the initial dataloader
-        self.dataloader = dataloader
-
         # Define some elements
         self._set_up_load_button(master)
         self._set_up_pp_selectors(master)
-        self._set_up_dataloader_selector(master)
         self._set_up_plots(master)
         self._set_up_colormap_sliders(master)
         self._set_up_z_slider(master)
@@ -134,16 +125,20 @@ class Gui :
         # The plot takes up the space of PLOT_COLUMNSPAN widgets
         PLOT_COLUMNSPAN = 8
         PLOT_ROWSPAN = 3
-        N_PATH_FIELD = PLOT_COLUMNSPAN - 1
+        N_PATH_FIELD = PLOT_COLUMNSPAN
 
         # 'Load file' elements
         LOADROW = 0
-        self.dataloader_dropdown.grid(row=LOADROW, column=0, sticky='ew')
-        self.browse_button.grid(row=LOADROW, column=1, sticky='ew')
-        self.load_button.grid(row=LOADROW, column=2, sticky='ew')
-        self.decrement_button.grid(row=LOADROW, column=3, sticky='ew')
-        self.increment_button.grid(row=LOADROW, column=4, sticky='ew')
-        self.path_field.grid(row=LOADROW, column=5, columnspan=N_PATH_FIELD, 
+        c = 0
+        self.browse_button.grid(row=LOADROW, column=c, sticky='ew')
+        c += 1
+        self.load_button.grid(row=LOADROW, column=c, sticky='ew')
+        c += 1
+        self.decrement_button.grid(row=LOADROW, column=c, sticky='ew')
+        c += 1
+        self.increment_button.grid(row=LOADROW, column=c, sticky='ew')
+        c += 1
+        self.path_field.grid(row=LOADROW, column=c, columnspan=N_PATH_FIELD, 
                              sticky='ew') 
 
         # Postprocessing selectors
@@ -226,19 +221,6 @@ class Gui :
                                    indicatoron=0)
                 self.radiobuttons[i].append(rb)
 
-    def _set_up_dataloader_selector(self, master) :
-        """ Create a dropdown containing all possible dataloaders. """
-        # Get the list of possible options for the dropdown
-        options = list(self.dataloaders.keys())
-
-        # Initialize the associated StringVar
-        self.dataloader_selection = tk.StringVar()
-        self.dataloader_selection.set(self.dataloader)
-
-        # Create the dropdown
-        self.dataloader_dropdown = tk.OptionMenu(master, self.dataloader_selection,
-                                                 *options)
-        
     def _set_up_plots(self, master) :
         """ Take care of all the matplotlib stuff for the plot. """
         fig = Figure(figsize=FIGSIZE)
@@ -409,19 +391,15 @@ class Gui :
         reset and prepare several things such that the GUI is able to handle 
         the new data properly. 
         """
-        # Get the chose dataloader from the selection
-        dataloader = self.dataloader_selection.get()
-
         # Show the user that something is happening
-        self.update_status('Loading {} data...'.format(dataloader))
+        self.update_status('Loading data...')
 
         # Try to load the data with the given dataloader
         try :
-            datadict = \
-            self.dataloaders[dataloader].load_data(self.filepath.get())
+            datadict = dl.load_data(self.filepath.get())
         except Exception as e :
             print(e)
-            self.update_status('Failed to load {} data.'.format(dataloader))
+            self.update_status('Failed to load data.')
             # Leave the function
             return 1
 
@@ -431,8 +409,7 @@ class Gui :
         self.yscale = datadict['yscale']
 
         # Notify user of success
-        self.update_status('Loaded {} data: {}.'.format(dataloader, 
-                                                        self.get_filename()))
+        self.update_status('Loaded data: {}.'.format(self.get_filename())) 
 
         # Update the max z value
         self.zmax.set( len(self.data) - 1) 
@@ -718,20 +695,20 @@ class Gui :
         # Inititate the cursors
         self.plot_cursors()
 
-def start_gui(filename=None, dataloader='PSI') :
+# +------+ #
+# | Main | # ===================================================================
+# +------+ #
+
+def start_gui(filename=None) :
     """ Initialize the Tk object, give it a title, attach the Gui (App) to it 
     and start the mainloop. 
     """
     root = tk.Tk()
     root.title('Data visualizer')
-    gui = Gui(root, filename=filename, dataloader=dataloader)
+    gui = Gui(root, filename=filename)
     gui.plot_data()
     root.mainloop()
 
-
-# +------+ #
-# | Main | # ===================================================================
-# +------+ #
-
 if __name__ == '__main__' :
     start_gui()
+
