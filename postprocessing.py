@@ -82,9 +82,9 @@ def make_slice(data, d, i, integrate=0) :
         'i - integrate ({}) < 0, setting start=0'.format(start))       
         start = 0
     if stop >= n_slices :
-        warnings.warn(
-        'i + integrate ({}) >= n_slices ({}), setting \
-            stop=n_slices'.format(stop, n_slices))       
+        warning = 'i + integrate ({}) >= n_slices ({}), setting \
+stop=n_slices'.format(stop, n_slices)       
+        warnings.warn(warning)
         stop = n_slices
 
     # Initialize data container and fill it with data from selected slices
@@ -652,13 +652,18 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
                 : float; lattice constant a in Angstrom used to convert to 
                 units of pi/a
     degrees     : bool; allows giving the angles in either degrees or radians
+
+    Returns
+    -------
+    kx, ky      : tuple of floats; kx and ky coordinates in units of pi/a
+
     """
     # Precalculate the prefactor (*lattice_constant to get lattice constant 
     # units)
     prefactor = c1 * np.sqrt(hv - work_func + E_b) * lattice_constant / np.pi
 
     # Apply a shift to the angles
-    angles += shift
+    angles = angles.copy() + shift
 
     # Convert all angles from degrees to radians
     if degrees :

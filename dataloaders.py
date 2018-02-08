@@ -8,6 +8,7 @@ import h5py
 import numpy as np
 import pickle
 import pyfits
+from warnings import catch_warnings, simplefilter
 
 class Dataloader() :
     """ Base dataloader class (interface) from which others inherit some 
@@ -36,29 +37,30 @@ class Dataloader_Pickle(Dataloader) :
         with open(filename, 'rb') as f :
             filedata = pickle.load(f)
 
-        # Check if we are dealing with an array
-        if type(filedata) != np.ndarray :
-            raise TypeError
-
-        # Get the dimensions of the array
-        shape = filedata.shape
-        x = shape[0]
-        y = shape[1]
-
-        # Create x and y scales from shape
-        xscale = np.arange(x)
-        yscale = np.arange(y)
-
-        # Bring the data in the right shape
-        data = filedata.reshape(1, x, y)
-
-        # Create and return the datadict
-        res = {
-                'data': data,
-                'xscale': yscale,
-                'yscale': xscale
-        }
-        return res
+#        # Check if we are dealing with an array
+#        if type(filedata) != np.ndarray :
+#            raise TypeError
+#
+#        # Get the dimensions of the array
+#        shape = filedata.shape
+#        x = shape[0]
+#        y = shape[1]
+#
+#        # Create x and y scales from shape
+#        xscale = np.arange(x)
+#        yscale = np.arange(y)
+#
+#        # Bring the data in the right shape
+#        data = filedata.reshape(1, x, y)
+#
+#        # Create and return the datadict
+#        res = {
+#                'data': data,
+#                'xscale': yscale,
+#                'yscale': xscale
+#        }
+#        return res
+        return filedata
 
 class Dataloader_ALS(Dataloader) :
     """ Object that allows loading and saving of ARPES data from the  
@@ -99,43 +101,93 @@ class Dataloader_ALS(Dataloader) :
         else :
             raise(IndexError('Couldn\'t determine scan type'))
 
+        # Determine whether the file uses the SS or SF prefix for metadata
+        if 'SSX0_0' in header :
+            pre = 'SS'
+        elif 'SFX0_0' in header :
+            pre = 'SF'
+        else :
+            raise(IndexError('Neither SSX0_0 nor SFX0_0 appear in header.'))
+
         if scanmode != 'Slit Defl' :
             # Starting pixel (energy scale)
-            p0 = header['SSX0_0']
+            p0 = header[pre+'X0_0']
             # Ending pixel (energy scale)
-            p1 = header['SSX1_0']
+            p1 = header[pre+'X1_0']
             # Pixels per eV
-            ppeV = header['SSPEV_0']
+            ppeV = header[pre+'PEV_0']
             # Zero pixel (=Fermi level?)
-            fermi_level = header['SSKE0_0']
+            fermi_level = header[pre+'KE0_0']
 
             # Create the energy (y) scale
-            # NOTE: Not sure whether these energies are appropriate
             energy_binning = 2
             energies_in_px = np.arange(p0, p1, energy_binning)
             energies = (energies_in_px - fermi_level)/ppeV
 
             # Starting and ending pixels (angle scale)
-            p0 = header['SSY0_0']
-            p1 = header['SSY1_0']
+            p0 = header[pre+'Y0_0']
+            p1 = header[pre+'Y1_0']
 
             # Use this arbitrary seeming conversion factor (found in Denys' 
             # script) to get from pixels to angles
             angle_binning = 2
             angles_in_px = np.arange(p0, p1, angle_binning)
-            c1 = 0.193
-            c2 = 4
-            angles = angles_in_px * c1/c2
+            deg_per_px = 0.193 / 2
+            # NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+            # Actually, I would think that we have to multiply by 
+            # `angle_binning` to get the right result. That leads to 
+            # unreasonable results, however, and division just gives a 
+            # perfect looking output. Maybe the factor 0.193/2 from ALS has 
+            # changed with the introduction of binning?
+            angles = angles_in_px * deg_per_px / angle_binning
 
             xscale = angles
             yscale = energies
             # For the binding energy, just take a min value as its variations 
             # are small compared to the photon energy
             E_b = energies.min()
+            zscale = None
         else :
-            xscale = None
-            yscale = None
-            angles = None
+            x0 = header['ST_0_0']
+            x1 = header['EN_0_0']
+            n_x = header['N_0_0']
+            angles = np.linspace(x0, x1, n_x)
+
+            # Starting pixel (energy scale)
+            e0 = header[pre+'X0_0']
+            # Ending pixel (energy scale)
+            e1 = header[pre+'X1_0']
+            # Pixels per eV
+            ppeV = header[pre+'PEV_0']
+            # Zero pixel (=Fermi level?)
+            fermi_level = header[pre+'KE0_0']
+
+            # Create the energy (y) scale
+            energy_binning = 2
+            energies_in_px = np.arange(e0, e1, energy_binning)
+            energies = (energies_in_px - fermi_level)/ppeV
+
+            # Starting and ending pixels (ky scale) (?)
+            y0 = header[pre+'Y0_0']
+            y1 = header[pre+'Y1_0']
+
+            angle_binning = 2
+            angles_in_px = np.arange(y0, y1, angle_binning)
+            deg_per_px = 0.193 / 2
+            # NOTE See above NOTE
+            y_angles = angles_in_px * deg_per_px / angle_binning
+
+            xscale = angles
+            yscale = y_angles
+            zscale = energies
+            E_b = energies.min()
+
+        # Case hv scan
+        if scanmode == 'mono_eV' :
+            z0 = header['ST_0_0']
+            z1 = header['EN_0_0']
+            nz = header['N_0_0']
+            zscale = np.linspace(z0, z1, nz)
 
         # Extract some additional metadata (mostly for angles->k conversion)
         # TODO Special cases for different scan types
@@ -152,6 +204,7 @@ class Dataloader_ALS(Dataloader) :
                'data': data,
                'xscale': xscale,
                'yscale': yscale,
+               'zscale': zscale,
                'angles': angles,
                'theta': theta,
                'phi': phi,
@@ -349,7 +402,8 @@ class Dataloader_PSI(Dataloader) :
 # List containing all reasonably defined dataloaders
 all_dls = [
            Dataloader_PSI,
-           Dataloader_ALS
+           Dataloader_ALS,
+           Dataloader_Pickle
           ]
 
 # Function to try all dataloaders in all_dls
@@ -362,26 +416,29 @@ def load_data(filename, exclude=None) :
     # Keep track of all exceptions in case no loader succeeds
     exceptions = dict()
 
-    for dataloader in all_dls :
-        # Instantiate a dataloader object
-        dl = dataloader()
+    # Suppress warnings
+    with catch_warnings() :
+        simplefilter('ignore')
+        for dataloader in all_dls :
+            # Instantiate a dataloader object
+            dl = dataloader()
 
-        # Skip to the next if this dl is excluded (continue brings us back to 
-        # the top of the loop, starting with the next element)
-        if exclude is not None and dl.name in exclude : 
-            continue
+            # Skip to the next if this dl is excluded (continue brings us back to 
+            # the top of the loop, starting with the next element)
+            if exclude is not None and dl.name in exclude : 
+                continue
 
-        # Try loading the data
-        try :
-            datadict = dl.load_data(filename)
-        except Exception as e :
-            # Temporarily store the exception
-            exceptions.update({dl : e})
-            # Try the next dl
-            continue
+            # Try loading the data
+            try :
+                datadict = dl.load_data(filename)
+            except Exception as e :
+                # Temporarily store the exception
+                exceptions.update({dl : e})
+                # Try the next dl
+                continue
 
-        # Reaching this point must mean we succeeded
-        return datadict
+            # Reaching this point must mean we succeeded
+            return datadict
 
     # Reaching this point means something went wrong. Print all exceptions.
     for dl in exceptions :

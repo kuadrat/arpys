@@ -2,3 +2,4 @@ bkup/
 data/
 *.p
 *.swp
+__pycache__/

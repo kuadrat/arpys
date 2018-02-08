@@ -23,4 +23,16 @@ Fermi background subtraction somehow broken.
 
 31.01.2018
 TODO:
-* Have all dataloaders load angles->k conversion metadata
+X DONE Have all dataloaders load angles->k conversion metadata
+
+6.02.2018
+Fixed Dataloader_ALS very crudely with the ugliest of code. Need to clean up 
+as soon as I get to it.
+To problem to be fixed was that some maps (quick maps) use the keys `SFXXX` 
+instead of `SSXXX` for their metadata...
+
+7.02.2018
+The file .../171025_psi/Tl_1_0018.h5 (a hv scan) is not represented correctly 
+in the gui.
+TODO:
+* Convert output of dataloaders load_data to an argparse.Namespace.
