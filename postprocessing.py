@@ -10,13 +10,13 @@ import warnings
 # | Decorators | # ============================================================
 # +------------+ #
 
-def array_input(f) :
-    """ Decorator which converts input to a numpy array. """
-    def decorated(data, *args, **kwargs) :
-        data = np.array(data)
-        return f(data, *args, **kwargs)
-    return decorated
-
+#def dc(f) :
+#    """ Decorator which converts input to a numpy array. """
+#    def decorated(data, *args, **kwargs) :
+#        data = np.array(data)
+#        return f(data, *args, **kwargs)
+#    return decorated
+#
 #def reshape(D) :
 #    """ Decorator factory which converts the input data array either to shape
 #    (l x m) (D=2) or to (l x m x 1) (D=3)
@@ -45,7 +45,6 @@ def array_input(f) :
 # | ARPES processing | # ======================================================
 # +------------------+ #
 
-@array_input
 def make_slice(data, d, i, integrate=0) :
     """ Create a slice out of the 3d data (l x m x n) along dimension d 
     (0,1,2) at index i. Optionally integrate around i.
@@ -101,7 +100,6 @@ stop=n_slices'.format(stop, n_slices)
 
     return sliced
 
-@array_input
 def make_map(data, i, integrate=0) :
     """ Create a 'top view' slice for FSM data.
     If the values of i or integrate are bigger than what is possible, they 
@@ -148,7 +146,6 @@ def make_map(data, i, integrate=0) :
 # | Normalization | # ========================================================
 # +---------------+ #
 
-@array_input
 def normalize_globally(data, minimum=True) :
     """ The simplest approach: normalize the whole dataset by the global min- 
     or maximum.
@@ -194,8 +191,8 @@ def convert_data_back(data, d, l, m) :
     """
     if d == 2 :
         data = data.reshape(l, m)
+    return data
 
-@array_input
 def normalize_per_segment(data, dim=0, minimum=False) :
     """ Normalize each column/row by its respective max value.
 
@@ -234,7 +231,6 @@ def normalize_per_segment(data, dim=0, minimum=False) :
 
     return data
 
-@array_input
 def normalize_per_integrated_segment(data, dim=0) :
     """ Normalize each MDC/EDC by its integral.
 
@@ -286,15 +282,38 @@ def normalize_per_integrated_segment(data, dim=0) :
             data[:,:,i] = row
 
     # Convert back to original shape, if necessary
-    convert_data_back(data, d, l, m)
+    data = convert_data_back(data, d, l, m)
 
     return data
+
+def normalize_above_fermi(data, ef=None, ef_index=None, n=10, dim=1) :
+    """ Pass """
+    # Convert data if necessary
+    data, d, l, m = convert_data(data)
+
+    for k in range(l) :
+        edc = data[0,k]
+        above_ef = edc[ef_index:]
+
+        ordered = sorted(above_ef)
+
+        norm = np.mean(above_ef[:n])
+
+    with np.errstate(invalid='raise') :
+        try :
+            edc = edc/norm
+        except FloatingPointError as e :
+            pass
+    
+    data = convert_data_back(data, d, l, m)
+
+    return data
+
 
 # +----------------+ #
 # | BG subtraction | # ========================================================
 # +----------------+ #
 
-@array_input
 def subtract_bg_fermi(data, n=10, ef=None, ef_index=None) :
     """ Use the mean of the counts above the Fermi level as a background and 
     subtract it from every channel/k. If no fermi level or index of the fermi
@@ -304,7 +323,7 @@ def subtract_bg_fermi(data, n=10, ef=None, ef_index=None) :
     Parameters
     ----------
     data        : array-like; the input data with shape (l x m) or 
-                  (1 x l x m) containing momentum in y (m momentum points) 
+                  (1 x l x m) containing momentum in y (m momentum points (?)) 
                   and energy along x (l energy points) (plotting amazingly 
                   inverts x and y)
     n           : int; number of smallest points to take in order to determine
@@ -331,10 +350,11 @@ def subtract_bg_fermi(data, n=10, ef=None, ef_index=None) :
 
     # Loop over every k
     for k in range(l) :
-        edc = data[k,ef_index:]
+        edc = data[k]
+        above_ef = edc[ef_index:]
 
         # Order the values in the edc by magnitude
-        ordered = sorted(edc)
+        ordered = sorted(above_ef)
 
         # Average over the first (smallest) n points to get the bg
         bg = np.mean(ordered[:n])
@@ -344,7 +364,6 @@ def subtract_bg_fermi(data, n=10, ef=None, ef_index=None) :
          
     return data
 
-@array_input
 def subtract_bg_matt(data, n=5) :
     """ Subtract background following the method in C.E.Matt's 
     "High-temperature Superconductivity Restrained by Orbital Hybridisation".
@@ -396,7 +415,6 @@ def subtract_bg_gold(data) :
     # @TODO Or should this be normalize?
     pass
 
-@array_input
 def subtract_bg_kaminski(data) :
     """ Use the method of Kaminski et al. (DOI: 10.1103/PhysRevB.69.212509) 
     to subtract background. The principle is as follows:
@@ -461,7 +479,6 @@ def _derivatives(data, dx, dy) :
 
     return grad_x, grad_y, grad2_x, grad2_y
 
-@array_input
 def laplacian(data, dx=1, dy=1, a=None) :
     """ Apply the second derivative (Laplacian) to the data.
 
@@ -681,4 +698,48 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
 
     return kx, ky
 
+# +---------+ #
+# | Various | # ================================================================
+# +---------+ #
 
+def rotate_xy(xscale, yscale, theta=45) :
+    """
+    Rotate the x and y cooridnates of rectangular 2D data by angle theta.
+
+    Parameters
+    ----------
+    xscale, yscale  : 1D arrays; the x (length m) and y (length n)  
+                      coordinates of the (rectangular) 2D data
+    theta           : float; rotation angle in degrees
+
+    Returns
+    -------
+    xr, yr          : 2D arrays; rotated coordinate meshes (shape n x m) that 
+                      can be used as arguments to matplotlib's pcolormesh
+    """
+    # Get dimensions
+    m = len(xscale)
+    n = len(yscale)
+
+    # Create a coordinate mesh
+    X, Y = np.meshgrid(xscale, yscale)
+
+    # Initialize the output arrays
+    xr = np.zeros([n, m])
+    yr = xr.copy()
+
+    # Build the rotation matrix (convert angle to radians first)
+    t = np.pi * theta/180.
+    R = np.array([[np.cos(t), -np.sin(t)],
+                  [np.sin(t),  np.cos(t)]])
+
+    # Rotate each coordinate vector and write it to the output arrays
+    # NOTE there must be a more pythonic way to do this
+    for i in range(n) :
+        for j in range(m) :
+            v = np.array([X[i,j], Y[i,j]])
+            vr = v.dot(R)
+            xr[i,j] = vr[0]
+            yr[i,j] = vr[1]
+
+    return xr, yr

@@ -22,9 +22,9 @@ class Dataloader() :
         return '<class Dataloader_{}>'.format(self.name)
 
 class Dataloader_Pickle(Dataloader) :
-    """ Load data that has been saved using python's `pickle` module. Usually 
-    this will be just rare arrays, so determin the shape and such from the 
-    array itself. 
+    """ Load data that has been saved using python's `pickle` module. ARPES 
+    pickle files are assumed to just contain the datadict the way it would be 
+    returned by any Dataloader of this module. 
     """
     name = 'Pickle'
 
@@ -377,6 +377,7 @@ class Dataloader_PSI(Dataloader) :
                'data': data,
                'xscale': xscale,
                'yscale': yscale,
+               'zscale': None,
                'angles': angles,
                'theta': theta,
                'phi': phi,

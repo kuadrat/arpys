@@ -76,6 +76,8 @@ cursor_kwargs = {'linewidth': 1,
                  'color': 'r'}
 cut_kwargs = {'linewidth': 1,
               'color': 'white'}
+intensity_kwargs = dict(linewidth=1,
+                        color='white')
 
 # +------------+ #
 # | GUI Object | # =============================================================
@@ -91,6 +93,7 @@ class Gui :
     cmaps = CMAPS
     xscale = None
     yscale = None
+    zscale = None
     cursor_xy = None
 
     def __init__(self, master, filename=None) :
@@ -407,6 +410,7 @@ class Gui :
         self.data = datadict['data']
         self.xscale = datadict['xscale']
         self.yscale = datadict['yscale']
+        self.zscale = datadict['zscale']
 
         # Notify user of success
         self.update_status('Loaded data: {}.'.format(self.get_filename())) 
@@ -454,6 +458,40 @@ class Gui :
         # Replot
         self.plot_data()
 
+    def plot_intensity(self) :
+        """ Plot the binding energy distribution in the top 
+        right if we have a map. """
+        # Clear the current distribution
+        ax = self.axes['energy']
+        ax.clear()
+
+        z = self.z.get()
+        if self.zscale is not None :
+            z_val = self.zscale[z]
+        else :
+            z_val = z
+        ax.text(0.1, 0.05, z_val, color='red', transform=ax.transAxes)
+
+        # Nothing else to do if we don't have a map
+        if self.map.get() == 'Off' : 
+            return
+
+        # Get the energies and number of energies
+        if self.zscale is not None :
+            energies = self.zscale
+        else :
+            energies = np.arange(len(self.data))
+        N_e = len(energies)
+        
+        # Get the intensities
+        intensities = []
+        for i in range(N_e) :
+            this_slice = self.data[i,:,:]
+            intensity = sum( sum(this_slice) )
+            intensities.append(intensity)
+
+        ax.plot(energies, intensities, **intensity_kwargs)
+
     def plot_cuts(self) :
         """ Plot cuts of whatever is in the bottom left ('map') axis along 
         the current positions of the cursors. 
@@ -473,10 +511,18 @@ class Gui :
             xcut = pp.make_slice(data, d=1, i=self.yind, integrate=1)
             ycut = pp.make_slice(data, d=2, i=self.xind, integrate=1)
 
+            kwargs = dict(cmap=self.cmap.get())
+
             # Plot x cut in upper left
-            self.axes['cut1'].pcolormesh(xcut)
+            vmin, vmax = self.vminmax(xcut)
+            kwargs.update(dict(vmin=vmin, vmax=vmax))
+            self.axes['cut1'].pcolormesh(self.xscale, self.zscale, xcut, 
+                                         **kwargs)
             # Plot y cut in lower right
-            self.axes['cut2'].pcolormesh(ycut)
+            vmin, vmax = self.vminmax(ycut)
+            kwargs.update(dict(vmin=vmin, vmax=vmax))
+            self.axes['cut2'].pcolormesh(self.yscale, self.zscale, ycut, 
+                                         **kwargs)
         else :
             z = self.z.get()
             xcut = self.pp_data[z, self.yind, :]
@@ -496,20 +542,6 @@ class Gui :
 
     def plot_data(self, event=None, *args, **kwargs) :
         """ Update the colormap range and (re)plot the data. """
-        # Note: vmin_index goes from 100 to 0 and vice versa for vmax_index.
-        # This is to turn the sliders upside down.
-        # Crude method to avoid unreasonable colormap settings
-        if self.vmin_index.get() < self.vmax_index.get() :
-            self.vmin_index.set(CM_SLIDER_RESOLUTION)
-
-        # Split the data value range into equal parts
-        drange = np.linspace(self.pp_data.min(), self.pp_data.max(), 
-                             CM_SLIDER_RESOLUTION + 1)
-
-        # Get the appropriate vmin and vmax values from the data
-        vmin = drange[CM_SLIDER_RESOLUTION - self.vmin_index.get()]
-        vmax = drange[CM_SLIDER_RESOLUTION - self.vmax_index.get()]
-
         # Remove old plots
         for ax in self.axes.values() :
             ax.clear()
@@ -529,6 +561,8 @@ class Gui :
             z = self.z.get()
 
         args.append(self.pp_data[z,:,:])
+
+        vmin, vmax = self.vminmax(self.pp_data)
         kwargs = dict(cmap=self.cmap.get(), vmin=vmin, vmax=vmax)
 
         # Do the actual plotting with just defined args and kwargs
@@ -537,7 +571,27 @@ class Gui :
         # Update the cursors (such that they are above the pcolormesh) and cuts
         self.plot_cursors()
         self.plot_cuts()
+        self.plot_intensity()
         self.canvas.draw()
+
+    def vminmax(self, data) :
+        """ Helper function that returns appropriate values for vmin and vmax
+        for a given set of data. """
+        # Note: vmin_index goes from 100 to 0 and vice versa for vmax_index.
+        # This is to turn the sliders upside down.
+        # Crude method to avoid unreasonable colormap settings
+        if self.vmin_index.get() < self.vmax_index.get() :
+            self.vmin_index.set(CM_SLIDER_RESOLUTION)
+
+        # Split the data value range into equal parts
+        drange = np.linspace(self.pp_data.min(), data.max(), 
+                             CM_SLIDER_RESOLUTION + 1)
+
+        # Get the appropriate vmin and vmax values from the data
+        vmin = drange[CM_SLIDER_RESOLUTION - self.vmin_index.get()]
+        vmax = drange[CM_SLIDER_RESOLUTION - self.vmax_index.get()]
+
+        return vmin, vmax
 
     def get_xy_minmax(self) :
         """ Return the min and max for the x and y axes, depending on whether 
@@ -651,6 +705,7 @@ class Gui :
             if event.inaxes != self.axes['map'] :
                 return
 
+            print('clicked')
             self.cursor_xy = (event.xdata, event.ydata)
             self.plot_cursors()
             # Also update the cuts
