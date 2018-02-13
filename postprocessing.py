@@ -604,8 +604,6 @@ def zero_crossings(x, direction=1) :
     (direction=1) or both (direction=0). This is detected simply by a change 
     of sign between two subsequent points.
 
-    :NOTE: The functionality with `direction` is not yet implemented!
-
     Parameters
     ----------
     x           : 1D array-like; data in which to find zero crossings
@@ -620,10 +618,23 @@ def zero_crossings(x, direction=1) :
     crossings = []
 
     for i in range(len(x) - 1) :
+        # Get the signs s0 and s1 of two neighbouring values i0 and i1
         i0 = x[i]
         i1 = x[i+1]
-        if np.sign(i0) == 1 and np.sign(i1) == -1 :
-            crossings.append(i)
+        s0 = np.sign(i0)
+        s1 = np.sign(i1)
+        if direction == -1 :
+            # Only detect changes from + t0 -
+            if s0 == 1 and s1 == -1 :
+                crossings.append(i)
+        elif direction == 1 :
+            # Only detect changes from - t0 +
+            if s0 == -1 and s1 == 1 :
+                crossings.append(i)
+        elif direction == 0 :
+            # Detect any sign change
+            if s0*s1 == -1 :
+                crossings.append(i)
 
     return crossings
 
