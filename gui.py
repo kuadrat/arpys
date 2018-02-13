@@ -4,6 +4,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 #import matplotlib.backends.backend_tkagg as tkagg
 from matplotlib import rcParams
+from matplotlib.pyplot import get_cmap
 import numpy as np
 import re
 import tkinter as tk
@@ -52,8 +53,8 @@ for D in PP_DICTS :
     D.update({'Off' : None})
 
 # Available matplotlib colormaps
-CMAPS = ['viridis', 'Greys', 'Greys_r', 'bone', 'summer', 'plasma', 'inferno', 'magma', \
-         'nipy_spectral', 'BrBG', 'Wistia', 'rainbow_light']
+CMAPS = ['viridis', 'Greys', 'bone', 'summer', 'plasma', 'inferno', 'magma', \
+         'nipy_spectral', 'BrBG', 'YlGnBu', 'PuBuGn', 'PuRd', 'rainbow_light']
 # Size of the plot in inches (includes labels and title etc)
 HEIGHT = 6.5
 WIDTH = 1.2*HEIGHT
@@ -72,12 +73,14 @@ STARTUP_DATA = np.array([ np.array([ np.array([k*(i+j) +(1-k)*(i-j) for i in
                                    range(2)])
 
 # Style of the cursors and cuts
-cursor_kwargs = {'linewidth': 1,
-                 'color': 'r'}
-cut_kwargs = {'linewidth': 1,
-              'color': 'white'}
+cursor_kwargs = dict(linewidth=1,
+                     color='r')
+cut_kwargs = dict(linewidth=1,
+                  color='white')
 intensity_kwargs = dict(linewidth=1,
                         color='white')
+intensity_cursor_kwargs = dict(linewidth=1,
+                               color='r')
 
 # +------------+ #
 # | GUI Object | # =============================================================
@@ -163,6 +166,7 @@ class Gui :
         self.cm_min_slider.grid(row=PLOTROW, column=right_of_plot + 1)
         self.cm_max_slider.grid(row=PLOTROW, column=right_of_plot + 2)
         self.cmap_dropdown.grid(row=PLOTROW + 1, column=right_of_plot + 1)
+        self.invert_cmap_checkbutton.grid(row=PLOTROW + 1, column=right_of_plot + 2)
 
         # z slider
         self.z_slider.grid(row=PLOTROW, column=0)
@@ -202,8 +206,8 @@ class Gui :
             2) Normalization
             3) derivative
         """
-        # Create IntVars to hold the selections and store them in a list for
-        # programmatic access later on
+        # Create control variables to hold the selections and store them in a 
+        # list for programmatic access later on
         self.map = tk.StringVar()
         self.subtractor = tk.StringVar()
         self.normalizer = tk.StringVar()
@@ -263,7 +267,8 @@ class Gui :
         """ Add the colormap adjust sliders, set their starting position and add 
         its binding such that it only triggers upon release. Also, couple 
         them to the variables vmin/max_index.
-        Then, also create a dropdown with all available cmaps.
+        Then, also create a dropdown with all available cmaps and a checkbox 
+        to invert the cmap.
         """
         self.vmin_index = tk.IntVar()
         self.vmax_index = tk.IntVar()
@@ -280,15 +285,24 @@ class Gui :
         self.cm_max_slider.set(0)
         self.cm_max_slider.bind('<ButtonRelease-1>', self.plot_data)
 
-        # StringVar to keep track of the cmap
+        # StringVar to keep track of the cmap and whether it's inverted
         self.cmap = tk.StringVar()
+        self.invert_cmap = tk.StringVar()
         # Default to the first cmap
         self.cmap.set(self.cmaps[0])
+        self.invert_cmap.set('')
         # Replot whenever the variable changes
         self.cmap.trace("w", self.plot_data)
+        self.invert_cmap.trace("w", self.plot_data)
 
         # Create the dropdown menu, populated with all strings in self.cmaps
         self.cmap_dropdown = tk.OptionMenu(master, self.cmap, *self.cmaps)
+
+        # And a button to invert
+        self.invert_cmap_checkbutton = tk.Checkbutton(master, text='Invert',
+                                                      variable=self.invert_cmap,
+                                                      onvalue='_r',
+                                                      offvalue='')
 
     def _set_up_z_slider(self, master) :
         """ Create a Slider which allows to select the z value of the data.
@@ -490,7 +504,15 @@ class Gui :
             intensity = sum( sum(this_slice) )
             intensities.append(intensity)
 
+        # Plot energy distribution
         ax.plot(energies, intensities, **intensity_kwargs)
+
+        # Plot a cursor indicating the current value of z
+        y0 = min(intensities)
+        y1 = max(intensities)
+        ylim = [y0, y1]
+        ax.plot(2*[z_val], ylim, **intensity_cursor_kwargs)
+        ax.set_ylim(ylim)
 
     def plot_cuts(self) :
         """ Plot cuts of whatever is in the bottom left ('map') axis along 
@@ -511,7 +533,7 @@ class Gui :
             xcut = pp.make_slice(data, d=1, i=self.yind, integrate=1)
             ycut = pp.make_slice(data, d=2, i=self.xind, integrate=1)
 
-            kwargs = dict(cmap=self.cmap.get())
+            kwargs = dict(cmap=self.get_cmap())
 
             # Plot x cut in upper left
             vmin, vmax = self.vminmax(xcut)
@@ -563,7 +585,8 @@ class Gui :
         args.append(self.pp_data[z,:,:])
 
         vmin, vmax = self.vminmax(self.pp_data)
-        kwargs = dict(cmap=self.cmap.get(), vmin=vmin, vmax=vmax)
+        kwargs = dict(cmap=self.get_cmap(), vmin=vmin, 
+                      vmax=vmax)
 
         # Do the actual plotting with just defined args and kwargs
         self.axes['map'].pcolormesh(*args, **kwargs)
@@ -573,6 +596,25 @@ class Gui :
         self.plot_cuts()
         self.plot_intensity()
         self.canvas.draw()
+
+    def get_cmap(self) :
+        """ Build and return the colormap from the selection and choice of 
+        inversion. """
+        # Build the name of the cmap
+        cmap_name = self.cmap.get() + self.invert_cmap.get()
+        # Make sure this name exists in the list of cmaps. Otherwise reset to 
+        # default cmap
+        try :
+            cmap = get_cmap(cmap_name)
+        except ValueError :
+            # Notify user
+            message = \
+            'Colormap {} not found. Using default instead.'.format(cmap_name)
+            self.update_status(message)
+            # Set default
+            cmap = get_cmap(self.cmaps[0])
+
+        return cmap
 
     def vminmax(self, data) :
         """ Helper function that returns appropriate values for vmin and vmax
@@ -701,17 +743,24 @@ class Gui :
         direction). 
         """
         def on_click(event):
-            # Stop if we're not in the right plot
-            if event.inaxes != self.axes['map'] :
-                return
-
-            print('clicked')
-            self.cursor_xy = (event.xdata, event.ydata)
-            self.plot_cursors()
-            # Also update the cuts
-            self.plot_cuts()
-            self.canvas.draw()
-
+            event_ax = event.inaxes
+            if event_ax == self.axes['map'] :
+                self.cursor_xy = (event.xdata, event.ydata)
+                self.plot_cursors()
+                # Also update the cuts
+                self.plot_cuts()
+                self.canvas.draw()
+            elif event_ax == self.axes['energy'] and \
+                 self.map.get() != 'Off' :
+                if self.zscale is not None :
+                    z = np.where(self.zscale > event.xdata)[0][0]
+                else :
+                    z = int(event.xdata)
+                self.z.set(z)
+                # Since z changed we need to apply the whole data processing
+                # and replot
+                self.process_data()
+                
         def on_press(event):
             # Get the name of the pressed key and info on the current cursors
             key = event.key
