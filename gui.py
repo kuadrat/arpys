@@ -424,7 +424,11 @@ class Gui :
         self.data = datadict['data']
         self.xscale = datadict['xscale']
         self.yscale = datadict['yscale']
-        self.zscale = datadict['zscale']
+        try :
+            self.zscale = datadict['zscale']
+        except KeyError :
+            # Let zscale stay None
+            pass
 
         # Notify user of success
         self.update_status('Loaded data: {}.'.format(self.get_filename())) 
@@ -535,15 +539,21 @@ class Gui :
 
             kwargs = dict(cmap=self.get_cmap())
 
+            # Ensure zscale is defined
+            if self.zscale is None :
+                zscale = np.arange(xcut.shape[0])
+            else :
+                zscale = self.zscale
+
             # Plot x cut in upper left
             vmin, vmax = self.vminmax(xcut)
             kwargs.update(dict(vmin=vmin, vmax=vmax))
-            self.axes['cut1'].pcolormesh(self.xscale, self.zscale, xcut, 
+            self.axes['cut1'].pcolormesh(self.xscale, zscale, xcut, 
                                          **kwargs)
             # Plot y cut in lower right
             vmin, vmax = self.vminmax(ycut)
             kwargs.update(dict(vmin=vmin, vmax=vmax))
-            self.axes['cut2'].pcolormesh(self.yscale, self.zscale, ycut, 
+            self.axes['cut2'].pcolormesh(self.yscale, zscale, ycut, 
                                          **kwargs)
         else :
             z = self.z.get()
@@ -675,7 +685,7 @@ class Gui :
         # Find out whether the lower or upper 'neighbour' is closest
         x_lower = xscale[self.xind-1]
         y_lower = yscale[self.yind-1]
-        # NOTE In principle, these IndexErrors shouldn't occur. Try catch 
+        # NOTE In principle, these IndexErrors shouldn't occur. Try-except 
         # only helps when debugging.
         try :
             x_upper = xscale[self.xind]
