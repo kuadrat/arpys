@@ -598,7 +598,7 @@ def smooth_derivative(x, n_box, n_smooth) :
     res = smooth(res, n_box, n_smooth)
     return res
 
-def zero_crossings(x, direction=1) :
+def zero_crossings(x, direction=0) :
     """ Return the indices of the points where the data in x crosses 0, going 
     from positive to negative values (direction = -1), vice versa 
     (direction=1) or both (direction=0). This is detected simply by a change 
@@ -729,14 +729,14 @@ def rotate_xy(xscale, yscale, theta=45) :
                       can be used as arguments to matplotlib's pcolormesh
     """
     # Get dimensions
-    m = len(xscale)
-    n = len(yscale)
+    n = len(xscale)
+    m = len(yscale)
 
     # Create a coordinate mesh
     X, Y = np.meshgrid(xscale, yscale)
 
     # Initialize the output arrays
-    xr = np.zeros([n, m])
+    xr = np.zeros([m, n])
     yr = xr.copy()
 
     # Build the rotation matrix (convert angle to radians first)
@@ -746,11 +746,106 @@ def rotate_xy(xscale, yscale, theta=45) :
 
     # Rotate each coordinate vector and write it to the output arrays
     # NOTE there must be a more pythonic way to do this
-    for i in range(n) :
-        for j in range(m) :
+    for i in range(m) :
+        for j in range(n) :
             v = np.array([X[i,j], Y[i,j]])
             vr = v.dot(R)
             xr[i,j] = vr[0]
             yr[i,j] = vr[1]
 
     return xr, yr
+
+def symmetrize_map(kx, ky, mapdata, n_rot=4, debug=False) :
+    """ Rotate a map around its center point (Gamma) and sum the rotated maps 
+    together in order to get a symmetric picture. 
+
+    Parameters
+    ----------
+    kx          : n length array
+    ky          : m length array
+    mapdata     : (m x n) array (counterintuitive to kx and ky but consistent 
+                  with pcolormesh)
+
+    Returns
+    -------
+    symmetrized : (m x n) array; the symmetrized map
+    bottom_left : pair of int; the indices of the bottom left corner that 
+                  could be completely symmetrized (i.e. that had overlap in 
+                  all rotation stages)
+    upper_right : pair of int; same as above
+    """
+    # Create data index ranges
+    m, n = mapdata.shape
+    ms = range(m)
+    ns = range(n)
+
+    # Sort kxy and retain a copy of the original data
+    kx.sort()
+    ky.sort()
+    symmetrized = mapdata.copy()
+
+    # DEBUG: create a highly visible artifact in the data
+    if debug:
+        symmetrized[int(m/2)+15:int(m/2)+25, int(n/2)+15:int(n/2)+25] = \
+                                                      symmetrized.max()
+
+    # Rotate n_rot times
+    theta0 = 360./n_rot
+
+    bottom_left = [0, 0]
+    upper_right = [np.inf, np.inf]
+    # Small helper fcn for the size of a vector
+    # NOTE: since we will only use this on index pairs, i.e. positive 
+    # numbers, this could be simplified
+    def D(v) :
+        return np.sqrt(v[0]**2 + v[1]**2)
+
+    for i in range(1, n_rot) :
+        # Build the rotation matrix (convert angle to radians first)
+        theta = i*theta0
+        t = np.pi * theta/180.
+        R = np.array([[np.cos(t), -np.sin(t)],
+                      [np.sin(t),  np.cos(t)]])
+
+        # Reset `first` and `last` counters
+        first = []
+        last = []
+
+        for m in ms :
+            for n in ns :
+                # Rotate the k vector that points to data index m,n in the 
+                # original data by theta
+                k = np.array([kx[n], ky[m]])
+                kv = k.dot(R)
+
+                # Find the indices of rotated k vector in the data
+                # (IndexError means that the k vector lies outside the data 
+                # range)
+                try :
+                    m_ = np.where(ky >= kv[1])[0][0]
+                except IndexError :
+                    continue
+                try :
+                    n_ = np.where(kx >= kv[0])[0][0]
+                except IndexError :
+                    continue
+
+                # Add the value at the rotated k point to the original data
+                symmetrized[m, n] += mapdata[m_, n_]
+
+                # The first time we have overlap, save the data indices
+                if first == [] :
+                    first = [n, m]
+
+                # And the last time we have overlap (just keeps getting 
+                # overwritten until the last iteration)
+                last = [n, m]
+
+        # Only keep the largest `first` and smallest `last` index pairs
+        if D(bottom_left) < D(first) :
+            bottom_left = first
+        if D(upper_right) > D(last) :
+            upper_right = last
+
+    return symmetrized, bottom_left, upper_right
+
