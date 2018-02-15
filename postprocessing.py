@@ -755,23 +755,13 @@ def rotate_xy(xscale, yscale, theta=45) :
 
     return xr, yr
 
-def symmetrize_map(kx, ky, mapdata, n_rot=4, debug=False) :
+def symmetrize_map(kx, ky, mapdata, clean=False, n_rot=4, debug=False) :
     """ Rotate a map around its center point (Gamma) and sum the rotated maps 
     together in order to get a symmetric picture. 
-    The additional returns `bottom_left` and `upper_right` allow cutting off 
-    unsymmetrized parts of the map. Do this as follows:
-
-    ```
-    >>> symmetrized, bl, ur = symmetrize_map(kx, ky, mapdata)
-    >>> x0, y0 = bl
-    >>> x1, y1 = ur
-    >>> clean_map = symmetrized[y0:y1, x0:x1]
-    >>> clean_kx = kx[x0:x1]
-    >>> clean_ky = ky[y0:y1]
-    ```
-
-    The fact that x and y seem to be inconsistent is due to pcolormesh's 
-    flipping of the data.
+    The `clean` option allows to automatically cut off unsymmetrized parts and 
+    returns a data array of reduced size, containing only the points that 
+    could get fully symmetrized. In this case, kx and ky are also trimmed to 
+    the right size.
 
     Parameters
     ----------
@@ -779,14 +769,15 @@ def symmetrize_map(kx, ky, mapdata, n_rot=4, debug=False) :
     ky          : m length array
     mapdata     : (m x n) array (counterintuitive to kx and ky but consistent 
                   with pcolormesh)
+    clean       : boolean; toggle whether or not to cut off unsymmetrized parts
 
     Returns
     -------
-    symmetrized : (m x n) array; the symmetrized map
-    bottom_left : pair of int; the indices of the bottom left corner that 
-                  could be completely symmetrized (i.e. that had overlap in 
-                  all rotation stages)
-    upper_right : pair of int; same as above
+    kx, ky      : if `clean` is False, these are the same as the input kx and 
+                  ky. If `clean` is True the arrays are cut to the right size
+    symmetrized : 2D array; the symmetrized map. Either it has shape (m x n) 
+                  `clean` is False) or smaller, depending on how much could 
+                  be symmetrized.
     """
     # Create data index ranges
     m, n = mapdata.shape
@@ -806,13 +797,16 @@ def symmetrize_map(kx, ky, mapdata, n_rot=4, debug=False) :
     # Rotate n_rot times
     theta0 = 360./n_rot
 
-    bottom_left = [0, 0]
-    upper_right = [np.inf, np.inf]
-    # Small helper fcn for the size of a vector
-    # NOTE: since we will only use this on index pairs, i.e. positive 
-    # numbers, this could be simplified
-    def D(v) :
-        return np.sqrt(v[0]**2 + v[1]**2)
+    # If we want to cut off unsymmetrized parts, we have to keep track of 
+    # what area of the original data gets properly symmetrized.
+    if clean :
+        bottom_left = [0, 0]
+        upper_right = [np.inf, np.inf]
+        # Small helper fcn for the size of a vector
+        # NOTE: since we will only use this on index pairs, i.e. positive 
+        # numbers, this could be simplified
+        def D(v) :
+            return np.sqrt(v[0]**2 + v[1]**2)
 
     for i in range(1, n_rot) :
         # Build the rotation matrix (convert angle to radians first)
@@ -822,8 +816,9 @@ def symmetrize_map(kx, ky, mapdata, n_rot=4, debug=False) :
                       [np.sin(t),  np.cos(t)]])
 
         # Reset `first` and `last` counters
-        first = []
-        last = []
+        if clean :
+            first = []
+            last = []
 
         for m in ms :
             for n in ns :
@@ -847,19 +842,31 @@ def symmetrize_map(kx, ky, mapdata, n_rot=4, debug=False) :
                 # Add the value at the rotated k point to the original data
                 symmetrized[m, n] += mapdata[m_, n_]
 
-                # The first time we have overlap, save the data indices
-                if first == [] :
-                    first = [n, m]
+                if clean :
+                    # The first time we have overlap, save the data indices
+                    if first == [] :
+                        first = [n, m]
 
-                # And the last time we have overlap (just keeps getting 
-                # overwritten until the last iteration)
-                last = [n, m]
+                    # And the last time we have overlap (just keeps getting 
+                    # overwritten until the last iteration)
+                    last = [n, m]
+        # End of m and n loops
 
-        # Only keep the largest `first` and smallest `last` index pairs
-        if D(bottom_left) < D(first) :
-            bottom_left = first
-        if D(upper_right) > D(last) :
-            upper_right = last
+        if clean :
+            # Only keep the largest `first` and smallest `last` index pairs
+            if D(bottom_left) < D(first) :
+                bottom_left = first
+            if D(upper_right) > D(last) :
+                upper_right = last
+    # End of i loop
 
-    return symmetrized, bottom_left, upper_right
+    # Cut off unsymmetrized parts of the data and kx, ky
+    if clean :
+        x0, y0 = bottom_left
+        x1, y1 = upper_right
+        symmetrized = symmetrized[y0:y1, x0:x1]
+        kx = kx[x0:x1]
+        ky = ky[y0:y1]
+
+    return kx, ky, symmetrized
 
