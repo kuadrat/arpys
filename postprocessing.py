@@ -758,6 +758,20 @@ def rotate_xy(xscale, yscale, theta=45) :
 def symmetrize_map(kx, ky, mapdata, n_rot=4, debug=False) :
     """ Rotate a map around its center point (Gamma) and sum the rotated maps 
     together in order to get a symmetric picture. 
+    The additional returns `bottom_left` and `upper_right` allow cutting off 
+    unsymmetrized parts of the map. Do this as follows:
+
+    ```
+    >>> symmetrized, bl, ur = symmetrize_map(kx, ky, mapdata)
+    >>> x0, y0 = bl
+    >>> x1, y1 = ur
+    >>> clean_map = symmetrized[y0:y1, x0:x1]
+    >>> clean_kx = kx[x0:x1]
+    >>> clean_ky = ky[y0:y1]
+    ```
+
+    The fact that x and y seem to be inconsistent is due to pcolormesh's 
+    flipping of the data.
 
     Parameters
     ----------
