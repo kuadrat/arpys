@@ -1,0 +1,98 @@
+#!/usr/bin/python
+
+import argparse
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.ndimage.filters import laplace
+
+import dataloaders as dl
+import postprocessing as pp
+#import kustom.plotting as kplot
+
+# Set up parser
+# ==============================================================================
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('filename', type=str,
+                   help='Name of the data file of which to apply ang2k \
+                    conversion')
+
+parser.add_argument('-x', '--xshift', type=float, default=0,
+                   help='How much to shift the angular scale (in its units).')
+
+parser.add_argument('-y', '--yshift', type=float, default=0,
+                   help='How much to shift the angular scale (in its units).')
+
+parser.add_argument('-l', '--lattice_constant', type=float, default=1,
+                   help='Lattice constant in Angstrom.')
+
+parser.add_argument('-i', '--index', type=int, default=0,
+                   help='Index where to take the map.')
+
+parser.add_argument('-I', '--integrate', type=int, default=5,
+                   help='Number of slices to integrate when making the map.')
+
+parser.add_argument('-t', '--theta', type=float, default=0,
+                   help='Rotation angle.')
+
+parser.add_argument('-v', '--vmax', type=float, default=1,
+                   help='Colorbar scaling percentage (0-1).')
+
+parser.add_argument('-c', '--cmap', type=str, default='bone_r',
+                   help='Name of matplotlib colormap.')
+
+args = parser.parse_args()
+
+# Load and process data
+# ==============================================================================
+datadict = dl.load_data(args.filename)
+
+data = datadict['data']
+xscale = datadict['xscale']
+yscale = datadict['yscale']
+angles = datadict['angles']
+theta = datadict['theta']
+phi = datadict['phi']
+hv = datadict['hv']
+E_b = datadict['E_b']
+
+kx, foo = pp.angle_to_k(xscale, theta, phi, hv, E_b, 
+                       lattice_constant=args.lattice_constant, 
+                       shift=args.xshift, degrees=True)
+
+ky, foo = pp.angle_to_k(yscale, theta=phi, phi=theta, hv=hv, E_b=E_b, 
+                       lattice_constant=args.lattice_constant, 
+                       shift=args.yshift, degrees=True)
+
+mp = pp.make_slice(data, d=0, i=args.index, integrate=args.integrate)
+
+KX, KY, sym_mp = pp.symmetrize_map(kx, ky, mp, clean=True)
+
+if args.theta :
+    kx, ky = pp.rotate_xy(kx, ky, args.theta)
+    KX, KY = pp.rotate_xy(KX, KY, args.theta)
+
+# Plotting
+# ==============================================================================
+fig, (ax0, ax1, ax2) = plt.subplots(nrows=1, ncols=3, figsize=(15,5))
+
+try :
+    cmap = plt.get_cmap(args.cmap)
+except Exception :
+    cmap = 'bone_r'
+
+vmax1 = args.vmax*mp.max()
+vmax2 = args.vmax*sym_mp.max()
+kwargs1 = dict(vmin=0, vmax=vmax1)
+kwargs2 = dict(vmin=0, vmax=vmax2)
+for kwargs in [kwargs1, kwargs2] :
+    kwargs.update(dict(cmap=cmap))
+
+ax0.pcolormesh(mp, **kwargs1)
+ax1.pcolormesh(kx, ky, mp, **kwargs1)
+ax1.grid()
+ax2.pcolormesh(KX, KY, sym_mp, **kwargs2)
+ax2.grid()
+
+plt.show()

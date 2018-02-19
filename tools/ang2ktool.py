@@ -67,7 +67,8 @@ vmax = args.vmax*data[0].max()
 cmap = args.cmap
 
 ax0.plot(angles+args.shift, kx)
-ax1.pcolormesh(xscale, yscale, data[0], vmin=0, vmax=vmax, cmap=cmap)
+ax1.pcolormesh(angles+args.shift, yscale, data[0], vmin=0, vmax=vmax, cmap=cmap)
 ax2.pcolormesh(kx, yscale, data[0], vmin=0, vmax=vmax, cmap=cmap)
+ax2.grid(axis='x')
 
 plt.show()

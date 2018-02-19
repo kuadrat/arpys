@@ -854,11 +854,15 @@ def symmetrize_map(kx, ky, mapdata, clean=False, n_rot=4, debug=False) :
 
         if clean :
             # Only keep the largest `first` and smallest `last` index pairs
-            if D(bottom_left) < D(first) :
+            if first != [] and D(bottom_left) < D(first) :
                 bottom_left = first
-            if D(upper_right) > D(last) :
+            if last != [] and D(upper_right) > D(last) :
                 upper_right = last
     # End of i loop
+
+    # In case something went wrong set bottom_left and upper right to extremals
+    if upper_right == [np.inf, np.inf] :
+        upper_right = [-1, -1]
 
     # Cut off unsymmetrized parts of the data and kx, ky
     if clean :

@@ -109,78 +109,59 @@ class Dataloader_ALS(Dataloader) :
         else :
             raise(IndexError('Neither SSX0_0 nor SFX0_0 appear in header.'))
 
+        # Starting pixel (energy scale)
+        e0 = header[pre+'X0_0']
+        # Ending pixel (energy scale)
+        e1 = header[pre+'X1_0']
+        # Pixels per eV
+        ppeV = header[pre+'PEV_0']
+        # Zero pixel (=Fermi level?)
+        fermi_level = header[pre+'KE0_0']
+
+        # Create the energy (y) scale
+        energy_binning = 2
+        energies_in_px = np.arange(e0, e1, energy_binning)
+        energies = (energies_in_px - fermi_level)/ppeV
+
+        # Starting and ending pixels (angle or ky scale)
+        y0 = header[pre+'Y0_0']
+        y1 = header[pre+'Y1_0']
+
+        # Use this arbitrary seeming conversion factor (found in Denys' 
+        # script) to get from pixels to angles
+        #deg_per_px = 0.193 / 2
+        deg_per_px = 0.193 
+        angle_binning = 2
+
+        #angles_in_px = np.arange(y0, y1, angle_binning)
+        n_y = int((y1-y0)/angle_binning)
+        angles_in_px = np.arange(0, n_y, 1)
+        # NOTE
+        # Actually, I would think that we have to multiply by 
+        # `angle_binning` to get the right result. That leads to 
+        # unreasonable results, however, and division just gives a 
+        # perfect looking output. Maybe the factor 0.193/2 from ALS has 
+        # changed with the introduction of binning?
+        #angles = angles_in_px * deg_per_px / angle_binning
+        angles = angles_in_px * deg_per_px  / angle_binning
+
+        # Case cut
         if scanmode != 'Slit Defl' :
-            # Starting pixel (energy scale)
-            p0 = header[pre+'X0_0']
-            # Ending pixel (energy scale)
-            p1 = header[pre+'X1_0']
-            # Pixels per eV
-            ppeV = header[pre+'PEV_0']
-            # Zero pixel (=Fermi level?)
-            fermi_level = header[pre+'KE0_0']
-
-            # Create the energy (y) scale
-            energy_binning = 2
-            energies_in_px = np.arange(p0, p1, energy_binning)
-            energies = (energies_in_px - fermi_level)/ppeV
-
-            # Starting and ending pixels (angle scale)
-            p0 = header[pre+'Y0_0']
-            p1 = header[pre+'Y1_0']
-
-            # Use this arbitrary seeming conversion factor (found in Denys' 
-            # script) to get from pixels to angles
-            angle_binning = 2
-            angles_in_px = np.arange(p0, p1, angle_binning)
-            deg_per_px = 0.193 / 2
-            # NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
-            # Actually, I would think that we have to multiply by 
-            # `angle_binning` to get the right result. That leads to 
-            # unreasonable results, however, and division just gives a 
-            # perfect looking output. Maybe the factor 0.193/2 from ALS has 
-            # changed with the introduction of binning?
-            angles = angles_in_px * deg_per_px / angle_binning
-
             xscale = angles
             yscale = energies
-            # For the binding energy, just take a min value as its variations 
-            # are small compared to the photon energy
-            E_b = energies.min()
             zscale = None
+        # Case map or hv scan
         else :
             x0 = header['ST_0_0']
             x1 = header['EN_0_0']
             n_x = header['N_0_0']
-            angles = np.linspace(x0, x1, n_x)
-
-            # Starting pixel (energy scale)
-            e0 = header[pre+'X0_0']
-            # Ending pixel (energy scale)
-            e1 = header[pre+'X1_0']
-            # Pixels per eV
-            ppeV = header[pre+'PEV_0']
-            # Zero pixel (=Fermi level?)
-            fermi_level = header[pre+'KE0_0']
-
-            # Create the energy (y) scale
-            energy_binning = 2
-            energies_in_px = np.arange(e0, e1, energy_binning)
-            energies = (energies_in_px - fermi_level)/ppeV
-
-            # Starting and ending pixels (ky scale) (?)
-            y0 = header[pre+'Y0_0']
-            y1 = header[pre+'Y1_0']
-
-            angle_binning = 2
-            angles_in_px = np.arange(y0, y1, angle_binning)
-            deg_per_px = 0.193 / 2
-            # NOTE See above NOTE
-            y_angles = angles_in_px * deg_per_px / angle_binning
-
-            xscale = angles
-            yscale = y_angles
+            xscale = np.linspace(x0, x1, n_x)
+            yscale = angles
             zscale = energies
-            E_b = energies.min()
+
+        # For the binding energy, just take a min value as its variations 
+        # are small compared to the photon energy
+        E_b = energies.min()
 
         # Case hv scan
         if scanmode == 'mono_eV' :
