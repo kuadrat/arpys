@@ -91,8 +91,23 @@ for kwargs in [kwargs1, kwargs2] :
 
 ax0.pcolormesh(mp, **kwargs1)
 ax1.pcolormesh(kx, ky, mp, **kwargs1)
-ax1.grid()
 ax2.pcolormesh(KX, KY, sym_mp, **kwargs2)
-ax2.grid()
+
+
+# Define cornerpoints for diagonals 
+c = 1
+diag_kwargs = dict(color='gray', ls = '--', lw=1)
+
+# Plot lines at sqrt(2)/2 which can help in orienting
+rt2 = np.sqrt(2)/2
+ax1.plot([-rt2, -rt2], [-1, 1], **diag_kwargs)
+ax1.plot([rt2, rt2], [-1, 1], **diag_kwargs)
+
+for ax in ax1, ax2 :
+    # Plot some diagonals
+    ax.plot([-c, c], [-c, c], **diag_kwargs)
+    ax.plot([-c, c], [c, -c], **diag_kwargs)
+    ax.set_xticks([-1, -0.5, 0, 0.5, 1])
+    ax.grid()
 
 plt.show()

@@ -67,6 +67,9 @@ class Dataloader_ALS(Dataloader) :
     beamline at ALS, Berkely which is in .fits format. 
     """
     name = 'ALS'
+    # A factor required to reach a reasonable result for the k space 
+    # coordinates 
+    k_stretch = 1.05
 
     def __init__(self, work_func=4) :
         # Assign a value for the work function
@@ -130,7 +133,7 @@ class Dataloader_ALS(Dataloader) :
         # Use this arbitrary seeming conversion factor (found in Denys' 
         # script) to get from pixels to angles
         #deg_per_px = 0.193 / 2
-        deg_per_px = 0.193 
+        deg_per_px = 0.193 * self.k_stretch
         angle_binning = 2
 
         #angles_in_px = np.arange(y0, y1, angle_binning)
@@ -155,7 +158,7 @@ class Dataloader_ALS(Dataloader) :
             x0 = header['ST_0_0']
             x1 = header['EN_0_0']
             n_x = header['N_0_0']
-            xscale = np.linspace(x0, x1, n_x)
+            xscale = np.linspace(x0, x1, n_x) * self.k_stretch
             yscale = angles
             zscale = energies
 
