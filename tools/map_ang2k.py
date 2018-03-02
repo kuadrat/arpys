@@ -67,7 +67,7 @@ ky, foo = pp.angle_to_k(yscale, theta=phi, phi=theta, hv=hv, E_b=E_b,
 
 mp = pp.make_slice(data, d=0, i=args.index, integrate=args.integrate)
 
-KX, KY, sym_mp = pp.symmetrize_map(kx, ky, mp, clean=True)
+KX, KY, sym_mp = pp.symmetrize_map(kx, ky, mp, clean=True, debug=False)
 
 if args.theta :
     kx, ky = pp.rotate_xy(kx, ky, args.theta)

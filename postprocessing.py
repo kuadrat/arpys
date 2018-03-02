@@ -713,6 +713,14 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
 # | Various | # ================================================================
 # +---------+ #
 
+def rotation_matrix(theta) :
+    """ Return the 2x2 rotation matrix for an angle theta (in degrees). """
+    # Build the rotation matrix (convert angle to radians first)
+    t = np.pi * theta/180.
+    R = np.array([[np.cos(t), -np.sin(t)],
+                  [np.sin(t),  np.cos(t)]])
+    return R
+
 def rotate_xy(xscale, yscale, theta=45) :
     """
     Rotate the x and y cooridnates of rectangular 2D data by angle theta.
@@ -740,9 +748,7 @@ def rotate_xy(xscale, yscale, theta=45) :
     yr = xr.copy()
 
     # Build the rotation matrix (convert angle to radians first)
-    t = np.pi * theta/180.
-    R = np.array([[np.cos(t), -np.sin(t)],
-                  [np.sin(t),  np.cos(t)]])
+    R = rotation_matrix(theta)
 
     # Rotate each coordinate vector and write it to the output arrays
     # NOTE there must be a more pythonic way to do this
@@ -756,12 +762,15 @@ def rotate_xy(xscale, yscale, theta=45) :
     return xr, yr
 
 def symmetrize_map(kx, ky, mapdata, clean=False, n_rot=4, debug=False) :
-    """ Rotate a map around its center point (Gamma) and sum the rotated maps 
-    together in order to get a symmetric picture. 
+    """ Apply all valid symmetry operations (rotation around 90, 180, 270 
+    degrees, mirror along x=0, y=0, y=x and y=-x axis) to a map and sum their 
+    results together in order to get a symmetric picture. 
     The `clean` option allows to automatically cut off unsymmetrized parts and 
     returns a data array of reduced size, containing only the points that 
     could get fully symmetrized. In this case, kx and ky are also trimmed to 
     the right size.
+    This functions implements a couple of optimizations, leading to slightly 
+    more complicated but faster running code.
 
     Parameters
     ----------
@@ -780,9 +789,9 @@ def symmetrize_map(kx, ky, mapdata, clean=False, n_rot=4, debug=False) :
                   be symmetrized.
     """
     # Create data index ranges
-    m, n = mapdata.shape
-    ms = range(m)
-    ns = range(n)
+    M, N = mapdata.shape
+    ms = range(M)
+    ns = range(N)
 
     # Sort kxy and retain a copy of the original data
     kx.sort()
@@ -791,83 +800,97 @@ def symmetrize_map(kx, ky, mapdata, clean=False, n_rot=4, debug=False) :
 
     # DEBUG: create a highly visible artifact in the data
     if debug:
-        symmetrized[int(m/2)+15:int(m/2)+25, int(n/2)+15:int(n/2)+25] = \
-                                                      symmetrized.max()
+        mapdata[int(M/2)+15:int(M/2)+25, int(N/2)+15:int(N/2)+25] = \
+                                                      2*symmetrized.max()
 
-    # Rotate n_rot times
+    # Define all symmetry operations, starting with the rotations
+    transformations = []
+    # Rotate n_rot-1 times
     theta0 = 360./n_rot
-
-    # If we want to cut off unsymmetrized parts, we have to keep track of 
-    # what area of the original data gets properly symmetrized.
-    if clean :
-        bottom_left = [0, 0]
-        upper_right = [np.inf, np.inf]
-        # Small helper fcn for the size of a vector
-        # NOTE: since we will only use this on index pairs, i.e. positive 
-        # numbers, this could be simplified
-        def D(v) :
-            return np.sqrt(v[0]**2 + v[1]**2)
-
     for i in range(1, n_rot) :
-        # Build the rotation matrix (convert angle to radians first)
         theta = i*theta0
-        t = np.pi * theta/180.
-        R = np.array([[np.cos(t), -np.sin(t)],
-                      [np.sin(t),  np.cos(t)]])
+        R = rotation_matrix(theta)
+        transformations.append(R)
+    
+    # Define the mirror transformation matrices
+    # Mirror along x=0 axis
+    Mx = np.array([[ 1,  0],
+                   [ 0, -1]])
+    # Mirror along y=0 axis
+    My = np.array([[-1,  0],
+                   [ 0,  1]])
+    # Mirrors along diagonals y=x and y=-x
+    # The diagonal reflections are a combinaton of rotation by 90 deg and 
+    # reflections
+    R90 = rotation_matrix(90)
+    Mxy = Mx.dot(R90)
+    Myx = My.dot(R90)
+    for T in Mx, My, Mxy, Myx :
+        transformations.append(T)
 
-        # Reset `first` and `last` counters
+    # Create original k vectors and index arrays (index arrays make np.array 
+    # assignments significantly faster compared to assignments in a loop)
+    K = []
+    MS = []
+    NS = []
+    for i,x in enumerate(kx) :
+        for j,y in enumerate(ky) :
+            K.append([x, y])
+            MS.append(j)
+            NS.append(i)
+    # Transpose to get a `np.dot()-able` shape
+    K = np.array(K).transpose()
+    MS = np.array(MS, dtype=int)
+    NS = np.array(NS, dtype=int)
+
+    # Initialize bottom left and top right k vectors
+    if clean :
+        kxmin = -np.inf
+        kxmax = np.inf
+        kymin = -np.inf
+        kymax = np.inf
+
+    for T in transformations :
+        # Transform all k vectors at once
+        KV = np.dot(T, K)
+
+        # Initialize new index arrays. searchsorted finds at which index one 
+        # would have to insert a given value into the given array -> MS_, NS_ 
+        # are lists of indices
+        MS_ = np.searchsorted(ky, KV[1])
+        NS_ = np.searchsorted(kx, KV[0])
+        # Set out-of-bounds regions to the actual indices
+        where_m = (MS_ >= M) | (MS_ <= 0)
+        where_n = (NS_ >= N) | (NS_ <= 0)
+        MS_[where_m] = MS[where_m]
+        NS_[where_n] = NS[where_n]
+
+        # Add the transformed map to the original
+        symmetrized[MS, NS] += mapdata[MS_, NS_]
+
+        # Keep track of min and max k vectors
         if clean :
-            first = []
-            last = []
+            # Get the still in-bound (ib) kx and ky components. `~` is the 
+            # bitwise `not` operator
+            kxs_ib = KV[0,~where_n]
+            kys_ib = KV[1,~where_m]
+            new_kxmin = kxs_ib.min()
+            new_kxmax = kxs_ib.max()
+            new_kymin = kys_ib.min()
+            new_kymax = kys_ib.max()
+            kxmin = new_kxmin if new_kxmin > kxmin else kxmin
+            kymin = new_kymin if new_kymin > kymin else kymin
+            kxmax = new_kxmax if new_kxmax < kxmax else kxmax
+            kymax = new_kymax if new_kymax < kymax else kymax
 
-        for m in ms :
-            for n in ns :
-                # Rotate the k vector that points to data index m,n in the 
-                # original data by theta
-                k = np.array([kx[n], ky[m]])
-                kv = k.dot(R)
-
-                # Find the indices of rotated k vector in the data
-                # (IndexError means that the k vector lies outside the data 
-                # range)
-                try :
-                    m_ = np.where(ky >= kv[1])[0][0]
-                except IndexError :
-                    continue
-                try :
-                    n_ = np.where(kx >= kv[0])[0][0]
-                except IndexError :
-                    continue
-
-                # Add the value at the rotated k point to the original data
-                symmetrized[m, n] += mapdata[m_, n_]
-
-                if clean :
-                    # The first time we have overlap, save the data indices
-                    if first == [] :
-                        first = [n, m]
-
-                    # And the last time we have overlap (just keeps getting 
-                    # overwritten until the last iteration)
-                    last = [n, m]
-        # End of m and n loops
-
-        if clean :
-            # Only keep the largest `first` and smallest `last` index pairs
-            if first != [] and D(bottom_left) < D(first) :
-                bottom_left = first
-            if last != [] and D(upper_right) > D(last) :
-                upper_right = last
-    # End of i loop
-
-    # In case something went wrong set bottom_left and upper right to extremals
-    if upper_right == [np.inf, np.inf] :
-        upper_right = [-1, -1]
+    # End of T loop
 
     # Cut off unsymmetrized parts of the data and kx, ky
     if clean :
-        x0, y0 = bottom_left
-        x1, y1 = upper_right
+        x0 = np.searchsorted(kx, kxmin)
+        x1 = np.searchsorted(kx, kxmax)
+        y0 = np.searchsorted(ky, kymin)
+        y1 = np.searchsorted(ky, kymax)
         symmetrized = symmetrized[y0:y1, x0:x1]
         kx = kx[x0:x1]
         ky = ky[y0:y1]
