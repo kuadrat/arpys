@@ -1,19 +1,20 @@
 #!/usr/bin/python
-from datetime import datetime
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
+
 #import matplotlib.backends.backend_tkagg as tkagg
-from matplotlib import rcParams
-from matplotlib.pyplot import get_cmap
 import numpy as np
 import re
 import tkinter as tk
-from tkinter.filedialog import askopenfilename
+from datetime import datetime
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+from matplotlib import rcParams
+from matplotlib.pyplot import get_cmap
+from tkinter.filedialog import askopenfilename, asksaveasfilename
 
 from dataloaders import *
 import dataloaders as dl
-import postprocessing as pp
 import kustom.plotting as kplot
+import postprocessing as pp
 
 # +------------+ #
 # | Parameters | # =============================================================
@@ -24,6 +25,9 @@ PLOT_SPACING = 0.02
 
 # Backgroundcolor of plot
 BGCOLOR = "black"
+
+# Plot resolution when saving to png
+DPI = 150
 
 # Length of sliders
 SLIDER_LENGTH = 200
@@ -59,6 +63,7 @@ CMAPS = ['viridis', 'Greys', 'bone', 'summer', 'plasma', 'inferno', 'magma', \
 HEIGHT = 6.5
 WIDTH = 1.2*HEIGHT
 FIGSIZE = (WIDTH, HEIGHT)
+VFIGSIZE = FIGSIZE
 
 # Set the font size for plot labels, titles, etc.
 FONTSIZE = 10
@@ -90,6 +95,14 @@ class Gui :
     """
     A tkinter GUI to quickly visualize ARPES data, i.e. cuts and maps. Should 
     be built in a modular fashion such that any data reader can be 'plugged in'.
+
+    data      : 3D array; the raw data from the selected file.
+    pp_data   : 3D array; the postprocessed data to be displayed.
+    cmaps     : list of str; a list of available matplotlib colormap names.
+    xscale, yscale, zscale
+              : 1D arrays; the x, y and z-axis data.
+    cursor_xy : tuple; current location of the cursor in the bottom left plot.
+    dpi       : int; resolution at which to save .png`s.
     """
     data = STARTUP_DATA
     pp_data = STARTUP_DATA.copy()
@@ -98,6 +111,7 @@ class Gui :
     yscale = None
     zscale = None
     cursor_xy = None
+    dpi = DPI
 
     def __init__(self, master, filename=None) :
         """ This init function mostly just calls all 'real' initialization 
@@ -168,6 +182,9 @@ class Gui :
         self.cmap_dropdown.grid(row=PLOTROW + 1, column=right_of_plot + 1)
         self.invert_cmap_checkbutton.grid(row=PLOTROW + 1, column=right_of_plot + 2)
 
+        # Save png button
+        self.save_button.grid(row=PLOTROW + 2, column=right_of_plot + 1)
+
         # z slider
         self.z_slider.grid(row=PLOTROW, column=0)
 
@@ -192,11 +209,15 @@ class Gui :
         self.filepath = tk.StringVar()
         self.path_field = tk.Entry(master, textvariable=self.filepath)
 
-        # Finally, also add inc and decrement buttons
+        # Also add inc and decrement buttons
         self.increment_button = tk.Button(master, text='>',
                                           command=lambda : self.increment('+')) 
         self.decrement_button = tk.Button(master, text='<',
                                           command=lambda : self.increment('-')) 
+
+        # Add a 'save' button for creating png s
+        self.save_button = tk.Button(master, text='Save png', 
+                                     command=self.save_plot)
 
     def _set_up_pp_selectors(self, master) :
         """ Create radiobuttons for the selction of postprocessing methods. 
@@ -236,6 +257,11 @@ class Gui :
         ax_cut2 = fig.add_subplot(224)
         ax_map = fig.add_subplot(223)#, sharex=ax_cut1, sharey=ax_cut2)
         ax_energy = fig.add_subplot(222)
+
+        # Virtual figure and ax for creation of png's
+        self.vfig = Figure(figsize=VFIGSIZE)
+        vax = self.vfig.add_subplot(111)
+        self.vcanvas = FigureCanvasTkAgg(self.vfig, master=master)
         
         # Remove padding between min and max of data and plot border
         ax_cut2.set_ymargin(0)
@@ -251,7 +277,8 @@ class Gui :
         self.axes = {'cut1': ax_cut1,
                      'cut2': ax_cut2,
                      'map': ax_map,
-                     'energy': ax_energy}
+                     'energy': ax_energy,
+                     'vax': vax}
 
         # Set bg color
         for ax in self.axes.values() :
@@ -601,6 +628,10 @@ class Gui :
         # Do the actual plotting with just defined args and kwargs
         self.axes['map'].pcolormesh(*args, **kwargs)
 
+        # Plot the same thing into a virtual figure such that a png can be 
+        # created
+        self.axes['vax'].pcolormesh(*args, **kwargs)
+
         # Update the cursors (such that they are above the pcolormesh) and cuts
         self.plot_cursors()
         self.plot_cuts()
@@ -808,6 +839,16 @@ class Gui :
 
         # Inititate the cursors
         self.plot_cursors()
+
+    def save_plot(self) :
+        """ Save a png image of the currently plotted data (only what is in 
+        bottom left) """
+        filename = asksaveasfilename()
+        if filename :
+            self.vfig.savefig(filename, transparent=True, dpi=self.dpi)
+            self.update_status('Saved file {}.'.format(filename))
+        else :
+            self.update_status('Saving file aborted.')
 
 # +------+ #
 # | Main | # ===================================================================
