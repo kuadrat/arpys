@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """
 Provides several Dataloader objects which open different kinds of data files 
 - typically acquired at different sources - and crunch them into the same 
@@ -333,11 +334,12 @@ class Dataloader_PSI(Dataloader) :
             N_E = y
             z = shape[2]
             # Reshape data
-            new_data = np.zeros([z, x, y])
-            for i in range(z) :
-                cut = data[:,:,i]
-                new_data[i] = cut
-            data = new_data
+            #new_data = np.zeros([z, x, y])
+            #for i in range(z) :
+            #    cut = data[:,:,i]
+            #    new_data[i] = cut
+            #data = new_data
+            data = np.rollaxis(data, 2, 0)
             # Extract the limits
             xlims = attributes['Axis1.Scale']
             ylims = attributes['Axis0.Scale']
@@ -380,6 +382,89 @@ class Dataloader_PSI(Dataloader) :
         end = start + (nstep+1)*step
         return np.linspace(start, end, nstep)
 
+class Dataloader_ADRESS(Dataloader) :
+   """ ADRESS beamline at SLS, PSI. """
+   name = 'ADRESS'
+
+   def load_data(self, filename) :
+        h5file = h5py.File(filename, 'r')
+        # The actual numbers are in the field: 'Matrix'
+        matrix = h5file['Matrix']
+
+        #PSI The scales can be extracted from the matrix' attributes
+        scalings = matrix.attrs['IGORWaveScaling']
+        units = matrix.attrs['IGORWaveUnits']
+        info = matrix.attrs['IGORWaveNote']
+
+        # Convert `units` and `info`, which is a bytestring of ASCII 
+        # characters, to lists of strings
+        metadata = info.decode('ASCII').split('\n')
+        units = [b.decode('ASCII') for b in units[0]]
+
+        data = np.array(matrix)
+        shape = data.shape
+
+        # Fcn to build the x, y (, z) ranges (maybe outsource this fcn 
+        # definition)
+        def start_step_n(start, step, n) :
+            """ Return an array that starts at value `start` and goes `n` 
+            steps of `step`. """
+            end = start + n*step
+            return np.arange(start, end, step)
+
+        # 'IGORWaveUnits' contains a list of the form 
+        # ['', 'degree', 'eV', units[3]]. The first three elements should 
+        # always be the same, but the third one may vary or not even exist. 
+        # Use this to determine the scan type.
+        # Convert to np.array bring it in the shape the gui expects, which is 
+        # [energy/hv/z, kparallel/x, kperpendicular/y] and prepare the x,y,z 
+        # scales
+        # Note: `scalings` is a 3/4 by 2 array where every line contains a 
+        # (step, start) pair
+        # Case cut
+        if len(units) == 3 :
+            # Make data 3-dimensional by adding an empty dimension
+            data = data.reshape(1, shape[0], shape[1])
+            data = np.rollaxis(data, 2, 1)
+            # Shape has changed                                   
+            shape = data.shape
+            xstep, xstart = scalings[2]
+            ystep, ystart = scalings[1]
+            zscale = None
+        # Case map or hv scan (or...?)
+        else :
+            data = np.rollaxis(data, 1, 0)
+            # Shape has changed                                   
+            shape = data.shape
+            xstep, xstart = scalings[3]
+            ystep, ystart = scalings[2]
+            zstep, zstart = scalings[1]
+            zscale = start_step_n(zstart, zstep, shape[0])
+
+        xscale = start_step_n(xstart, xstep, shape[2])
+        yscale = start_step_n(ystart, ystep, shape[1])
+
+        # Get some metadata for ang2k conversion
+        hv = metadata[0]
+        theta = metadata[8]
+        phi = metadata[10]
+        angles = xscale
+        # For the binding energy just take the minimum of the energies
+        E_b = yscale.min()
+
+        res = {
+               'data': data,
+               'xscale': xscale,
+               'yscale': yscale,
+               'zscale': zscale,
+               'angles': angles,
+               'theta': theta,
+               'phi': phi,
+               'E_b': E_b,
+               'hv': hv
+              }
+        return res
+
 # +-------+ #
 # | Tools | # ==================================================================
 # +-------+ #
@@ -387,13 +472,16 @@ class Dataloader_PSI(Dataloader) :
 # List containing all reasonably defined dataloaders
 all_dls = [
            Dataloader_PSI,
+           Dataloader_ADRESS,
            Dataloader_ALS,
            Dataloader_Pickle
           ]
 
 # Function to try all dataloaders in all_dls
 def load_data(filename, exclude=None) :
-    """ Pass """
+    """ Try to load some dataset 'filename' by iterating through `all_dls` 
+    and appliyng the respective dataloader's load_data method. If it works: 
+    great. If not, try with the next dataloader. """
     # If only a single string is given as exclude, pack it into a list
     if exclude is not None and type(exclude)==str :
         exclude = [exclude]
@@ -432,5 +520,24 @@ def load_data(filename, exclude=None) :
 
     raise Exception('Could not load data {}.'.format(filename))
 
-        
-        
+# +---------+ #
+# | Testing | # ================================================================
+# +---------+ #
+
+if __name__ == '__main__' :
+#    sis = Dataloader_PSI()
+#    path = '/home/kevin/qmap/experiments/2017_10_PSI/Tl2201/Tl_1_0003.h5'
+#    datadict = sis.load_data(path)
+#    print(datadict['data'].shape)
+#    print(datadict['xscale'].shape)
+#    print(datadict['yscale'].shape)
+    adress = Dataloader_ADRESS()
+    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/003_quickmap_540eV.h5'
+    datadict = adress.load_data(path)
+
+    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/002_quick_kz_350to800.h5'
+    datadict = adress.load_data(path)
+
+    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/014_HSscan_nodal_428eV.h5'
+    datadict = adress.load_data(path)
+    
