@@ -2,6 +2,7 @@
 
 #import matplotlib.backends.backend_tkagg as tkagg
 import numpy as np
+import os
 import re
 import tkinter as tk
 from datetime import datetime
@@ -33,7 +34,7 @@ DPI = 150
 SLIDER_LENGTH = 200
 
 # Number of entries allowed in colormap sliders (starts from 0)
-CM_SLIDER_RESOLUTION = 99
+CM_SLIDER_RESOLUTION = 49
 
 # Postprocessing functions dicts
 MAP = { 'map' : None }
@@ -57,7 +58,7 @@ for D in PP_DICTS :
     D.update({'Off' : None})
 
 # Available matplotlib colormaps
-CMAPS = ['viridis', 'Greys', 'bone', 'summer', 'plasma', 'inferno', 'magma', \
+CMAPS = ['Blues', 'viridis', 'Greys', 'bone', 'summer', 'plasma', 'inferno', 'magma', \
          'nipy_spectral', 'BrBG', 'YlGnBu', 'PuBuGn', 'PuRd', 'rainbow_light']
 # Size of the plot in inches (includes labels and title etc)
 HEIGHT = 6.5
@@ -87,6 +88,10 @@ intensity_kwargs = dict(linewidth=1,
 intensity_cursor_kwargs = dict(linewidth=1,
                                color='r')
 
+# Filename endings which indicate that the file is clearly not an ARPES data 
+# file (which typically end in .h5, .fits, .pickle)
+SKIPPABLE = ['txt', 'zip']
+
 # +------------+ #
 # | GUI Object | # =============================================================
 # +------------+ #
@@ -96,7 +101,8 @@ class Gui :
     A tkinter GUI to quickly visualize ARPES data, i.e. cuts and maps. Should 
     be built in a modular fashion such that any data reader can be 'plugged in'.
 
-    data      : 3D array; the raw data from the selected file.
+    data      : 3D array; the raw data from the selected file. This is 
+                expected to be in the shape (z, x, y) (z may be equal to 1)
     pp_data   : 3D array; the postprocessed data to be displayed.
     cmaps     : list of str; a list of available matplotlib colormap names.
     xscale, yscale, zscale
@@ -211,9 +217,9 @@ class Gui :
 
         # Also add inc and decrement buttons
         self.increment_button = tk.Button(master, text='>',
-                                          command=lambda : self.increment('+')) 
+                                          command=lambda : self.increment(1)) 
         self.decrement_button = tk.Button(master, text='<',
-                                          command=lambda : self.increment('-')) 
+                                          command=lambda : self.increment(-1)) 
 
         # Add a 'save' button for creating png s
         self.save_button = tk.Button(master, text='Save png', 
@@ -354,54 +360,51 @@ class Gui :
         self.status_label = tk.Label(textvariable=self.status, justify=tk.LEFT,
                                     anchor='w')
 
+    def update_z_slider(self, state) :
+        """ Change the relief of the z slider to indicate that it is 
+        inactive/active. Also update the z slider range"""
+        if state == 'active' :
+            config = dict(sliderrelief='raised', showvalue=1)
+        else :
+            config = dict(sliderrelief='flat', showvalue=0)
+        self.zmax.set( len(self.data) - 1) 
+        config.update(dict(to=self.zmax.get()))
+        self.z_slider.config(**config)
+
     def get_filename(self) :
         """ Return the filename (without path) of the currently selected 
         file. """
         return self.filepath.get().split('/')[-1]
 
     def increment(self, plusminus) :
-        """ Raise or lower the filename by one. This assumes a filename of 
-        the form <FILENAME>XXXX<SUFFIX> where XXXX is the four digit ID 
-        number of the file which is being in- or decremented.
-        """
-        old_filename = self.filepath.get()
+        # Get the path and the name of the current file
+        filepath = self.filepath.get()
+        split = filepath.split('/')
+        # If just a filename is given, assume the current directory
+        if filepath[0] is not '/' :
+            path = './'
+        else :
+            path = '/' + '/'.join(split[:-1]) + '/'
 
-        # Search from the back of the string (thus reversed) for a sequence 
-        # of four digits
-        found = re.search('\d\d\d\d', old_filename[::-1])
+        old_filename = split[-1]
+        
+        # Get a list of the files in the current directory
+        dir_content = sorted( os.listdir(path) )
+        dir_size = len(dir_content)
 
-        if not found : 
-            message = 'Could not find sequence of four digits in filename.'
-            self.update_status(message)
-            return
+        # Get the index of the current file in the directory 
+        index = dir_content.index(old_filename)
 
-        # Because the string was inverted, start end stop indexes are swapped 
-        # and negative
-        start = -found.end()
-        end = -found.start()
-
-        # Get the old string and value and raise/lower it
-        old_string = old_filename[start:end]
-        n = int(old_string)
-
-        if plusminus == '+' :
-            n += 1
-        elif plusminus == '-' :
-            # Don't lower when we are already at 0000
-            if n > 0 :
-                n -= 1
-            elif n <= 0 :
-                return
-
-        # Convert back to string of four digits
-        new_string = '{:>04.0f}'.format(n)
-
-        # Split the filepath and replace the correct parts
-        prefix = old_filename[:start]
-        tail = old_filename[start:]
-        new_tail = tail.replace(old_string, new_string)
-
-        self.filepath.set(prefix + new_tail)
+        # Raise/lower the index until a not-obiously skippable entry is found
+        while True :
+            index += plusminus
+            # Cycle through the list
+            index %= dir_size
+            new_filename = dir_content[index]
+            suffix = new_filename.split('.')[-1]
+            if suffix not in SKIPPABLE :
+                self.filepath.set(path+new_filename)
+                break
 
     def update_status(self, status=DEFAULT_STATUS) :
         """ Update the status StringVar with the current time and the given
@@ -454,15 +457,19 @@ class Gui :
         try :
             self.zscale = datadict['zscale']
         except KeyError :
-            # Let zscale stay None
+            # Set zscale to None
+            self.zscale = None
             pass
 
         # Notify user of success
         self.update_status('Loaded data: {}.'.format(self.get_filename())) 
 
-        # Update the max z value
-        self.zmax.set( len(self.data) - 1) 
-        self.z_slider.config(to=self.zmax.get())
+        # Update the max z value/toggle z slider (should better be handled in 
+        # background by tkinter)
+        if self.data.shape[0] == 1 :
+            self.update_z_slider('disabled')
+        else :
+            self.update_z_slider('active')
 
         # Initiate new cursors
         self.cursor_xy = None
@@ -575,12 +582,12 @@ class Gui :
             # Plot x cut in upper left
             vmin, vmax = self.vminmax(xcut)
             kwargs.update(dict(vmin=vmin, vmax=vmax))
-            self.axes['cut1'].pcolormesh(self.xscale, zscale, xcut, 
+            self.axes['cut1'].pcolormesh(xscale, zscale, xcut, 
                                          **kwargs)
             # Plot y cut in lower right
             vmin, vmax = self.vminmax(ycut)
             kwargs.update(dict(vmin=vmin, vmax=vmax))
-            self.axes['cut2'].pcolormesh(self.yscale, zscale, ycut, 
+            self.axes['cut2'].pcolormesh(yscale, zscale, ycut, 
                                          **kwargs)
         else :
             z = self.z.get()
@@ -865,5 +872,10 @@ def start_gui(filename=None) :
     root.mainloop()
 
 if __name__ == '__main__' :
-    start_gui()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('filename', nargs='?', default=None)
+    args = parser.parse_args()
+    
+    start_gui(args.filename)
 

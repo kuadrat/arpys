@@ -26,6 +26,7 @@ TODO:
 X DONE Have all dataloaders load angles->k conversion metadata
 
 6.02.2018
+X DONE
 Fixed Dataloader_ALS very crudely with the ugliest of code. Need to clean up 
 as soon as I get to it.
 To problem to be fixed was that some maps (quick maps) use the keys `SFXXX` 
