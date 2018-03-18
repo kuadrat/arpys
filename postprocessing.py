@@ -335,10 +335,11 @@ def subtract_bg_fermi(data, n=10, ef=None, ef_index=None) :
     """
     # Reshape input
     shape = data.shape
-    if len(shape)==3 :
+    d = len(shape)
+    if d == 3 :
         l = shape[1] 
         m = shape[2]
-        data = data.reshape([l,m])
+        data = data.reshape([l, m])
     else :
         l = shape[0]
         m = shape[1]
@@ -361,6 +362,9 @@ def subtract_bg_fermi(data, n=10, ef=None, ef_index=None) :
 
         # Subtract the background (this updates the data array in place)
         edc -= bg
+
+    if d==3 :
+        data = data.reshape([1, l, m])
          
     return data
 
@@ -384,7 +388,8 @@ def subtract_bg_matt(data, n=5) :
     """
     # Reshape input
     shape = data.shape
-    if len(shape)==3 :
+    d = len(shape)
+    if d == 3 :
         l = shape[1] 
         m = shape[2]
         data = data.reshape([l,m])
@@ -409,6 +414,9 @@ def subtract_bg_matt(data, n=5) :
         # Subtract the background (this updates the data array in place)
         mdc -= bg
      
+    if d == 3 :
+        data = data.reshape([1, l, m])
+
     return data
 
 def subtract_bg_gold(data) :
@@ -761,7 +769,8 @@ def rotate_xy(xscale, yscale, theta=45) :
 
     return xr, yr
 
-def symmetrize_map(kx, ky, mapdata, clean=False, n_rot=4, debug=False) :
+def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4, 
+                   debug=False) :
     """ Apply all valid symmetry operations (rotation around 90, 180, 270 
     degrees, mirror along x=0, y=0, y=x and y=-x axis) to a map and sum their 
     results together in order to get a symmetric picture. 
@@ -850,6 +859,9 @@ def symmetrize_map(kx, ky, mapdata, clean=False, n_rot=4, debug=False) :
         kymin = -np.inf
         kymax = np.inf
 
+    if overlap :
+        product = 0
+
     for T in transformations :
         # Transform all k vectors at once
         KV = np.dot(T, K)
@@ -862,11 +874,16 @@ def symmetrize_map(kx, ky, mapdata, clean=False, n_rot=4, debug=False) :
         # Set out-of-bounds regions to the actual indices
         where_m = (MS_ >= M) | (MS_ <= 0)
         where_n = (NS_ >= N) | (NS_ <= 0)
-        MS_[where_m] = MS[where_m]
-        NS_[where_n] = NS[where_n]
+        MS_[where_m] = 0#MS[where_m]
+        NS_[where_n] = 0#NS[where_n]
 
-        # Add the transformed map to the original
-        symmetrized[MS, NS] += mapdata[MS_, NS_]
+        # Add the transformed map to the original (only where we actually had 
+        # overlap) (`~` is the bitwise not operator)
+        w = ~where_m & ~where_n
+        symmetrized[MS[w], NS[w]] += mapdata[MS_[w], NS_[w]]
+
+        if overlap :
+            product += sum( mapdata[MS, NS] * mapdata[MS_, NS_] )
 
         # Keep track of min and max k vectors
         if clean :
@@ -874,14 +891,16 @@ def symmetrize_map(kx, ky, mapdata, clean=False, n_rot=4, debug=False) :
             # bitwise `not` operator
             kxs_ib = KV[0,~where_n]
             kys_ib = KV[1,~where_m]
-            new_kxmin = kxs_ib.min()
-            new_kxmax = kxs_ib.max()
-            new_kymin = kys_ib.min()
-            new_kymax = kys_ib.max()
-            kxmin = new_kxmin if new_kxmin > kxmin else kxmin
-            kymin = new_kymin if new_kymin > kymin else kymin
-            kxmax = new_kxmax if new_kxmax < kxmax else kxmax
-            kymax = new_kymax if new_kymax < kymax else kymax
+            if len(kxs_ib) is not 0 :
+                new_kxmin = kxs_ib.min()
+                new_kxmax = kxs_ib.max()
+                kxmin = new_kxmin if new_kxmin > kxmin else kxmin
+                kxmax = new_kxmax if new_kxmax < kxmax else kxmax
+            if len(kys_ib) is not 0 :
+                new_kymin = kys_ib.min()
+                new_kymax = kys_ib.max()
+                kymin = new_kymin if new_kymin > kymin else kymin
+                kymax = new_kymax if new_kymax < kymax else kymax
 
     # End of T loop
 
@@ -895,5 +914,8 @@ def symmetrize_map(kx, ky, mapdata, clean=False, n_rot=4, debug=False) :
         kx = kx[x0:x1]
         ky = ky[y0:y1]
 
-    return kx, ky, symmetrized
+    if overlap :
+        return kx, ky, symmetrized, product
+    else :
+        return kx, ky, symmetrized
 

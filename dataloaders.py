@@ -373,7 +373,8 @@ class Dataloader_ADRESS(Dataloader) :
         metadata = info.decode('ASCII').split('\n')
         units = [b.decode('ASCII') for b in units[0]]
 
-        data = np.array(matrix)
+        # Put the data into a numpy array and convert to float
+        data = np.array(matrix, dtype=float)
         shape = data.shape
 
         # Fcn to build the x, y (, z) ranges (maybe outsource this fcn 
