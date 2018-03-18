@@ -48,4 +48,5 @@ TODO:
 dataset. This means that, depending on the postprocessing, their colorscale 
 will be inconsistent with the bottom left plot. The same happens when 
 increasing the integration range. (<-this part fixed)
+* self.cursor_xy v.s. self.xinf, self.yind?
 

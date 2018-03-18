@@ -118,6 +118,10 @@ class Gui :
     zscale = None
     cursor_xy = None
     dpi = DPI
+    main_mesh = None
+    vmain_mesh = None
+    cut1 = None
+    cut2 = None
 
     def __init__(self, master, filename=None) :
         """ This init function mostly just calls all 'real' initialization 
@@ -313,12 +317,10 @@ class Gui :
         self.cm_min_slider = tk.Scale(master, variable=self.vmin_index,
                                       label='Min', **cm_slider_kwargs)
         self.cm_min_slider.set(CM_SLIDER_RESOLUTION)
-        self.cm_min_slider.bind('<ButtonRelease-1>', self.plot_data)
 
         self.cm_max_slider = tk.Scale(master, variable=self.vmax_index,
                                       label='Max', **cm_slider_kwargs)
         self.cm_max_slider.set(0)
-        self.cm_max_slider.bind('<ButtonRelease-1>', self.plot_data)
 
         # StringVar to keep track of the cmap and whether it's inverted
         self.cmap = tk.StringVar()
@@ -326,9 +328,11 @@ class Gui :
         # Default to the first cmap
         self.cmap.set(self.cmaps[0])
         self.invert_cmap.set('')
-        # Replot whenever the variable changes
-        self.cmap.trace("w", self.plot_data)
-        self.invert_cmap.trace("w", self.plot_data)
+
+        # Register callbacks for colormap-range change
+        for var in [self.vmin_index, self.vmax_index, self.cmap, 
+                    self.invert_cmap] :
+            var.trace('w', self.redraw_mesh)
 
         # Create the dropdown menu, populated with all strings in self.cmaps
         self.cmap_dropdown = tk.OptionMenu(master, self.cmap, *self.cmaps)
@@ -368,6 +372,52 @@ class Gui :
         self.update_status()
         self.status_label = tk.Label(textvariable=self.status, justify=tk.LEFT,
                                     anchor='w')
+
+    def redraw_mesh(self, *args, **kwargs) :
+        """ Efficiently redraw the pcolormesh without having to redraw the 
+        axes, ticks, labels, etc. """
+        # Get the new colormap parameters and apply them to the pcolormesh
+        cmap = self.get_cmap()
+        vmin, vmax = self.vminmax(self.pp_data)
+        mesh = self.main_mesh
+        mesh.set_clim(vmin=vmin, vmax=vmax)
+        mesh.set_cmap(cmap)
+
+        # Redraw the mesh
+        ax = self.axes['map']
+        ax.draw_artist(mesh)
+
+        # Cursors need to be redrawn - the blitting happens there
+        self.redraw_cursors()
+
+        # Also redraw the cuts if they are pcolormeshes
+        if self.map.get() != 'Off' :
+            self.redraw_cuts()
+
+    def redraw_cuts(self, *args, **kwargs) :
+        """ Efficiently redraw the cuts (meshes or lines, depending on state 
+        of `self.map`) without having to redraw the axes, ticks, labels, etc. 
+        """
+        axes = [self.axes['cut1'], self.axes['cut2']]
+        data = [self.cut1, self.cut2]
+        artists = [self.cut1_plot, self.cut2_plot] 
+        for i,ax in enumerate(axes) :
+            artist = artists[i]
+            if self.map.get() != 'Off' :
+                vmin, vmax = self.vminmax(data[i])
+                cmap = self.cmap.get()
+                artist.set_clim(vmin=vmin, vmax=vmax)
+                artist.set_cmap(cmap)
+            ax.draw_artist(artist)
+            self.canvas.blit(ax.bbox)
+
+    def redraw_cursors(self, *args, **kwargs) :
+        """ Efficiently redraw the cursors in the bottom left plot without 
+        having to redraw the axes, ticks, labels, etc. """
+        ax = self.axes['map']
+        ax.draw_artist(self.xcursor)
+        ax.draw_artist(self.ycursor)
+        self.canvas.blit(ax.bbox)
 
     def update_z_slider(self, state) :
         """ Change the relief of the z slider to indicate that it is 
@@ -561,10 +611,25 @@ class Gui :
         ax.plot(2*[z_val], ylim, **intensity_cursor_kwargs)
         ax.set_ylim(ylim)
 
+    def calculate_cuts(self) :
+        """ """
+        if self.map.get() != 'Off' :
+            # Create a copy of the original map (3D) data
+            data = self.data.copy()
+            # Slice and dice it
+            self.cut1 = pp.make_slice(data, d=1, i=self.yind, integrate=1)
+            self.cut2 = pp.make_slice(data, d=2, i=self.xind, integrate=1)
+        else :
+            z = self.z.get()
+            self.cut1 = self.pp_data[z, self.yind, :]
+            self.cut2 = self.pp_data[z, :, self.xind]
+
     def plot_cuts(self) :
         """ Plot cuts of whatever is in the bottom left ('map') axis along 
         the current positions of the cursors. 
         """
+        self.calculate_cuts()
+
         # Clear the current cuts
         for ax in ['cut1', 'cut2'] :
             self.axes[ax].clear()
@@ -572,42 +637,32 @@ class Gui :
         # Get the right xscale/yscale information
         xscale, yscale = self.get_xy_scales()
 
-        # Set z depending on whether we deal with a map or not
         if self.map.get() != 'Off' :
-            # Create a copy of the original map (3D) data
-            data = self.data.copy()
-            # Slice and dice it
-            xcut = pp.make_slice(data, d=1, i=self.yind, integrate=1)
-            ycut = pp.make_slice(data, d=2, i=self.xind, integrate=1)
-
             kwargs = dict(cmap=self.get_cmap())
 
             # Ensure zscale is defined
             if self.zscale is None :
-                zscale = np.arange(xcut.shape[0])
+                zscale = np.arange(self.cut1.shape[0])
             else :
                 zscale = self.zscale
 
             # Plot x cut in upper left
-            vmin, vmax = self.vminmax(xcut)
+            vmin, vmax = self.vminmax(self.cut1)
             kwargs.update(dict(vmin=vmin, vmax=vmax))
-            self.axes['cut1'].pcolormesh(xscale, zscale, xcut, 
-                                         **kwargs)
+            self.cut1_plot = self.axes['cut1'].pcolormesh(xscale, zscale, 
+                                                      self.cut1, **kwargs)
             # Plot y cut in lower right
-            vmin, vmax = self.vminmax(ycut)
+            vmin, vmax = self.vminmax(self.cut2)
             kwargs.update(dict(vmin=vmin, vmax=vmax))
-            self.axes['cut2'].pcolormesh(yscale, zscale, ycut, 
-                                         **kwargs)
+            self.cut2_plot = self.axes['cut2'].pcolormesh(yscale, zscale, 
+                                                      self.cut2, **kwargs)
         else :
-            z = self.z.get()
-            xcut = self.pp_data[z, self.yind, :]
-            ycut = self.pp_data[z, :, self.xind]
-
             # Plot the x cut in the upper left
-            self.axes['cut1'].plot(xscale, xcut, **cut_kwargs)
-
+            self.cut2_plot = self.axes['cut1'].plot(xscale, self.cut1, 
+                                                    **cut_kwargs)
             # Plot the y cut in the lower right
-            self.axes['cut2'].plot(ycut, yscale, **cut_kwargs)
+            self.cut2_plot = self.axes['cut2'].plot(self.cut2, yscale, 
+                                                    **cut_kwargs)
 
             # Make sure the cut goes over the full range of the plot
             #self.axes['cut2'].set_ymargin(0) # For some reason this doesn't work
@@ -642,11 +697,11 @@ class Gui :
                       vmax=vmax)
 
         # Do the actual plotting with just defined args and kwargs
-        self.axes['map'].pcolormesh(*args, **kwargs)
+        self.main_mesh = self.axes['map'].pcolormesh(*args, **kwargs)
 
         # Plot the same thing into a virtual figure such that a png can be 
         # created
-        self.axes['vax'].pcolormesh(*args, **kwargs)
+        self.vmain_mesh = self.axes['vax'].pcolormesh(*args, **kwargs)
 
         # Update the cursors (such that they are above the pcolormesh) and cuts
         self.plot_cursors()
@@ -655,8 +710,10 @@ class Gui :
         self.canvas.draw()
 
     def get_cmap(self) :
-        """ Build and return the colormap from the selection and choice of 
-        inversion. """
+        """ Build the name of the colormap by combining the value stored in 
+        `self.cmap` (the basename of the colormap) and `self.invert_cmap` 
+        (either empty string or '_r', which is the suffix for inverted cmaps 
+        in matplotlib) """
         # Build the name of the cmap
         cmap_name = self.cmap.get() + self.invert_cmap.get()
         # Make sure this name exists in the list of cmaps. Otherwise reset to 
@@ -847,10 +904,10 @@ class Gui :
 
             # Update the cursor position and redraw it
             self.cursor_xy = (x, y)
-            self.plot_cursors()
+            self.redraw_cursors()
             # Now the cuts have to be redrawn as well
-            self.plot_cuts()
-            self.canvas.draw()
+            self.calculate_cuts()
+            self.redraw_cuts()
 
         cid = self.canvas.mpl_connect('button_press_event', on_click)
         pid = self.canvas.mpl_connect('key_press_event', on_press)
@@ -877,7 +934,7 @@ def start_gui(filename=None) :
     and start the mainloop. 
     """
     root = tk.Tk()
-    root.title('Data visualizer')
+    root.title('ARPES visualizer')
     gui = Gui(root, filename=filename)
     gui.plot_data()
     root.mainloop()
