@@ -131,6 +131,7 @@ class Gui :
         self._set_up_plots(master)
         self._set_up_colormap_sliders(master)
         self._set_up_z_slider(master)
+        self._set_up_integration_range_selector(master)
         self._set_up_status_label(master)
 
         # Align all elements
@@ -191,8 +192,9 @@ class Gui :
         # Save png button
         self.save_button.grid(row=PLOTROW + 2, column=right_of_plot + 1)
 
-        # z slider
+        # z slider, integration range selector
         self.z_slider.grid(row=PLOTROW, column=0)
+        self.integration_range_entry.grid(row=PLOTROW+1, column=0)
 
         # Put the status label at the very bottom left
         STATUSROW = PLOTROW + PLOT_ROWSPAN + 1
@@ -349,6 +351,13 @@ class Gui :
                                  length=SLIDER_LENGTH) 
         self.z_slider.bind('<ButtonRelease-1>', self.process_data)
 
+    def _set_up_integration_range_selector(self, master) :
+        """ Create widgets that will allow setting the integration range when 
+        creating a map. """
+        self.integrate = tk.IntVar()
+        self.integration_range_entry = tk.Entry(master, width=3,
+                                           textvariable=self.integrate)
+
     def _set_up_status_label(self, master) :
         """ Create a label which can hold informative text about the current
         state of the GUI or success/failure of certain operations. This text 
@@ -491,7 +500,7 @@ class Gui :
 
         # Make a map if necessary
         if self.map.get() != 'Off' :
-            integrate = 5
+            integrate = self.integrate.get()
             self.pp_data = pp.make_slice(self.pp_data, d=0, i=z, integrate=integrate)
             #self.pp_data = pp.make_map(self.pp_data, z, integrate=integrate)
             
@@ -674,7 +683,9 @@ class Gui :
             self.vmin_index.set(CM_SLIDER_RESOLUTION)
 
         # Split the data value range into equal parts
-        drange = np.linspace(self.pp_data.min(), data.max(), 
+        #drange = np.linspace(self.pp_data.min(), data.max(), 
+        #                     CM_SLIDER_RESOLUTION + 1)
+        drange = np.linspace(data.min(), data.max(), 
                              CM_SLIDER_RESOLUTION + 1)
 
         # Get the appropriate vmin and vmax values from the data

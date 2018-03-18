@@ -30,42 +30,14 @@ class Dataloader_Pickle(Dataloader) :
     name = 'Pickle'
 
     def load_data(self, filename) :
-        # Print a warning
-        import warnings
-        warnings.warn('Pickle dataloader is in experimental stage.')
-
         # Open the file and get a handle for it
         with open(filename, 'rb') as f :
             filedata = pickle.load(f)
-
-#        # Check if we are dealing with an array
-#        if type(filedata) != np.ndarray :
-#            raise TypeError
-#
-#        # Get the dimensions of the array
-#        shape = filedata.shape
-#        x = shape[0]
-#        y = shape[1]
-#
-#        # Create x and y scales from shape
-#        xscale = np.arange(x)
-#        yscale = np.arange(y)
-#
-#        # Bring the data in the right shape
-#        data = filedata.reshape(1, x, y)
-#
-#        # Create and return the datadict
-#        res = {
-#                'data': data,
-#                'xscale': yscale,
-#                'yscale': xscale
-#        }
-#        return res
         return filedata
 
 class Dataloader_ALS(Dataloader) :
     """ Object that allows loading and saving of ARPES data from the  
-    beamline at ALS, Berkely which is in .fits format. 
+    beamline at ALS, Berkely, which is in .fits format. 
     """
     name = 'ALS'
     # A factor required to reach a reasonable result for the k space 
@@ -267,11 +239,11 @@ class Dataloader_ALS(Dataloader) :
 
         return data
 
-class Dataloader_PSI(Dataloader) :
+class Dataloader_SIS(Dataloader) :
     """ Object that allows loading and saving of ARPES data from the SIS 
     beamline at PSI which is in hd5 format. 
     """
-    name = 'PSI'
+    name = 'SIS'
     # Number of cuts that need to be present to assume the data as a map 
     # instead of a series of cuts
     min_cuts_for_map = 10
@@ -391,7 +363,7 @@ class Dataloader_ADRESS(Dataloader) :
         # The actual numbers are in the field: 'Matrix'
         matrix = h5file['Matrix']
 
-        #PSI The scales can be extracted from the matrix' attributes
+        # The scales can be extracted from the matrix' attributes
         scalings = matrix.attrs['IGORWaveScaling']
         units = matrix.attrs['IGORWaveUnits']
         info = matrix.attrs['IGORWaveNote']
@@ -410,7 +382,7 @@ class Dataloader_ADRESS(Dataloader) :
             """ Return an array that starts at value `start` and goes `n` 
             steps of `step`. """
             end = start + n*step
-            return np.arange(start, end, step)
+            return np.linspace(start, end, n)
 
         # 'IGORWaveUnits' contains a list of the form 
         # ['', 'degree', 'eV', units[3]]. The first three elements should 
@@ -428,8 +400,8 @@ class Dataloader_ADRESS(Dataloader) :
             data = np.rollaxis(data, 2, 1)
             # Shape has changed                                   
             shape = data.shape
-            xstep, xstart = scalings[2]
-            ystep, ystart = scalings[1]
+            xstep, xstart = scalings[1]
+            ystep, ystart = scalings[2]
             zscale = None
         # Case map or hv scan (or...?)
         else :
@@ -471,7 +443,7 @@ class Dataloader_ADRESS(Dataloader) :
 
 # List containing all reasonably defined dataloaders
 all_dls = [
-           Dataloader_PSI,
+           Dataloader_SIS,
            Dataloader_ADRESS,
            Dataloader_ALS,
            Dataloader_Pickle
@@ -525,7 +497,7 @@ def load_data(filename, exclude=None) :
 # +---------+ #
 
 if __name__ == '__main__' :
-#    sis = Dataloader_PSI()
+#    sis = Dataloader_SIS()
 #    path = '/home/kevin/qmap/experiments/2017_10_PSI/Tl2201/Tl_1_0003.h5'
 #    datadict = sis.load_data(path)
 #    print(datadict['data'].shape)
