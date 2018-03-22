@@ -390,12 +390,12 @@ class Dataloader_ADRESS(Dataloader) :
         # always be the same, but the third one may vary or not even exist. 
         # Use this to determine the scan type.
         # Convert to np.array bring it in the shape the gui expects, which is 
-        # [energy/hv/z, kparallel/x, kperpendicular/y] and prepare the x,y,z 
-        # scales
+        # [energy/hv/1, kparallel/"/kparallel, kperpendicular/"/energy] and 
+        # prepare the x,y,z # scales
         # Note: `scalings` is a 3/4 by 2 array where every line contains a 
         # (step, start) pair
-        # Case cut
         if len(units) == 3 :
+        # Case cut
             # Make data 3-dimensional by adding an empty dimension
             data = data.reshape(1, shape[0], shape[1])
             data = np.rollaxis(data, 2, 1)
@@ -404,23 +404,31 @@ class Dataloader_ADRESS(Dataloader) :
             xstep, xstart = scalings[1]
             ystep, ystart = scalings[2]
             zscale = None
-        # Case map or hv scan (or...?)
         else :
+        # Case map or hv scan (or...?)
             data = np.rollaxis(data, 1, 0)
             # Shape has changed                                   
             shape = data.shape
             xstep, xstart = scalings[3]
-            ystep, ystart = scalings[2]
-            zstep, zstart = scalings[1]
+            ystep, ystart = scalings[1]
+            zstep, zstart = scalings[2]
             zscale = start_step_n(zstart, zstep, shape[0])
 
+        # Binned data may contain some sort of scaling 
         xscale = start_step_n(xstart, xstep, shape[2])
         yscale = start_step_n(ystart, ystep, shape[1])
 
         # Get some metadata for ang2k conversion
-        hv = metadata[0]
-        theta = metadata[8]
-        phi = metadata[10]
+        hv_raw = metadata[0].split('=')[-1]
+        if ':' in hv_raw :
+            # hv_raw is of the form start:step:end
+            start, step, end = [float(n) for n in hv_raw.split(':')]
+            hv = np.arange(start, end*step, step)
+        else :
+            hv = float(hv_raw)
+        theta_raw = metadata[8].split('=')[-1]
+        theta = float(theta_raw)
+        phi = float(metadata[10].split('=')[-1])
         angles = xscale
         # For the binding energy just take the minimum of the energies
         E_b = yscale.min()

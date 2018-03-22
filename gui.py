@@ -90,7 +90,7 @@ intensity_cursor_kwargs = dict(linewidth=1,
 
 # Filename endings which indicate that the file is clearly not an ARPES data 
 # file (which typically end in .h5, .fits, .pickle)
-SKIPPABLE = ['txt', 'zip']
+SKIPPABLE = ['txt', 'zip', 'png', 'pdf']
 
 # +------------+ #
 # | GUI Object | # =============================================================
@@ -670,13 +670,9 @@ class Gui :
             ymax = max(yscale)
             self.axes['cut2'].set_ylim([ymin, ymax])
 
-    def plot_data(self, event=None, *args, **kwargs) :
-        """ Update the colormap range and (re)plot the data. """
-        # Remove old plots
-        for ax in self.axes.values() :
-            ax.clear()
-
-        # Prepare args and kwargs for plotting, depending on the circumstances
+    def get_plot_args_and_kwargs(self) :
+        """ Prepare args and kwargs for plotting, depending on the 
+        circumstances. """
         # Add x and y scales to args if available
         args = []
         if self.xscale is not None and self.yscale is not None :
@@ -695,13 +691,17 @@ class Gui :
         vmin, vmax = self.vminmax(self.pp_data)
         kwargs = dict(cmap=self.get_cmap(), vmin=vmin, 
                       vmax=vmax)
+        return args, kwargs
 
+    def plot_data(self, event=None, *args, **kwargs) :
+        """ Update the colormap range and (re)plot the data. """
+        # Remove old plots
+        for ax in self.axes.values() :
+            ax.clear()
+
+        args, kwargs = self.get_plot_args_and_kwargs()
         # Do the actual plotting with just defined args and kwargs
         self.main_mesh = self.axes['map'].pcolormesh(*args, **kwargs)
-
-        # Plot the same thing into a virtual figure such that a png can be 
-        # created
-        self.vmain_mesh = self.axes['vax'].pcolormesh(*args, **kwargs)
 
         # Update the cursors (such that they are above the pcolormesh) and cuts
         self.plot_cursors()
@@ -918,7 +918,13 @@ class Gui :
     def save_plot(self) :
         """ Save a png image of the currently plotted data (only what is in 
         bottom left) """
-        filename = asksaveasfilename()
+        # Plot the same thing into a virtual figure such that a png can be 
+        # created
+        args, kwargs = self.get_plot_args_and_kwargs()
+        self.vmain_mesh = self.axes['vax'].pcolormesh(*args, **kwargs)
+
+        # Open a filebrowser where user can select a place to store the result
+        filename = asksaveasfilename(filetype='png')
         if filename :
             self.vfig.savefig(filename, transparent=True, dpi=self.dpi)
             self.update_status('Saved file {}.'.format(filename))
