@@ -418,17 +418,24 @@ class Dataloader_ADRESS(Dataloader) :
         xscale = start_step_n(xstart, xstep, shape[2])
         yscale = start_step_n(ystart, ystep, shape[1])
 
-        # Get some metadata for ang2k conversion
+        def convert_raw(raw) :
+            """ Try to convert a string which is expected to be either just a 
+            decimal number or a MATLAB-like range expression 
+            (START:STEP:STOP) to either a float or an np.array. """
+            if ':' in raw :
+                # raw is of the form start:step:end
+                start, step, end = [float(n) for n in raw.split(':')]
+                res = np.arange(start, end*step, step)
+            else :
+                res = float(raw)
+            return res
+
         hv_raw = metadata[0].split('=')[-1]
-        if ':' in hv_raw :
-            # hv_raw is of the form start:step:end
-            start, step, end = [float(n) for n in hv_raw.split(':')]
-            hv = np.arange(start, end*step, step)
-        else :
-            hv = float(hv_raw)
+        hv = convert_raw(hv_raw)
         theta_raw = metadata[8].split('=')[-1]
-        theta = float(theta_raw)
-        phi = float(metadata[10].split('=')[-1])
+        theta = convert_raw(theta_raw)
+        phi_raw = metadata[10].split('=')[-1]
+        phi = convert_raw(phi_raw)
         angles = xscale
         # For the binding energy just take the minimum of the energies
         E_b = yscale.min()

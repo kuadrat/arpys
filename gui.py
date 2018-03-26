@@ -401,11 +401,11 @@ class Gui :
         axes = [self.axes['cut1'], self.axes['cut2']]
         data = [self.cut1, self.cut2]
         artists = [self.cut1_plot, self.cut2_plot] 
+        cmap = self.get_cmap()
         for i,ax in enumerate(axes) :
             artist = artists[i]
             if self.map.get() != 'Off' :
                 vmin, vmax = self.vminmax(data[i])
-                cmap = self.cmap.get()
                 artist.set_clim(vmin=vmin, vmax=vmax)
                 artist.set_cmap(cmap)
             ax.draw_artist(artist)
@@ -924,7 +924,7 @@ class Gui :
         self.vmain_mesh = self.axes['vax'].pcolormesh(*args, **kwargs)
 
         # Open a filebrowser where user can select a place to store the result
-        filename = asksaveasfilename(filetype='png')
+        filename = asksaveasfilename(filetypes=[('PNG', '*.png')])
         if filename :
             self.vfig.savefig(filename, transparent=True, dpi=self.dpi)
             self.update_status('Saved file {}.'.format(filename))
