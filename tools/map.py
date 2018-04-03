@@ -109,11 +109,11 @@ iax = ifig.add_subplot(111, projection='cursor')
 
 # Load data
 # ==============================================================================
-ddict = dl.load_data(args.filename)
+ns = dl.load_data(args.filename)
 
-data = ddict['data']
-xscale = ddict['xscale']
-yscale = ddict['yscale']
+data = ns.data
+xscale = ns.xscale
+yscale = ns.yscale
 
 shape = data.shape
 N_e = shape[0]

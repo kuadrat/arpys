@@ -502,19 +502,19 @@ class Gui :
 
         # Try to load the data with the given dataloader
         try :
-            datadict = dl.load_data(self.filepath.get())
+            ns = dl.load_data(self.filepath.get())
         except Exception as e :
             print(e)
             self.update_status('Failed to load data.')
             # Leave the function
             return 1
 
-        # Extract the fields from the datadict
-        self.data = datadict['data']
-        self.xscale = datadict['xscale']
-        self.yscale = datadict['yscale']
+        # Extract the fields from the namespace
+        self.data = ns.data
+        self.xscale = ns.xscale
+        self.yscale = ns.yscale
         try :
-            self.zscale = datadict['zscale']
+            self.zscale = ns.zscale
         except KeyError :
             # Set zscale to None
             self.zscale = None
@@ -570,12 +570,13 @@ class Gui :
         self.plot_data()
 
     def plot_intensity(self) :
-        """ Plot the binding energy distribution in the top 
-        right if we have a map. """
+        """ Plot the binding energy distribution in the top right if we have 
+        a map. """
         # Clear the current distribution
         ax = self.axes['energy']
         ax.clear()
 
+        # Write the value of the energy in the upper right plot
         z = self.z.get()
         if self.zscale is not None :
             z_val = self.zscale[z]
@@ -651,11 +652,11 @@ class Gui :
             kwargs.update(dict(vmin=vmin, vmax=vmax))
             self.cut1_plot = self.axes['cut1'].pcolormesh(xscale, zscale, 
                                                       self.cut1, **kwargs)
-            # Plot y cut in lower right
+            # Plot y cut in lower right (rotated by 90 degrees)
             vmin, vmax = self.vminmax(self.cut2)
             kwargs.update(dict(vmin=vmin, vmax=vmax))
-            self.cut2_plot = self.axes['cut2'].pcolormesh(yscale, zscale, 
-                                                      self.cut2, **kwargs)
+            self.cut2_plot = self.axes['cut2'].pcolormesh(zscale, yscale, 
+                                                      self.cut2.T, **kwargs)
         else :
             # Plot the x cut in the upper left
             self.cut2_plot = self.axes['cut1'].plot(xscale, self.cut1, 

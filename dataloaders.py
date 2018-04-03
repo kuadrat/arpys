@@ -9,6 +9,7 @@ import h5py
 import numpy as np
 import pickle
 import pyfits
+from argparse import Namespace
 from warnings import catch_warnings, simplefilter
 
 class Dataloader() :
@@ -21,6 +22,11 @@ class Dataloader() :
 
     def __repr__(self, *args, **kwargs) :
         return '<class Dataloader_{}>'.format(self.name)
+
+    def print_m(self, *messages) :
+        """ Print message to console, adding the dataloader name. """
+        s = '[Dataloader {}]'.format(self.name)
+        print(s, *messages)
 
 class Dataloader_Pickle(Dataloader) :
     """ Load data that has been saved using python's `pickle` module. ARPES 
@@ -44,6 +50,12 @@ class Dataloader_ALS(Dataloader) :
     # coordinates 
     k_stretch = 1.05
 
+    # Scanmode aliases
+    CUT = 'null'
+    MAP = 'Slit Defl'
+    HV = 'mono_eV'
+    DOPING = 'Sorensen Program'
+
     def __init__(self, work_func=4) :
         # Assign a value for the work function
         self.work_func = work_func
@@ -55,27 +67,37 @@ class Dataloader_ALS(Dataloader) :
         # Access the BinTableHDU
         self.bintable = hdulist[1]
 
+        # Try to fix FITS standard violations
+        self.bintable.verify('fix')
+
         # Get the header to extract metadata from
         header = hdulist[0].header
 
         # Find out what scan mode we're dealing with
         scanmode = header['NM_0_0']
+        self.print_m('Scanmode: ', scanmode)
 
         # Find out whether we are in fixed or swept (dithered) mode which has 
         # an influence on how the data is stored in the fits file.
         swept = True if ('SSSW0' in header) else False
         
         # Case normal cut
-        if scanmode == 'null' :
+        if scanmode == self.CUT :
             data = self.load_cut()
         # Case FSM
-        elif scanmode == 'Slit Defl' :
+        elif scanmode == self.MAP :
             data = self.load_map(swept)
         # Case hv scan
-        elif scanmode == 'mono_eV' :
+        elif scanmode == self.HV :
+            data = self.load_hv_scan()
+        # Case doping scan
+        elif scanmode == self.DOPING :
+            #data = self.load_doping_scan()
             data = self.load_hv_scan()
         else :
             raise(IndexError('Couldn\'t determine scan type'))
+
+        nz, ny, nx = data.shape
 
         # Determine whether the file uses the SS or SF prefix for metadata
         if 'SSX0_0' in header :
@@ -100,18 +122,21 @@ class Dataloader_ALS(Dataloader) :
         energies = (energies_in_px - fermi_level)/ppeV
 
         # Starting and ending pixels (angle or ky scale)
-        y0 = header[pre+'Y0_0']
-        y1 = header[pre+'Y1_0']
+        # DEPRECATED
+        #y0 = header[pre+'Y0_0']
+        #y1 = header[pre+'Y1_0']
 
         # Use this arbitrary seeming conversion factor (found in Denys' 
         # script) to get from pixels to angles
         #deg_per_px = 0.193 / 2
         deg_per_px = 0.193 * self.k_stretch
-        angle_binning = 2
+        #angle_binning = 3
+        angle_binning = 1
 
         #angles_in_px = np.arange(y0, y1, angle_binning)
-        n_y = int((y1-y0)/angle_binning)
-        angles_in_px = np.arange(0, n_y, 1)
+        #n_y = int((y1-y0)/angle_binning)
+        #angles_in_px = np.arange(0, n_y, 1)
+        angles_in_px = np.arange(0, ny, 1)
         # NOTE
         # Actually, I would think that we have to multiply by 
         # `angle_binning` to get the right result. That leads to 
@@ -122,42 +147,80 @@ class Dataloader_ALS(Dataloader) :
         angles = angles_in_px * deg_per_px  / angle_binning
 
         # Case cut
-        if scanmode != 'Slit Defl' :
-            xscale = angles
+        if scanmode == self.CUT :
+            # NOTE x and y scale may need to be swapped
             yscale = energies
+            xscale = angles
             zscale = None
-        # Case map or hv scan
-        else :
+        # Case map
+        elif scanmode == self.MAP :
             x0 = header['ST_0_0']
             x1 = header['EN_0_0']
-            n_x = header['N_0_0']
-            xscale = np.linspace(x0, x1, n_x) * self.k_stretch
+            #n_x = header['N_0_0']
+            #xscale = np.linspace(x0, x1, n_x) * self.k_stretch
+            xscale = np.linspace(x0, x1, nx) * self.k_stretch
             yscale = angles
             zscale = energies
+        # Case hv scan
+        elif scanmode == self.HV :
+            z0 = header['ST_0_0']
+            z1 = header['EN_0_0']
+            #nz = header['N_0_0']
+            angles_in_px = np.arange(0, nx, 1)
+            angles = angles_in_px * deg_per_px  / angle_binning
+            xscale = angles
+            yscale = energies
+            zscale = np.linspace(z0, z1, nz)
+        # Case doping
+        elif scanmode == self.DOPING :
+            z0 = header['ST_0_0']
+            z1 = header['EN_0_0']
+            angles_in_px = np.arange(0, nx, 1)
+            angles = angles_in_px * deg_per_px  / angle_binning
+            xscale = angles
+            # For some reason the energy determination from file fails here...
+            yscale = range(ny)
+            zscale = np.linspace(z0, z1, nz)
 
         # For the binding energy, just take a min value as its variations 
         # are small compared to the photon energy
         E_b = energies.min()
 
-        # Case hv scan
-        if scanmode == 'mono_eV' :
-            z0 = header['ST_0_0']
-            z1 = header['EN_0_0']
-            nz = header['N_0_0']
-            zscale = np.linspace(z0, z1, nz)
-
         # Extract some additional metadata (mostly for angles->k conversion)
         # TODO Special cases for different scan types
         # Get relevant metadata from header
         theta = header['LMOTOR3']
+        # beta in LMOTOR4
         phi = header['LMOTOR5']
 
         # The photon energy may vary in the case that this is a hv_scan
         hv = header['MONO_E']
 
+        # In recent ALS data the above determined x, y and z scales did not 
+        # match the actual shape of the data...
+        self.print_m(*data.shape)
+        self.print_m(nx, ny, nz)
+        for scale in [xscale, yscale, zscale] :
+            try :
+                self.print_m(len(scale))
+            except Exception :
+                self.print_m('length problem')
+
         # NOTE angles==xscale and E_b can be extracted from yscale, thus it 
         # is not really necessary to pass them on here.
-        res = {
+        res = Namespace(
+               data = data,
+               xscale = xscale,
+               yscale = yscale,
+               zscale = zscale,
+               angles = angles,
+               theta = theta,
+               phi = phi,
+               E_b = E_b,
+               hv = hv
+        )
+        """
+            {
                'data': data,
                'xscale': xscale,
                'yscale': yscale,
@@ -168,6 +231,7 @@ class Dataloader_ALS(Dataloader) :
                'E_b': E_b,
                'hv': hv
               }
+        """
         return res
     
     def load_cut(self) :
@@ -192,6 +256,8 @@ class Dataloader_ALS(Dataloader) :
         n_slices = len(bt_data)
 
         first_slice = bt_data[0][-1]
+        # The shape of the returned array must be (energy, kx, ky)
+        # (n_slices corresponds to ky)
         if swept :
             n_energy, n_kx = first_slice.shape    
             data = np.zeros([n_energy, n_kx, n_slices])
@@ -200,16 +266,12 @@ class Dataloader_ALS(Dataloader) :
                 data[:,:,i] = this_slice
         else :
             n_kx, n_energy = first_slice.shape
-            
-            # The shape of the returned array must be (energy, kx, ky)
-            # (n_slices corresponds to ky)
             data = np.zeros([n_energy, n_kx, n_slices])
             for i in range(n_slices) :
                 this_slice = bt_data[i][-1]
                 # Reshape the slice to (energy, kx)
                 this_slice = this_slice.transpose()
                 data[:,:,i] = this_slice
-
 
         # Convert to numpy array
         data = np.array(data)
@@ -220,7 +282,9 @@ class Dataloader_ALS(Dataloader) :
         """ Read data from a hv scan, i.e. a series of energy vs k cuts 
         (shape (n_kx, n_energy), each belonging to a different photon energy 
         hv. The returned shape in this case must be 
-        (photon_energies, energy, k) 
+        (photon_energies, energy, k)
+        The same is used for doping scans, where the output shape is
+        (doping, energy, k)
         """
         bt_data = self.bintable.data
         n_hv = len(bt_data)
@@ -331,7 +395,18 @@ class Dataloader_SIS(Dataloader) :
         angles = xscale
         E_b = min(energies)
 
-        res = {
+        res = Namespace(
+               data = data,
+               xscale = xscale,
+               yscale = yscale,
+               zscale = None,
+               angles = angles,
+               theta = theta,
+               phi = phi,
+               E_b = E_b,
+               hv = hv
+        )
+        """{
                'data': data,
                'xscale': xscale,
                'yscale': yscale,
@@ -341,7 +416,7 @@ class Dataloader_SIS(Dataloader) :
                'phi': phi,
                'E_b': E_b,
                'hv': hv
-              }
+              }"""
 
         return res
 
@@ -440,7 +515,18 @@ class Dataloader_ADRESS(Dataloader) :
         # For the binding energy just take the minimum of the energies
         E_b = yscale.min()
 
-        res = {
+        res = Namespace(
+               data = data,
+               xscale = xscale,
+               yscale = yscale,
+               zscale = zscale,
+               angles = angles,
+               theta = theta,
+               phi = phi,
+               E_b = E_b,
+               hv = hv
+        )
+        """{
                'data': data,
                'xscale': xscale,
                'yscale': yscale,
@@ -450,7 +536,7 @@ class Dataloader_ADRESS(Dataloader) :
                'phi': phi,
                'E_b': E_b,
                'hv': hv
-              }
+              }"""
         return res
 
 # +-------+ #
@@ -484,14 +570,14 @@ def load_data(filename, exclude=None) :
             # Instantiate a dataloader object
             dl = dataloader()
 
-            # Skip to the next if this dl is excluded (continue brings us back to 
-            # the top of the loop, starting with the next element)
+            # Skip to the next if this dl is excluded (continue brings us 
+            # back to the top of the loop, starting with the next element)
             if exclude is not None and dl.name in exclude : 
                 continue
 
             # Try loading the data
             try :
-                datadict = dl.load_data(filename)
+                namespace = dl.load_data(filename)
             except Exception as e :
                 # Temporarily store the exception
                 exceptions.update({dl : e})
@@ -499,12 +585,13 @@ def load_data(filename, exclude=None) :
                 continue
 
             # Reaching this point must mean we succeeded
-            return datadict
+            return namespace
 
     # Reaching this point means something went wrong. Print all exceptions.
     for dl in exceptions :
         print(dl)
-        print(exceptions[dl])
+        e = exceptions[dl]
+        print('Exception {}: {}'.format(type(e), e))
 
     raise Exception('Could not load data {}.'.format(filename))
 
@@ -521,11 +608,11 @@ if __name__ == '__main__' :
 #    print(datadict['yscale'].shape)
     adress = Dataloader_ADRESS()
     path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/003_quickmap_540eV.h5'
-    datadict = adress.load_data(path)
+    ns = adress.load_data(path)
 
     path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/002_quick_kz_350to800.h5'
-    datadict = adress.load_data(path)
+    ns = adress.load_data(path)
 
     path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/014_HSscan_nodal_428eV.h5'
-    datadict = adress.load_data(path)
+    ns = adress.load_data(path)
     

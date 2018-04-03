@@ -33,16 +33,16 @@ args = parser.parse_args()
 
 # Load and process data
 # ==============================================================================
-datadict = dl.load_data(args.filename)
+ns = dl.load_data(args.filename)
 
-data = datadict['data']
-xscale = datadict['xscale']
-yscale = datadict['yscale']
-angles = datadict['angles']
-theta = datadict['theta']
-phi = datadict['phi']
-hv = datadict['hv']
-E_b = datadict['E_b']
+data = ns.data
+xscale = ns.xscale
+yscale = ns.yscale
+angles = ns.angles
+theta = ns.theta
+phi = ns.phi
+hv = ns.hv
+E_b = ns.E_b
 
 shape = data.shape
 # Quick fix for PSI "scans"
@@ -51,7 +51,7 @@ if shape[0] != 1 :
     data = data[0]
     data = data.reshape([1, shape[1], shape[2]])
 
-#for key, val in datadict.items() :
+#for key, val in ns.items() :
 #    if key in ['theta', 'phi', 'hv', 'E_b'] :
 #        print('{} {}'.format(key, val))
         

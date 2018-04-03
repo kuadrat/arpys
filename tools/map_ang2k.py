@@ -42,20 +42,26 @@ parser.add_argument('-v', '--vmax', type=float, default=1,
 parser.add_argument('-c', '--cmap', type=str, default='bone_r',
                    help='Name of matplotlib colormap.')
 
+parser.add_argument('-C', '--clean', default=True, action='store_false',
+                   help='Whether to cut off unsymmetrized parts.')
+
+parser.add_argument('-D', '--debug', default=False,
+                   help='Toggle debug mode.')
+
 args = parser.parse_args()
 
 # Load and process data
 # ==============================================================================
-datadict = dl.load_data(args.filename)
+ns = dl.load_data(args.filename)
 
-data = datadict['data']
-xscale = datadict['xscale']
-yscale = datadict['yscale']
-angles = datadict['angles']
-theta = datadict['theta']
-phi = datadict['phi']
-hv = datadict['hv']
-E_b = datadict['E_b']
+data = ns.data
+xscale = ns.xscale
+yscale = ns.yscale
+angles = ns.angles
+theta = ns.theta
+phi = ns.phi
+hv = ns.hv
+E_b = ns.E_b
 
 kx, foo = pp.angle_to_k(xscale, theta, phi, hv, E_b, 
                        lattice_constant=args.lattice_constant, 
@@ -67,7 +73,12 @@ ky, foo = pp.angle_to_k(yscale, theta=phi, phi=theta, hv=hv, E_b=E_b,
 
 mp = pp.make_slice(data, d=0, i=args.index, integrate=args.integrate)
 
-KX, KY, sym_mp = pp.symmetrize_map(kx, ky, mp, clean=True, debug=False)
+KX, KY, sym_mp = pp.symmetrize_map(kx, ky, mp, clean=args.clean, 
+                                   debug=args.debug)
+
+if 0 in sym_mp.shape :
+    print('Symmetrization failed.')
+    KX, KY, sym_mp = kx, ky, mp
 
 if args.theta :
     kx, ky = pp.rotate_xy(kx, ky, args.theta)
@@ -85,7 +96,7 @@ except Exception :
 vmax1 = args.vmax*mp.max()
 vmax2 = args.vmax*sym_mp.max()
 kwargs1 = dict(vmin=0, vmax=vmax1)
-kwargs2 = dict(vmin=0, vmax=vmax2)
+kwargs2 = dict(vmin=sym_mp.min(), vmax=vmax2)
 for kwargs in [kwargs1, kwargs2] :
     kwargs.update(dict(cmap=cmap))
 

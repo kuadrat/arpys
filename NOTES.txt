@@ -36,11 +36,12 @@ instead of `SSXXX` for their metadata...
 The file .../171025_psi/Tl_1_0018.h5 (a hv scan) is not represented correctly 
 in the gui.
 TODO:
-* Convert output of dataloaders load_data to an argparse.Namespace.
+X DONE Convert output of dataloaders load_data to an argparse.Namespace.
 
 14.02.2018
 TODO:
 * Dataloader_ALS' hardcoded binning makes certain files unreadable.
+(29.03.2018: angle binning not existent anymore)
 
 18.03.2018
 TODO:
@@ -49,4 +50,11 @@ dataset. This means that, depending on the postprocessing, their colorscale
 will be inconsistent with the bottom left plot. The same happens when 
 increasing the integration range. (<-this part fixed)
 * self.cursor_xy v.s. self.xinf, self.yind?
+
+29.03.2018
+Rotated bottom right cut in map/3D mode
+
+TODO:
+* Cursors in cuts in map/3D mode
+* `Hide cursor` button
 

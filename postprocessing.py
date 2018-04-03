@@ -384,7 +384,7 @@ def subtract_bg_matt(data, n=5) :
 
     Returns
     -------
-    res         : np.array; bg-subtracted  version of input data in same shape
+    res         : np.array; bg-subtracted version of input data in same shape
     """
     # Reshape input
     shape = data.shape

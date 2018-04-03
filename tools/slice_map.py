@@ -42,9 +42,9 @@ figsize = (4, 8)
 
 # Load the data
 dataloader = dl.Dataloader_ALS()
-datadict = dataloader.load_data(filename)
-print(datadict['xscale'])
-data = datadict['data']
+ns = dataloader.load_data(filename)
+print(ns.xscale)
+data = ns.data
 # Extract a Fermi surface map
 fsm = pp.make_slice(data, d=0, i=z, integrate=integrate)
 
@@ -73,11 +73,12 @@ import pickle
 # Reshape data before outputting
 x, y = cut.shape
 new_data = cut.reshape([1, x, y])
-datadict.update({'data': new_data})
-print(datadict)
+ns.data = new_data
+print(ns)
 
 # Write an output file (binary)
 with open(outfile, 'wb') as f :
-    pickle.dump(datadict, f)
+    pickle.dump(ns, f)
 
 plt.show()
+
