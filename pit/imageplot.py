@@ -162,12 +162,19 @@ class ImagePlot3d(ImagePlot):
         self.image = ImageItem(image, **self.imageKwargs)
         self.addItem(self.image)
 
-    def zChanged(self) :
+    def zChanged(self, caller=None) :
         """ Callback to the :signal: `sigZChanged`. Ensure self.z does not go 
         out of bounds and update the Image slice with a call to :func: 
         `updateImageSlice <arpys.pit.imageplot.ImagePlot3d.updateImageSlice>`.
         """
-        #self.z.set_value( clip(self.z, self.zmin, self.zmax) )
+        # Ensure z doesn't go out of bounds
+        z = self.z.get_value()
+        clipped_z = clip(z, self.zmin, self.zmax)
+        if z != clipped_z :
+            # NOTE this leads to unnecessary signal emitting. Should avoid 
+            # emitting the signal from inside a slot (function connected to 
+            # that signal)
+            self.z.set_value(clipped_z)
         self.updateImageSlice()
 
     def keyPressEvent(self, event) :
@@ -178,8 +185,6 @@ class ImagePlot3d(ImagePlot):
             z += 1
         elif key == qt.QtCore.Qt.Key_Left :
             z -= 1
-        # Ensure we don't go out of bounds
-        z = clip(z, self.zmin, self.zmax)
         self.z.set_value(z)
 
 class ImagePlotWidget(qt.QtGui.QWidget) :
@@ -200,7 +205,7 @@ class ImagePlotWidget(qt.QtGui.QWidget) :
         # Explicitly wrap methods and attributes from ImagePlot3d
         # NOTE: If you change this list, update the documentation above as 
         # well.
-        for m in ['z', 'zChanged', 'sigZChanged', 'image_data', 'setImage',
+        for m in ['z', 'zChanged', 'image_data', 'setImage',
                   'removeImage', 'updateImageSlice'] :
             setattr(self, m, getattr(self.imagePlot3d, m))
 
