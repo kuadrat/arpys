@@ -84,10 +84,17 @@ class ImagePlot3d(ImagePlot):
         """ 
         # Initialize self.z before the call to super() because super's 
         # __init__ will call self.setImage which accesses self.z
-        self.z = TracedVariable()
-        self.z.sigValueChanged.connect(self.zChanged)
+        z = TracedVariable()
+        self.registerTracedVar(z)
         super().__init__(image=image, parent=parent, background=background, 
                          **kwargs) 
+
+    def registerTracedVar(self, tracedVariable) :
+        """ Set self.z to the given TracedVariable instance and connect the 
+        relevant slots to the signals. 
+        """
+        self.z = tracedVariable
+        self.z.sigValueChanged.connect(self.zChanged)
 
     def sizeHint(self) :
         """ NOTE: Doesn't seem to do much. """
@@ -130,6 +137,9 @@ class ImagePlot3d(ImagePlot):
         # Determine the new ranges for z
         self.zmin = 0
         self.zmax = image.shape[self.zaxis] - 1
+
+        # Update the allowed values for z
+        self.z.set_allowed_values(range(self.zmin, self.zmax+1))
 
         self.image_data = image
         self.axes = axes
@@ -186,6 +196,118 @@ class ImagePlot3d(ImagePlot):
         elif key == qt.QtCore.Qt.Key_Left :
             z -= 1
         self.z.set_value(z)
+
+class Scalebar(pg.PlotWidget) :
+    """ Implements a simple, draggable scalebar represented by a line 
+    (:class: `InfiniteLine <pyqtgraph.InfiniteLine>) on an axis (:class: 
+    `PlotWidget <pyqtgraph.PlotWidget>).
+    The current position of the slider is tracked with the :class: 
+    `TracedVariable <arpys.pit.utilities.TracedVariable>` self.pos.
+    """
+
+    def __init__(self, parent=None, background='default', **kwargs) :
+        """ Initialize the slider and set up the visual tweaks to make a 
+        PlotWidget look more like a scalebar.
+
+        ==========  ============================================================
+        parent      QtWidget instance; parent widget of this widget.
+        background  str; confer PyQt documentation
+        ==========  ============================================================
+        """
+        super().__init__(parent=parent, background=background, **kwargs) 
+
+        # The position of the slider is stored with a TracedVariable
+        initial_pos = 0
+        pos = TracedVariable(initial_pos)
+        self.registerTracedVar(pos)
+
+        # Set up the slider
+        self.slider = pg.InfiniteLine(initial_pos, movable=True)
+        self.slider.setPen((255,255,0,255))
+        # Add a marker. Args are (style, position (from 0-1), size #NOTE 
+        # seems broken
+        #self.slider.addMarker('o', 0.5, 10)
+        self.addItem(self.slider)
+
+        # Aesthetics and other widget configs
+        self.hideAxis('left')
+        self.setSize(300, 50)
+        # Disable mouse scrolling, panning and zooming for both axes
+        self.setMouseEnabled(False, False)
+
+        # Initialize range to [0, 1]
+        self.setBounds(initial_pos, initial_pos + 1)
+
+        # Connect a slot (callback) to dragging and clicking events
+        self.slider.sigDragged.connect(self.onPositionChange)
+        # sigMouseReleased seems to not work (maybe because sigDragged is used)
+        #self.sigMouseReleased.connect(self.onClick)
+        # The inherited mouseReleaseEvent is probably used for sigDragged 
+        # already. Anyhow, overwriting it here leads to inconsistent behaviour.
+        #self.mouseReleaseEvent = self.onClick
+
+    def registerTracedVar(self, tracedVariable) :
+        """ Set self.pos to the given TracedVariable instance and connect the 
+        relevant slots to the signals. This can be used to share a 
+        TracedVariable among widgets.
+        """
+        self.pos = tracedVariable
+        self.pos.sigValueChanged.connect(self.setPosition)
+        self.pos.sigAllowedValuesChanged.connect(self.onAllowedValuesChange)
+        # Set the bounds to the current values of this TracedVar, if existent
+        #self.onAllowedValuesChanged()
+
+    def onClick(self, *args) :
+        """ For testing. """
+        print(args)
+        print('Clicked')
+
+    def onPositionChange(self) :
+        """ Callback for the :signal: `sigDragged 
+        <pyqtgraph.InfiniteLine.sigDragged>`. Set the value of the 
+        TracedVariable instance self.pos to the current slider position. 
+        """
+        current_pos = self.slider.value()
+        # NOTE pos.set_value emits signal sigValueChanged which may lead to 
+        # duplicate processing of the position change.
+        self.pos.set_value(current_pos)
+
+    def onAllowedValuesChange(self) :
+        """ Callback for the :signal: `sigDragged 
+        <pyqtgraph.InfiniteLine.sigDragged>`. With a change of the allowed 
+        values in the TracedVariable, we should update our bounds 
+        accordingly.
+        """
+        # If the allowed values were reset, just exit
+        if self.pos.allowed_values is None : return
+
+        lower = self.pos.min_allowed
+        upper = self.pos.max_allowed
+        self.setBounds(lower, upper)
+
+    def setPosition(self) :
+        """ Callback for the :signal: `sigValueChanged 
+        <arpys.pit.utilities.TracedVariable.sigValueChanged>`. Whenever the 
+        value of this TracedVariable is updated (possibly from outside this 
+        Scalebar object), put the slider to the appropriate position.
+        """
+        new_pos = self.pos.get_value()
+        self.slider.setValue(new_pos)
+
+    def setSize(self, width, height) :
+        """ Set this widgets size by setting minimum and maximum sizes 
+        simultaneously to the same value. 
+        """
+        self.setMinimumSize(width, height)
+        self.setMaximumSize(width, height)
+
+    def setBounds(self, lower, upper) :
+        """ Set both, the displayed area of the axis as well as the the range 
+        in which the slider (InfiniteLine) can be dragged to the interval 
+        [lower, upper]. 
+        """
+        self.setXRange(lower, upper, padding=0.01)
+        self.slider.setBounds([lower, upper])
 
 class ImagePlotWidget(qt.QtGui.QWidget) :
     """ A widget that contains an :class: `ImagePlot3d 
