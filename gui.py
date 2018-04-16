@@ -415,6 +415,7 @@ class Gui :
         """ Efficiently redraw the cursors in the bottom left plot without 
         having to redraw the axes, ticks, labels, etc. """
         ax = self.axes['map']
+        #self.canvas.restore_region(self.bg_mesh)
         ax.draw_artist(self.xcursor)
         ax.draw_artist(self.ycursor)
         self.canvas.blit(ax.bbox)
@@ -443,7 +444,8 @@ class Gui :
         if filepath[0] is not '/' :
             path = './'
         else :
-            path = '/' + '/'.join(split[:-1]) + '/'
+            #path = '/' + '/'.join(split[:-1]) + '/'
+            path = '/'.join(split[:-1]) + '/'
 
         old_filename = split[-1]
         
@@ -482,11 +484,14 @@ class Gui :
         old_filepath = self.filepath.get() 
         if old_filepath :
             default_file = old_filepath
+            initialdir = None
         else :
             default_file = None
+            initialdir = '/home/kevin/qmap/'
 
         # Open a browser dialog
-        new_filepath = askopenfilename(initialfile=default_file)
+        new_filepath = askopenfilename(initialfile=default_file,
+                                       initialdir=initialdir)
 
         # Update the path only if a selection was made
         if new_filepath != "" :
@@ -659,11 +664,11 @@ class Gui :
                                                       self.cut2.T, **kwargs)
         else :
             # Plot the x cut in the upper left
-            self.cut2_plot = self.axes['cut1'].plot(xscale, self.cut1, 
-                                                    **cut_kwargs)
+            self.cut1_plot = self.axes['cut1'].plot(xscale, self.cut1, 
+                                                    **cut_kwargs)[0]
             # Plot the y cut in the lower right
             self.cut2_plot = self.axes['cut2'].plot(self.cut2, yscale, 
-                                                    **cut_kwargs)
+                                                    **cut_kwargs)[0]
 
             # Make sure the cut goes over the full range of the plot
             #self.axes['cut2'].set_ymargin(0) # For some reason this doesn't work
@@ -702,7 +707,10 @@ class Gui :
 
         args, kwargs = self.get_plot_args_and_kwargs()
         # Do the actual plotting with just defined args and kwargs
-        self.main_mesh = self.axes['map'].pcolormesh(*args, **kwargs)
+        ax = self.axes['map']
+        self.main_mesh = ax.pcolormesh(*args, **kwargs)
+
+        self.bg_mesh = self.canvas.copy_from_bbox(ax.bbox)
 
         # Update the cursors (such that they are above the pcolormesh) and cuts
         self.plot_cursors()
@@ -905,9 +913,11 @@ class Gui :
 
             # Update the cursor position and redraw it
             self.cursor_xy = (x, y)
+            #self.plot_cursors()
             self.redraw_cursors()
             # Now the cuts have to be redrawn as well
             self.calculate_cuts()
+            #self.plot_cuts()
             self.redraw_cuts()
 
         cid = self.canvas.mpl_connect('button_press_event', on_click)
