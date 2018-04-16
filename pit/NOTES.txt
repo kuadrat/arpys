@@ -1,4 +1,9 @@
 Current step:
-implement allowed values for TracedVariable. This requires 'type checking' if 
-allowed values are set and a signal which is emitted when the allowed values 
-change.
+* started implementing mousewheel scrolling in Scalebar
+* add a 3D array slicing ROI
+  \- implement a proper class for that (Cursor)
+* add colorbar histogram widget
+
+
+Notes:
+maybe TracedVariable with allowed_values should be subclassed

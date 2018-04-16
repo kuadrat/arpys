@@ -1,4 +1,4 @@
-""" matplotlib pcolormesh equivalent in pyqtgraph """
+""" matplotlib pcolormesh equivalent in pyqtgraph (more or less) """
 
 from numpy import clip, inf, ndarray
 import pyqtgraph as pg
@@ -7,6 +7,7 @@ from pyqtgraph.graphicsItems.ImageItem import ImageItem
 from pyqtgraph.widgets import PlotWidget, GraphicsView
 
 from .utilities import TracedVariable
+from cursor import Cursor
 
 class ImagePlot(pg.PlotWidget) :
     """
@@ -76,8 +77,8 @@ class ImagePlot3d(ImagePlot):
     data with the keyboard.
     """
 
-    def __init__(self, image=None, parent=None, background='default', 
-                 **kwargs) :
+    def __init__(self, image=None, axes=(0,1), parent=None, 
+                 background='default', **kwargs) :
         """ Call super() and connect signals. See doc of :func: ` __init__() 
         <arpys.pit.imageplot.ImagePlot.__init__> for explanation of 
         arguments.  
@@ -86,8 +87,15 @@ class ImagePlot3d(ImagePlot):
         # __init__ will call self.setImage which accesses self.z
         z = TracedVariable()
         self.registerTracedVar(z)
-        super().__init__(image=image, parent=parent, background=background, 
-                         **kwargs) 
+        super().__init__(parent=parent, background=background, **kwargs) 
+        if image is not None :
+            self.setImage(image, axes)
+
+        # DEBUG add a cursor
+        self.cursor = Cursor(([0,0], [100,100]))
+        #self.cursor.setMovable(True)
+        self.addItem(self.cursor)
+        self.cursor.setZValue(1)
 
     def registerTracedVar(self, tracedVariable) :
         """ Set self.z to the given TracedVariable instance and connect the 
@@ -245,6 +253,15 @@ class Scalebar(pg.PlotWidget) :
         # The inherited mouseReleaseEvent is probably used for sigDragged 
         # already. Anyhow, overwriting it here leads to inconsistent behaviour.
         #self.mouseReleaseEvent = self.onClick
+
+    def wheelEvent(self, event) :
+        print(event.angleDelta())
+        print(event.pixelDelta())
+        delta = event.pixelDelta().y()
+        if delta > 0 :
+            self.pos.set_value(self.pos.get_value() - 1)
+        elif delta < 0 :
+            self.pos.set_value(self.pos.get_value() + 1)
 
     def registerTracedVar(self, tracedVariable) :
         """ Set self.pos to the given TracedVariable instance and connect the 
