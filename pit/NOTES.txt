@@ -1,7 +1,7 @@
 Current step:
-* started implementing mousewheel scrolling in Scalebar
 * add a 3D array slicing ROI
-  \- implement a proper class for that (Cursor)
+  \- implement a proper class for that (Cursor) EDIT: this is too time 
+    consuming, just use a draggable LineSegmentROI instead.
 * add colorbar histogram widget
 
 

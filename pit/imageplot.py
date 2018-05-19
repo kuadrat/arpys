@@ -1,6 +1,6 @@
 """ matplotlib pcolormesh equivalent in pyqtgraph (more or less) """
 
-from numpy import clip, inf, ndarray
+from numpy import clip, inf, ndarray, inf
 import pyqtgraph as pg
 from pyqtgraph import Qt as qt #import QtCore
 from pyqtgraph.graphicsItems.ImageItem import ImageItem
@@ -16,6 +16,7 @@ class ImagePlot(pg.PlotWidget) :
     the nice pyqtgraph axes panning/rescaling/zooming functionality.
     """
     image = None
+    sigImageChanged = qt.QtCore.Signal()
 
     def __init__(self, image=None, parent=None, background='default', 
                  **kwargs) :
@@ -66,6 +67,25 @@ class ImagePlot(pg.PlotWidget) :
         self.image = image
         self.addItem(image)
 
+        self.sigImageChanged.emit()
+
+    def fixViewRange(self) :
+        """ Prevent zooming out by fixing the limits of the ViewBox. """
+        [[xMin, xMax], [yMin, yMax]] = self.viewRange()
+        self.setLimits(xMin=xMin, xMax=xMax, yMin=yMin, yMax=yMax,
+                      maxXRange=xMax-xMin, maxYRange=yMax-yMin)
+
+    def releaseViewRange(self) :
+        """ Undo the effects of :func: `fixViewRange 
+        <pit.imageplot.ImagePlot.fixViewRange>`
+        """
+        self.setLimits(xMin=-inf,
+                       xMax=inf,
+                       yMin=-inf,
+                       yMax=inf,
+                       maxXRange=inf,
+                       maxYRange=inf)
+
     def getImage(self) :
         """ Getter method for self.image. """
         return self.image
@@ -90,12 +110,6 @@ class ImagePlot3d(ImagePlot):
         super().__init__(parent=parent, background=background, **kwargs) 
         if image is not None :
             self.setImage(image, axes)
-
-        # DEBUG add a cursor
-        self.cursor = Cursor(([0,0], [100,100]))
-        #self.cursor.setMovable(True)
-        self.addItem(self.cursor)
-        self.cursor.setZValue(1)
 
     def registerTracedVar(self, tracedVariable) :
         """ Set self.z to the given TracedVariable instance and connect the 
@@ -156,7 +170,12 @@ class ImagePlot3d(ImagePlot):
         # Initialize z to 0, taking the first slice of the data
         self.z.set_value(0)
         self.updateImageSlice()
+
+        # Fix the scales to prevent zooming out
+        self.fixViewRange()
         
+        self.sigImageChanged.emit()
+
     def updateImageSlice(self) :
         """ Update the currently displayed image slice by deleting the old 
         `self.image` and using :func: `addItem 
@@ -246,6 +265,10 @@ class Scalebar(pg.PlotWidget) :
         # Initialize range to [0, 1]
         self.setBounds(initial_pos, initial_pos + 1)
 
+        # Set the speed at which the slider moves on mousewheel scroll
+        # in units of % of total range
+        self.wheel_sensitivity = 0.5
+
         # Connect a slot (callback) to dragging and clicking events
         self.slider.sigDragged.connect(self.onPositionChange)
         # sigMouseReleased seems to not work (maybe because sigDragged is used)
@@ -255,13 +278,20 @@ class Scalebar(pg.PlotWidget) :
         #self.mouseReleaseEvent = self.onClick
 
     def wheelEvent(self, event) :
-        print(event.angleDelta())
-        print(event.pixelDelta())
+        """ Override of the Qt wheelEvent method. Fired on mousewheel 
+        scrolling inside the widget. Change the position of the 
+        """
+        # Get the relevant coordinate of the mouseWheel scroll
         delta = event.pixelDelta().y()
         if delta > 0 :
-            self.pos.set_value(self.pos.get_value() - 1)
+            sign = -1
         elif delta < 0 :
-            self.pos.set_value(self.pos.get_value() + 1)
+            sign = 1
+        else :
+            # It seems that in some cases delta==0
+            sign = 0
+        self.pos.set_value(self.pos.get_value() + sign * 
+                           self.wheel_frames) 
 
     def registerTracedVar(self, tracedVariable) :
         """ Set self.pos to the given TracedVariable instance and connect the 
@@ -290,10 +320,10 @@ class Scalebar(pg.PlotWidget) :
         self.pos.set_value(current_pos)
 
     def onAllowedValuesChange(self) :
-        """ Callback for the :signal: `sigDragged 
-        <pyqtgraph.InfiniteLine.sigDragged>`. With a change of the allowed 
-        values in the TracedVariable, we should update our bounds 
-        accordingly.
+        """ Callback for the :signal: `sigAllowedValuesChanged
+        <pyqtgraph.utilities.TracedVariable.sifAllowedValuesChanged>`. With a 
+        change of the allowed values in the TracedVariable, we should update 
+        our bounds accordingly.
         """
         # If the allowed values were reset, just exit
         if self.pos.allowed_values is None : return
@@ -301,6 +331,9 @@ class Scalebar(pg.PlotWidget) :
         lower = self.pos.min_allowed
         upper = self.pos.max_allowed
         self.setBounds(lower, upper)
+
+        # When the bounds update, the mousewheelspeed should change accordingly
+        self.wheel_frames = 0.01 * self.wheel_sensitivity * (upper-lower)
 
     def setPosition(self) :
         """ Callback for the :signal: `sigValueChanged 
@@ -326,6 +359,7 @@ class Scalebar(pg.PlotWidget) :
         self.setXRange(lower, upper, padding=0.01)
         self.slider.setBounds([lower, upper])
 
+# Deprecated
 class ImagePlotWidget(qt.QtGui.QWidget) :
     """ A widget that contains an :class: `ImagePlot3d 
     <arpys.pit.imageplot.ImagePlot3d> as its main element accompanied by a 
