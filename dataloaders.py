@@ -7,6 +7,7 @@ shape and form.
 
 import h5py
 import numpy as np
+import os.path
 import pickle
 import pyfits
 from argparse import Namespace
@@ -30,8 +31,8 @@ class Dataloader() :
 
 class Dataloader_Pickle(Dataloader) :
     """ Load data that has been saved using python's `pickle` module. ARPES 
-    pickle files are assumed to just contain the datadict the way it would be 
-    returned by any Dataloader of this module. 
+    pickle files are assumed to just contain the data namespace the way it 
+    would be returned by any Dataloader of this module. 
     """
     name = 'Pickle'
 
@@ -131,7 +132,7 @@ class Dataloader_ALS(Dataloader) :
         #deg_per_px = 0.193 / 2
         deg_per_px = 0.193 * self.k_stretch
         #angle_binning = 3
-        angle_binning = 1
+        angle_binning = 2
 
         #angles_in_px = np.arange(y0, y1, angle_binning)
         #n_y = int((y1-y0)/angle_binning)
@@ -158,7 +159,7 @@ class Dataloader_ALS(Dataloader) :
             x1 = header['EN_0_0']
             #n_x = header['N_0_0']
             #xscale = np.linspace(x0, x1, n_x) * self.k_stretch
-            xscale = np.linspace(x0, x1, nx) * self.k_stretch
+            xscale = np.linspace(x0, x1, nx) #* self.k_stretch
             yscale = angles
             zscale = energies
         # Case hv scan
@@ -175,11 +176,12 @@ class Dataloader_ALS(Dataloader) :
         elif scanmode == self.DOPING :
             z0 = header['ST_0_0']
             z1 = header['EN_0_0']
-            angles_in_px = np.arange(0, nx, 1)
-            angles = angles_in_px * deg_per_px  / angle_binning
+            # Not sure how the sqrt2 comes in
+            angles_in_px = np.arange(0, nx, 1) * np.sqrt(2)
+            angles = angles_in_px * deg_per_px  / angle_binning 
             xscale = angles
             # For some reason the energy determination from file fails here...
-            yscale = range(ny)
+            yscale = np.arange(ny, dtype=float)
             zscale = np.linspace(z0, z1, nz)
 
         # For the binding energy, just take a min value as its variations 
@@ -595,6 +597,66 @@ def load_data(filename, exclude=None) :
 
     raise Exception('Could not load data {}.'.format(filename))
 
+# Function to create a python pickle file from a data namespace
+def dump(D, filename, force=False) :
+    """ Wrapper for :func: `pickle.dump()`. Does not overwrite if a file of 
+    the given name already exists, unless :param: `force` is True.
+
+    ========  ==================================================================
+    D         argparse.Namespace; the namespace holding the data and 
+              metadata. The format is the same as what is returned by a 
+              dataloader.
+    filename  str; name of the output file to create.
+    force     boolean; if True, overwrite existing file.
+    ========  ==================================================================
+    """
+    # Check if file already exists
+    if not force and os.path.isfile(filename) :
+        question = 'File {} exists. Overwrite it? (y/N)'.format(filename)
+        answer = input(question)
+        # If the answer is anything but a clear affirmative, stop here
+        if answer.lower() not in ['y', 'yes'] :
+            return
+
+    with open(filename, 'wb') as f :
+        pickle.dump(D, f)
+
+    message = 'Wrote to file {}.'.format(filename)
+    print(message)
+
+def update_namespace(D, *attributes) :
+    """ Add arbitrary attributes to a :class: `Namespace <argparse.Namespace>`.
+
+    ==========  ================================================================
+    D           argparse.Namespace; the namespace holding the data and 
+                metadata. The format is the same as what is returned by a 
+                dataloader.
+    attributes  tuples or len(2) lists; (name, value) pairs of the attributes 
+                to add. Where `name` is a str and value any python object.
+    ==========  ================================================================
+    """
+    for name, attribute in attributes :
+        D.__dict__.update( {name: attribute} )
+
+def add_attributes(filename, *attributes) :
+    """ Add arbitrary attributes to an argparse.Namespace that is stored as a 
+    python pickle file. Simply opens the file, updates the namespace with 
+    :func: `update_namespace <arpys.dataloaders.update_namespace>` and writes 
+    back to file.
+
+    ==========  ================================================================
+    filename    str; name of the file to update.
+    attributes  tuples or len(2) lists; (name, value) pairs of the attributes 
+                to add. Where `name` is a str and value any python object.
+    ==========  ================================================================
+    """
+    dataloader = Dataloader_Pickle()
+    D = dataloader.load_data(filename)
+    
+    update_namespace(D, *attributes)
+    
+    dump(D, filename, force=True)
+    
 # +---------+ #
 # | Testing | # ================================================================
 # +---------+ #
@@ -606,13 +668,22 @@ if __name__ == '__main__' :
 #    print(datadict['data'].shape)
 #    print(datadict['xscale'].shape)
 #    print(datadict['yscale'].shape)
-    adress = Dataloader_ADRESS()
-    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/003_quickmap_540eV.h5'
-    ns = adress.load_data(path)
 
-    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/002_quick_kz_350to800.h5'
-    ns = adress.load_data(path)
-
-    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/014_HSscan_nodal_428eV.h5'
-    ns = adress.load_data(path)
+#    adress = Dataloader_ADRESS()
+#    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/003_quickmap_540eV.h5'
+#    ns = adress.load_data(path)
+#
+#    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/002_quick_kz_350to800.h5'
+#    ns = adress.load_data(path)
+#
+#    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/014_HSscan_nodal_428eV.h5'
+#    ns = adress.load_data(path)
     
+    D = Namespace(a=0, b=1)
+    dump(D, 'foo.p')
+
+    add_attributes('foo.p', ('c', 2), ['d', 'three'])
+
+    dl = Dataloader_Pickle()
+    D = dl.load_data('foo.p')
+    print(D)

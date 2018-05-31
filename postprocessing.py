@@ -6,6 +6,8 @@ Contains different tools to post-process (ARPES) data.
 import numpy as np
 import warnings
 
+from kustom import constants
+
 # +------------+ #
 # | Decorators | # ============================================================
 # +------------+ #
@@ -179,10 +181,12 @@ def convert_data(data) :
         l = shape[0]
         m = shape[1]
         data = data.reshape(1, l, m)
+    elif d == 3 :
+        l = shape[1]
+        m = shape[2]
     else :
-        l = None
-        m = None
-
+        raise ValueError('Could not bring data with shape {} into right \
+                         form.'.format(shape))
     return data, d, l, m
 
 def convert_data_back(data, d, l, m) :
@@ -286,28 +290,85 @@ def normalize_per_integrated_segment(data, dim=0) :
 
     return data
 
-def normalize_above_fermi(data, ef=None, ef_index=None, n=10, dim=1) :
-    """ Pass """
-    # Convert data if necessary
+def normalize_above_fermi(data, ef_index=None, n=10, dist=0, inverted=False, 
+                          dim=1, profile=False) : 
+    """ Normalize data to the mean of the n smallest values above the Fermi 
+    level.
+
+    Parameters
+    ----------
+    data     : array-like; data of shape (lxm) or (1xlxm)
+    ef_index : int; index of the Fermi level in the EDCs
+    n        : int; number of points above the Fermi level to average over
+    dist     : int; distance from Fermi level before starting to take points 
+               for the normalization. The points taken correspond to 
+               EDC[ef_index+d:ef_index+d+n] (in the non-inverted case)
+    dim      : either 1 or 2; 1 if EDCs have length m, 2 if EDCs have length l
+    inverted : boolean; this should be set to True if higher energy values 
+               come first in the EDCs
+    profile  : boolean; if True, the list of normalization factors is returned
+               additionally
+
+    Returns
+    -------
+    data     : array-like; normalized data of same shape as input data
+    profile  : 1D-array; only returned as a tuple with data (`data, profile`) 
+               if argument `profile` was set to True. Contains the 
+               normalization profile, i.e. the normalization factor for each 
+               channel. Its length is m if dim==2 and l if dim==1.
+    """
+    # Prevent input data from being overwritten by creating a copy and 
+    # convert data shape if necessary
+    data = data.copy()
     data, d, l, m = convert_data(data)
 
-    for k in range(l) :
-        edc = data[0,k]
-        above_ef = edc[ef_index:]
+    # Create a mini-function (with lambda) which extracts the right part of 
+    # the data, depending on the user input
+    if dim==1 :
+        get_edc = lambda k : data[0,k]
+        n_edcs = l
+    elif dim==2 :
+        get_edc = lambda k : data[0,:,k]
+        n_edcs = m
+    else :
+        message = '[arpys.pp.normalize_above_fermi]`dim` should be 1 or 2, \
+        got {}'.format(dim)
+        raise ValueError(message)
 
-        ordered = sorted(above_ef)
+    # Create the right mini-function for the extraction of points above the 
+    # Fermi level
+    if inverted :
+        get_above_fermi = lambda edc : edc[:ef_index-dist][::-1]
+    else :
+        get_above_fermi = lambda edc : edc[ef_index+dist:]
+
+    if profile :
+        norms = []
+
+    # Iterate over EDCs
+    for k in range(n_edcs) :
+        edc = get_edc(k)
+        above_ef = get_above_fermi(edc)
 
         norm = np.mean(above_ef[:n])
+        if profile :
+            norms.append(norm)
 
-    with np.errstate(invalid='raise') :
-        try :
-            edc = edc/norm
-        except FloatingPointError as e :
-            pass
-    
+        # This syntax updates the data in-place
+        edc /= norm
+#    with np.errstate(invalid='raise') :
+#        try :
+#            # This should update the data in-place
+#            edc /= norm
+#        except FloatingPointError as e :
+#            print('Passing...')
+#            pass
     data = convert_data_back(data, d, l, m)
 
-    return data
+    if profile :
+        return data, np.array(norms)
+    else :
+        return data
 
 
 # +----------------+ #
@@ -368,24 +429,32 @@ def subtract_bg_fermi(data, n=10, ef=None, ef_index=None) :
          
     return data
 
-def subtract_bg_matt(data, n=5) :
+def subtract_bg_matt(data, n=5, profile=False) :
     """ Subtract background following the method in C.E.Matt's 
     "High-temperature Superconductivity Restrained by Orbital Hybridisation".
-    Use the mean of the n smallest point in the spectrum for each energy.
+    Use the mean of the n smallest points in the spectrum for each energy 
+    (i.e. each MDC).
 
     Parameters
     ----------
-    data        : array-like; the input data with shape (l x m) or 
-                  (1 x l x m) containing momentum in y (m momentum points) 
-                  and energy along x (l energy points) (plotting amazingly 
-                  inverts x and y)
-    n           : int; number of smallest points to take in order to determine
-                  bg
+    data    : array-like; the input data with shape (l x m) or (1 x l x m) 
+              containing momentum in y (m momentum points) and energy along x 
+              (l energy points) (plotting amazingly inverts x and y)
+    n       : int; number of smallest points to take in each MDC in order to 
+              determine bg
+    profile : boolean; if True, a list of the background values for each MDC 
+              is returned additionally.
 
     Returns
     -------
-    res         : np.array; bg-subtracted version of input data in same shape
+    res     : np.array; bg-subtracted version of input data in same shape
+    profile : 1D-array; only returned as a tuple with data (`data, profile`) 
+              if argument `profile` was set to True. Contains the 
+              background profile, i.e. the background value for each MDC.
     """
+    # Prevent original data from being overwritten by retaining a copy
+    data = data.copy()
+
     # Reshape input
     shape = data.shape
     d = len(shape)
@@ -397,9 +466,11 @@ def subtract_bg_matt(data, n=5) :
         l = shape[0]
         m = shape[1]
 
-# Determine the number of energies l
-#    shape = data.shape
-#    l = shape[1] if len(shape)==3 else shape[0]
+    # Determine the number of energies l
+    #    shape = data.shape
+    #    l = shape[1] if len(shape)==3 else shape[0]
+    if profile :
+        bgs = []
 
     # Loop over every energy
     for e in range(l) :
@@ -410,6 +481,8 @@ def subtract_bg_matt(data, n=5) :
 
         # Average over the first (smallest) n points to get the bg
         bg = np.mean(ordered[:n])
+        if profile :
+            bgs.append(bg)
 
         # Subtract the background (this updates the data array in place)
         mdc -= bg
@@ -417,6 +490,70 @@ def subtract_bg_matt(data, n=5) :
     if d == 3 :
         data = data.reshape([1, l, m])
 
+    if profile :
+        return data, np.array(bgs)
+    else :
+        return data
+
+def subtract_bg_shirley(data, dim=0) :
+    """ Use an iterative approach for the background of an EDC as described in
+    DOI:10.1103/PhysRevB.5.4709. Mathematically, the value of the EDC after 
+    BG subtraction for energy E EDC'(E) can be expressed as follows :
+
+                               E1
+                               /
+        EDC'(E) = EDC(E) - s * | EDC(E') dE
+                               /
+                               E
+
+    where EDC(E) is the value of the EDC at E before bg subtraction, E1 is a 
+    chosen energy value (in our case the last value in the EDC) up to which 
+    the subtraction is applied and s is chosen such that EDC'(E0)=EDC'(E1) 
+    with E0 being the starting value of the bg subtraction (in our case the 
+    first value in the EDC).
+
+    In principle, this is an iterative method, so it should be applied 
+    repeatedly, until no appreciable change occurs through an iteration. In 
+    practice this convergence is reached in 4-5 iterations at most and even a 
+    single iteration may suffice.
+
+    Parameters
+    ----------
+    data : np.array; input data with shape (l x m) or (1 x l x m) containing 
+           an E(k) cut
+    dim  : int; either 0 or 1. Determines whether the input is aranged as 
+           E(k) (m EDCs of length l) or k(E) (l EDCs of length m)
+
+    Returns
+    -------
+    data : np.array; has the same dimensions as the input array.
+    """
+    # Prevent original data from being overwritten by retaining a copy
+    data = data.copy()
+
+    data, d, l, m = convert_data(data)
+    
+    if dim == 0 :
+        nk = m
+        ne = l
+        get_edc = lambda k : data[0,:,k]
+    elif dim == 1 :
+        nk = l
+        ne = m
+        get_edc = lambda k : data[0,k]
+
+    indices = np.arange(ne)
+    for k in range(nk) :
+        edc = get_edc(k)
+        # Calculate the "normalization" prefactor
+        s = (edc[0] - edc[-1]) / edc.sum()
+        # Prepare a function that sums the EDC from a given index upwards
+        sum_from = np.frompyfunc(lambda e : edc[e:].sum(), 1, 1)
+
+        # Update data in-place
+        edc -= s * sum_from(indices).astype(float)
+
+    data = convert_data_back(data, d, l, m)
     return data
 
 def subtract_bg_gold(data) :
@@ -560,6 +697,11 @@ def smooth(x, n_box, recursion_level=1) :
     Can be called recursively to apply the smoothing n times in a row 
     by setting with 'recursion_level' to n.
 
+    At the endpoints, the arrays are assumed to continue by repeating their 
+    value at the start/end as to minimize endpoint effects. I.e. the array 
+    [1,1,2,3,5,8,13] becomes [1,1,1,1,2,3,5,8,13,13,13] for a box with 
+    n_box=5.  
+
     Parameters
     ----------
     x           : 1D array-like; the data to smooth
@@ -571,13 +713,20 @@ def smooth(x, n_box, recursion_level=1) :
 
     Returns
     -------
-    res         : np.array; smoothed data points
+    res         : np.array; smoothed data points of same shape as input.
     """
     # Make the box. Sum(box) should equal 1 to keep the normalization (?)
     box = np.ones(n_box) / n_box
 
+    # Append some points to reduce endpoint effects
+    n_append = int(0.5*(n_box-1))
+    left = [x[0]]
+    right = [x[-1]]
+    y = np.array(n_append*left + list(x) + n_append*right)
+
     # Let numpy do the work
-    smoothened = np.convolve(x, box, mode='same')
+    #smoothened = np.convolve(x, box, mode='same')
+    smoothened = np.convolve(y, box, mode='valid')
 
     # Do it again (enter next recursion level) or return the result
     if recursion_level == 1 :
@@ -585,7 +734,7 @@ def smooth(x, n_box, recursion_level=1) :
     else :
         return smooth(smoothened, n_box, recursion_level - 1)
 
-def smooth_derivative(x, n_box, n_smooth) :
+def smooth_derivative(x, n_box=15, n_smooth=3) :
     """ Apply linear smoothing to some data, take the derivative of the 
     smoothed curve, smooth that derivative and take the derivative again. 
     Finally, apply a last round of smoothing.
@@ -593,6 +742,7 @@ def smooth_derivative(x, n_box, n_smooth) :
     Parameters
     ----------
     Same as in `func:arpys.postprocessing.smooth`.
+    `n_smooth` corresponds to `recursion_level`.
     """
     # Smoothing 1
     res = smooth(x, n_box, n_smooth)
@@ -646,6 +796,12 @@ def zero_crossings(x, direction=0) :
 
     return crossings
 
+def detect_fermi_level(edc, n_box, n_smooth, orientation=1) :
+    """ TODO """
+    smoothdev = smooth_derivative(edc, n_box, n_smooth)
+    crossings = zero_crossings(smoothdev[::orientation])
+    return crossings
+
 # +------------------------------------------------+ #
 # | Conversion from angular coordinates to k space | # =========================
 # +------------------------------------------------+ #
@@ -686,7 +842,7 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
                   position 
     lattice_constant    
                 : float; lattice constant a in Angstrom used to convert to 
-                units of pi/a
+                  units of pi/a
     degrees     : bool; allows giving the angles in either degrees or radians
 
     Returns
@@ -716,6 +872,160 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
     ky = prefactor * np.sin(phi) 
 
     return kx, ky
+
+# +---------+ #
+# | Fitting | # ================================================================
+# +---------+ #
+
+def step_function_core(x, step_x=0, flip=False) :
+    """ Implement a perfect step function f(x) with step at `step_x`:
+    
+            / 0   if x < step_x
+            |
+    f(x) = {  0.5 if x = step_x
+            |
+            \ 1   if x > step_x
+
+    Parameters
+    ----------
+    x      array; x domain of function
+    step_x float; position of the step
+    flip   boolean; Flip the > and < signs in the definition
+    """
+    sign = -1 if flip else 1
+    if sign*x < sign*step_x :
+        result = 0
+    elif x == step_x :
+        result = 0.5
+    elif sign*x > sign*step_x :
+        result = 1
+    return result
+
+def step_function(x, step_x=0, flip=False) :
+    """ np.ufunc wrapper for step_function_core. Confer corresponding 
+    documentation. 
+    """
+    res = \
+    np.frompyfunc(lambda x : step_function_core(x, step_x, flip), 1, 1)(x)
+    return res.astype(float)
+
+def lorentzian(x, a=1, mu=0, gamma=1) :
+    """ Implement a Lorentzian curve f(x) given by the expression
+
+
+                        a
+           ----------------------------
+    f(x) =                         2
+                      /   /  x-mu \  \
+            pi*gamma*( 1+( ------- )  )
+                      \   \ gamma /  /
+
+
+    Parameters
+    ----------
+    x     : array; variable at which to evaluate f(x)
+    a     : float; amplitude (maximum value of curve)
+    mu    : float; mean of curve (location of maximum)
+    gamma : float; half-width at half-maximum (HWHM) of the curve
+
+    Returns
+    -------
+    res   : array containing the value of the Lorentzian at every point of 
+            input x 
+    """
+    return a/( np.pi*gamma*( 1 + ((x-mu)/gamma)**2 ) )
+
+def gaussian(x, a=1, mu=0, sigma=1) :
+    """ Implement a Gaussian bell curve f(x) given by the expression
+
+                                     2
+                      1    / (x-mu) \
+    f(x) = a * exp( - - * ( -------  ) )
+                      2    \ sigma  /
+
+    Parameters
+    ----------
+    x     : array; variable at which to evaluate f(x)
+    a     : float; amplitude (maximum value of curve)
+    mu    : float; mean of curve (location of maximum)
+    sigma : float; standard deviation (`width` of the curve)
+
+    Returns
+    -------
+    res   : array containing the value of the Gaussian at every point of 
+            input x 
+    """
+    return a * np.exp(-0.5 * (x-mu)**2 / sigma**2)
+
+#def merge_functions(f, g, x0) :
+#    """ Return a function F(x) which is defined by:
+#                / f(x) if x < x0
+#        F(x) = {
+#                \ g(x) if x >= x0
+#    """
+#    def core_func(x, fparams, gparams) :
+#        if x < x0 :
+#            return f(x, **fparams)
+#        else :
+#            return g(x, **gparams)
+#
+#    # Convert to np.ufunc and ensure the returned dtype is float
+#    core_func = np.frompyfunc(core_func, 1, 1)
+#    def F(x, fparams, gparams) :
+#        return core_func(x, fparams, gparams).astype(float)
+#    return F
+
+def gaussian_step(x, step_x=0, a=1, mu=0, sigma=1, flip=False, after_step=None) :
+    """ Implement (as a broadcastable np.ufunc) a sort-of convolution of a 
+    step-function with a Gaussian bell curve, defined as follows :
+
+            / g(x, a, mu, sigma) if x < step_x
+    f(x) = {
+            \ after_step         if x >= step_x
+
+    where g(x) is the :func: gaussian.
+
+    Parameters
+    ----------
+    x          array; x domain of function
+    step_x     float; position of the step
+    a          float; prefactor of the Gaussian
+    mu         float; mean of the Gaussian
+    sigma      float; standard deviation of the Gaussian
+    flip       boolean; Flip the > and < signs in the definition
+    after_step float; if not None, set a constant value that is assumed after 
+               the step. Else assume the value of the Gaussian at the step_x.   
+    """
+    # If no specific step height is given, use the value of the Gaussian at 
+    # x=step_x
+    if after_step is None :
+        after_step = gaussian(step_x, a, mu, sigma)
+
+    # Define the function core
+    def core_function(X) :
+        sign = -1 if flip else 1
+        if sign*X < sign*step_x :
+            return gaussian(X, a, mu, sigma)
+        else :
+            return after_step
+    # Convert to a numpy ufunc on the fly, such that arrays can be accepted 
+    # as input
+    result = np.frompyfunc(core_function, 1, 1)(x)
+    # Convert to float
+    return result.astype(float)
+
+def fermi_dirac(E, mu=0, T=4.2) :
+    """ Return the Fermi Dirac distribution with `step value` mu at 
+    temperature T for energy E. The Fermi Dirac distribution is given by
+
+                     1
+    n(E) = ----------------------
+            exp((E-mu)/(kT)) + 1
+
+    and assumes values from 0 to 1.
+    """
+    kT = constants.k_B * T
+    return 1/(np.exp((E-mu)/kT) + 1)
 
 # +---------+ #
 # | Various | # ================================================================
