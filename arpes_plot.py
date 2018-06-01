@@ -17,10 +17,15 @@ import kustom.arpys.postprocessing as pp
 # | Parameters and constants | # ===============================================
 # +--------------------------+ #
 
-# Shortands for final variables
-INT_EDC = 'integrated_edc'
-ABOVE_FERMI = 'above_fermi'
-NONE = 'no_norm'
+# Shortands for final variables (Update the respective docstrings if you 
+# change these)
+INT_EDC_NORM = 'integrated_edc'
+FERMI_NORM = 'above_fermi'
+NO_NORM = 'off'
+
+FERMI_BG = 'above_fermi'
+PROFILE_BG = 'profile'
+NO_BG = 'off'
 
 # Kevin's screen dimensions
 WIDTH = 1600
@@ -36,7 +41,7 @@ class APCmd(cmd.Cmd) :
     """ (A)RPES (P)lot (C)o(m)man(d) line interpreter.
     """
     #_Initial_parameters________________________________________________________
-    normalization = NONE
+    normalization = NO_NORM
     vmax = 1
 
     #_Cmd2_configuration________________________________________________________
@@ -72,67 +77,38 @@ interpreter.'.format(*bold)
         self.X = D.xscale.copy()
         self.Y = D.yscale.copy()
 
-    def parse(self, args, default=None) :
-        """ Parse the supplied arguments by simply splitting on whitespace. 
-        Returns the list of user-supplied arguments. If no user arguments 
-        were supplied, the args are set to a list containing just the element 
-        `default`.
-
-        =======  ===============================================================
-        args     str; space-seperated sequence of arguments.
-        default  str; if `args` is an empty string, the result will be the list
-                 [`default`].
-        =======  ===============================================================
-        """
-        args = args.split()
-        if len(args) is 0 :
-            args = [default]
-        return args
-
+    """ Define the parser for :func: `do_norm`. """
+    norm_parser = \
+    argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    norm_parser.add_argument('method', nargs='?', default=INT_EDC_NORM, 
+                             choices=[NO_NORM, INT_EDC_NORM, FERMI_NORM],
+                             help='Name of normalization method.')
+                                 
+    @cmd.with_argparser(norm_parser)
     def do_norm(self, args) :
-        """ Apply normalization to the data. """
-        args = self.parse(args, default='int')
-        method = args[0]
-
-        # Retain the original user input for later
-        original_input = method
-
-        # Define all recognized command names for the different methods
-        methods = {
-                   INT_EDC: ['1', 'int', 'int_edc'],
-                   ABOVE_FERMI: ['2', 'above', 'fermi', 'above_fermi'],
-                   NONE: ['0', 'none', 'no', 'n', 'off']
-                  }
-        
-        # Convert input to lowercase
-        method = method.lower()
-        
-        # Try to understand the user supplied method name
-        recognized = False
-        for name in methods :
-            if method in [name] + methods[name] :
-                method = name
-                # Recognized! Leave the loop
-                recognized = True
-                break
-
-        # Print a help text
-        if not recognized :
-            self.poutput('Normalization method name `{}` not understood. Try one of \
-these:\n'.format(original_input))
-            self.poutput('{:<20}  {:<}'.format('Method name', 'Aliases'))
-            self.poutput(80*'=')
-            for name in methods :
-                self.poutput('{:<20}  {:<}'.format(name, '  '.join(methods[name])))
-            return
+        """ Apply normalization to the data. Available options:
+                    off: no normalization.
+                int_edc: normalize each EDC by its integral.
+            above_fermi: normalize each EDC by the mean in a defined region above the
+                         Fermi level.
+        """
+        method = args.method
 
         # Apply the correct normalization
         self.poutput('Applying norm {}. \n'.format(method))
-        
-        #if method==INT_EDC :
-           #self.data = pp.normalize_per_integrated_segment(self.data, dim=1)
         self.normalization = method
         self.plot()
+
+    """ Define the parser for :func: `do_bg` """
+    bg_parser = \
+    argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    bg_parser.add_argument('method', nargs='?', choices=[NO_BG, PROFILE_BG, FERMI_BG], 
+                           default='off', help='stub')
+        
+    @cmd.with_argparser(bg_parser)
+    def do_bg(self, args) :
+        """ Apply bg subtraction to the data. """
+        self.poutput(args)
 
     """ Define the parser for :func: `do_ang2k` """
     a2k_parser = argparse.ArgumentParser()
@@ -198,9 +174,9 @@ these:\n'.format(original_input))
         self.data = self.original_data.copy()
 
         # Normalization
-        if self.normalization == NONE :
+        if self.normalization == NO_NORM :
             pass
-        elif self.normalization == INT_EDC :
+        elif self.normalization == INT_EDC_NORM :
             self.data = pp.normalize_per_integrated_segment(self.data, dim=1)
 
         # Plot
