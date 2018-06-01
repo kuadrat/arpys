@@ -782,11 +782,11 @@ def zero_crossings(x, direction=0) :
         s0 = np.sign(i0)
         s1 = np.sign(i1)
         if direction == -1 :
-            # Only detect changes from + t0 -
+            # Only detect changes from + to -
             if s0 == 1 and s1 == -1 :
                 crossings.append(i)
         elif direction == 1 :
-            # Only detect changes from - t0 +
+            # Only detect changes from - to +
             if s0 == -1 and s1 == 1 :
                 crossings.append(i)
         elif direction == 0 :
