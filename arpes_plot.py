@@ -13,6 +13,7 @@ TODO:
     - shirley bg, and other norms and bgs (`above_fermi`)
     - Fermi level detection
     - find a way for iPython to be non-blocking
+    - main plot with clickable cursor that does something
 """
 
 import argparse
@@ -81,7 +82,7 @@ class APCmd(cmd.Cmd) :
         # Define the prompt and welcome messages
         self.prompt = self.colorize('[APC] ', 'cyan')
         bold = [self.colorize(i, 'bold') for i in ['APC', 'A', 'P', 'C']]
-        self.intro = ('Welcome to {}, the {}RPES {}lot {}ommand line'
+        self.intro = ('Welcome to {}, the {}RPES {}lot {}ommand line '
                       'interpreter.').format(*bold)
 
         self.ax = ax
@@ -313,14 +314,17 @@ class APCmd(cmd.Cmd) :
     """ Define the parser for :func: `do_cut` """
     cut_parser = \
     argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    cut_parser.add_argument('dimension', type=int, #choices=['0', '1', '2'],
+    cut_parser.add_argument('dimension', type=str, 
+                            choices=['0', '1', '2', 'x', 'y', 'z'],
                             help=('Dimension along which to cut. The '
                                   'definitions are as in :func: `make_slice '
                                   '<kustom.arpys.postprocessing.make_slice>`, '
-                                  'i.e. 0 corresponds to the first dimension '
-                                  'in the array ([X,:,:]) which is the '
-                                  '`logical` z axis; 1 ([:,X,:]) is the y- and '
-                                  '2 ([:,:,X]) the x-axis.'))
+                                  'but can also given as `x`, `y` or `z`.'
+                                  'E.g. 0 or `z` corresponds to the first '
+                                  'dimension in the array ([X,:,:]) which '
+                                  'is the `logical` z axis; 1 or `y` '
+                                  '([:,X,:]) is the y- and 2 or `x` ([:,:,X]) '
+                                  'the x-axis.'))
     cut_parser.add_argument('value', type=float,
                             help=('Value along dimension `dimension` (in that '
                                   'dimension`s units) at which to take the cut.'))
@@ -331,7 +335,6 @@ class APCmd(cmd.Cmd) :
     @cmd.with_category(ANALYSIS)
     @cmd.with_argparser(cut_parser)
     def do_cut(self, args) :
-        # TODO Support for 3D data
         """
         Cut along the specified dimension and at the specified point and 
         present the result in a new figure.
@@ -339,16 +342,19 @@ class APCmd(cmd.Cmd) :
         iPython via `self.get_axes()`.
         """
         # Get the right axes scales
-        d = int(args.dimension)
-        if d==0 :
+        d = args.dimension
+        if d in ['0', 'z'] :
+            d = 0
             scale = self.Z
             x = self.X
             y = self.Y
-        elif d==1 :
+        elif d in ['1', 'y'] :
+            d = 1
             scale = self.Y
             x = self.X
             y = self.Z
-        elif d==2 :
+        elif d in ['2', 'x'] :
+            d = 2
             scale = self.X
             x = self.Y
             y = self.Z
@@ -429,6 +435,12 @@ class APCmd(cmd.Cmd) :
     def do_ylabel(self, arg) :
         """ Set the label of the y axis. """
         self.ax.set_ylabel(arg)
+
+    @cmd.with_category(VISUAL)
+    def do_close_all(self, arg) :
+        """ Close all plots except the main one. """
+        for fig in plt.get_fignums()[1:] :
+            plt.close(fig)
 
     def do_name(self, arg) :
         """ Print the name of the currently opened file. """

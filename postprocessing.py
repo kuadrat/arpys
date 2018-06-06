@@ -83,7 +83,7 @@ def make_slice(data, d, i, integrate=0) :
         'i - integrate ({}) < 0, setting start=0'.format(start))       
         start = 0
     if stop > n_slices :
-        warning = ('i + integrate ({}) > n_slices ({}), setting ')
+        warning = ('i + integrate ({}) > n_slices ({}), setting '
                    'stop=n_slices').format(stop, n_slices)       
         warnings.warn(warning)
         stop = n_slices
