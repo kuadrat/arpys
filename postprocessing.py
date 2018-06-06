@@ -70,7 +70,7 @@ def make_slice(data, d, i, integrate=0) :
     try :
         n_slices = shape[d]
     except IndexError :
-        print('d ({}) can only be 0, 1 or 2'.format(d))
+        print('d ({}) can only be 0, 1 or 2 and data must be 3D.'.format(d))
         return
 
     output_shape = shape[:d] + shape[d+1:]
@@ -82,9 +82,9 @@ def make_slice(data, d, i, integrate=0) :
         warnings.warn(
         'i - integrate ({}) < 0, setting start=0'.format(start))       
         start = 0
-    if stop >= n_slices :
-        warning = 'i + integrate ({}) >= n_slices ({}), setting \
-stop=n_slices'.format(stop, n_slices)       
+    if stop > n_slices :
+        warning = ('i + integrate ({}) > n_slices ({}), setting ')
+                   'stop=n_slices').format(stop, n_slices)       
         warnings.warn(warning)
         stop = n_slices
 
@@ -123,18 +123,18 @@ def make_map(data, i, integrate=0) :
     # Prepare the start and stop indices for slicing of the map data
     l, m, n = data.shape
     if i >= l :
-        warnings.warn('i ({}) >= l ({}), setting i=l'.format(i, l))       
-        i = l
+        warnings.warn('i ({}) >= l ({}), setting i=l-1.'.format(i, l))       
+        i = l-1
 
     start = i - integrate
     stop = i + integrate + 1
     if start < 0 :
         warnings.warn(
-        'i - integrate ({}) < 0, setting start=0'.format(start))       
+        'i - integrate ({}) < 0, setting start=0.'.format(start))       
         start = 0
-    if stop >= l :
+    if stop > l :
         warnings.warn(
-        'i + integrate ({}) >= l ({}), setting stop=l'.format(stop, l))       
+        'i + integrate ({}) > l ({}), setting stop=l.'.format(stop, l))       
         stop = l
 
     # Initialize data container and fill it with data from selected slices
