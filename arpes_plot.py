@@ -5,25 +5,29 @@ arpes_plot.py
 A tool to plot ARPES data from the command line.
 
 TODO:
-    - extract EDCs/MDCs
-    - cut off unwanted parts of the image
+    - open new files from within APC
     - functionality for maps/3D data
       > maps need different normalization and bg subtraction routines
     - fit functions to EDCs
     - shirley bg, and other norms and bgs (`above_fermi`)
     - Fermi level detection
     - find a way for iPython to be non-blocking
-    - main plot with clickable cursor that does something
+    - re-open figure with `do_plot` if window has been closed >or< close app 
+      on window close.
+    - record sequence of commands to replay (ideally on a new file)
 """
 
 import argparse
 import cmd2 as cmd
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import rcParams
+from matplotlib import cm, rcParams
+from screeninfo import get_monitors
 
 import kustom.arpys.dataloaders as dl
 import kustom.arpys.postprocessing as pp
+# Need to import kustom.plotting to have projection='cursor' available
+from kustom import plotting as kplot
 
 # +--------------------------+ #
 # | Parameters and constants | # ===============================================
@@ -46,6 +50,9 @@ VISUAL = 'Plot'
 PROCESSING = 'Data Processing'
 ANALYSIS = 'Data analysis'
 
+# List of registered matplotlib colormaps
+CMAPS = [name for name in cm.datad]
+
 # +-----+ #
 # | CLI | # ====================================================================
 # +-----+ #
@@ -53,12 +60,27 @@ ANALYSIS = 'Data analysis'
 class APCmd(cmd.Cmd) :
     """ (A)RPES (P)lot (C)o(m)man(d) line interpreter. """
     #_Initial_parameters________________________________________________________
+    # Porcessing
     normalization = NO_NORM
     bg = NO_BG
     cmap = DEFAULT_CMAP
     vmax = 1
     z = 0
     integrate = 0
+    crop_x_above = None
+    crop_x_below = None
+    crop_y_above = None
+    crop_y_below = None
+    lattice_constant = 1
+    convert_ang2k = False
+    convert_y_ang2k = False
+    kx_shift = 0
+    ky_shift = 0
+    # Visual
+    grid_on = False
+    xlabel = ''
+    ylabel = ''
+    title = ''
 
     #_Cmd2_configuration________________________________________________________
     debug = True
@@ -90,11 +112,13 @@ class APCmd(cmd.Cmd) :
         self.filename = filename
 
         # Get a handle on the data and retain a copy of the original
-        self.original_data = D.data
+        self.original_data = D.data.copy()
         self.data = D.data.copy()
         # Also remmeber whether or not this is 3D data
         self.is_three_d = True if D.data.shape[0] > 1 else False
         # Look for x- and y- scales
+        self.original_X = D.xscale.copy()
+        self.original_Y = D.yscale.copy()
         self.X = D.xscale.copy()
         self.Y = D.yscale.copy()
         try :
@@ -102,11 +126,17 @@ class APCmd(cmd.Cmd) :
         except AttributeError :
             self.Z = None
 
-        # Set up path-completion for the `do_save` command.
+        # Set up path-completion for respective do_xxx commands by defining 
+        # complete_xxx
         self.complete_save = self.path_complete
+        self.complete_png = self.path_complete
 
         # Plot the initial data
         self.plot()
+
+        # Plot the energy (z scale) distribution in 3D datasets
+        if self.is_three_d :
+            self.do_integrate('')
 
     def move_right(self) :
         """ Move the last created figure to the right of the `main` figure. """
@@ -192,12 +222,14 @@ class APCmd(cmd.Cmd) :
         self.bg = method
         self.plot()
 
-    """ Define the parser for :func: `do_ang2k` """
+    """ Define the parser for :func: `do_ang2k`. NOTE: By using this parser 
+    also for :func: `do_y_ang2k` we get the bug that the help message 
+    displays the name `y_ang2k` in both cases. """
     a2k_parser = \
     argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     a2k_parser.add_argument('-s', '--shift', type=float, default=0,
                             help='Linear shift to apply.')
-    a2k_parser.add_argument('-l', '--lattice_constant', type=float, default=1,
+    a2k_parser.add_argument('-l', '--lattice_constant', type=float,
                             help='Lattice constant of the crystal.')
 
     @cmd.with_category(PROCESSING)
@@ -206,14 +238,13 @@ class APCmd(cmd.Cmd) :
         """ 
         Carry out an angle-to-k-space conversion with the given parameters. 
         """
-        # Shorthand for self.D
-        D = self.D
+        # Save the relevant k-space conversion parameters
+        if args.lattice_constant :
+            self.lattice_constant = args.lattice_constant
+        self.kx_shift = args.shift
 
-        # Calculate kx
-        self.X, foo = pp.angle_to_k(D.angles, D.theta, D.phi, D.hv, D.E_b,
-                                    lattice_constant=args.lattice_constant,
-                                    shift=args.shift,
-                                    degrees=True)
+        self.convert_ang2k = True
+
         self.plot()
 
     @cmd.with_category(PROCESSING)
@@ -223,15 +254,13 @@ class APCmd(cmd.Cmd) :
         Carry out an angle-to-k-space conversion for the y-axis with the 
         given parameters. 
         """
-        # Shorthand for self.D
-        D = self.D
+        # Save the relevant k-space conversion parameters
+        if args.lattice_constant :
+            self.lattice_constant = args.lattice_constant
+        self.ky_shift = args.shift
 
-        # Calculate kx
-        self.Y, foo = pp.angle_to_k(D.yscale, theta=D.phi, phi=D.theta, 
-                                    hv=D.hv, E_b=D.E_b,
-                                    lattice_constant=args.lattice_constant,
-                                    shift=args.shift,
-                                    degrees=True)
+        self.convert_y_ang2k = True
+
         self.plot()
 
     @cmd.with_category(PROCESSING)
@@ -385,28 +414,181 @@ class APCmd(cmd.Cmd) :
         self.move_right()
 
     @cmd.with_category(ANALYSIS)
-    def do_plot_angle_integrated(self, args) :
+    def do_integrate(self, args) :
         """ Show the angle integrated EDC. """
-        # Angle-integrate the energy distributions
-        self.EDC = self.sliced.sum(1)
-        self.angintfig, self.angintax = plt.subplots(1)
-        self.angintax.plot(self.EDC)
+        # Prepare the figure and axes
+        self.angintfig = plt.figure(num='{} | Integrated'.format(self.filename),
+                                    figsize=(4,4))
+        self.angintax = self.angintfig.add_subplot(111, projection='cursor')
+
+        # Handle cases for 3D and 2D data differently
+        if self.is_three_d :
+            # Angle-integrate the energy distributions
+            integrated = self.data.sum(1).sum(1)
+
+            # Prepare for index to energy conversion
+            indices = np.arange(self.data.shape[0])
+            energies = self.D.zscale 
+            try :
+                m = (energies.max()-energies.min()) / \
+                     (indices.max()-indices.min())
+            except AttributeError :
+                pass
+
+            # Define a function for index to energy conversion on-the-fly
+            ind_to_energy = lambda x : (x-indices.min())*m + energies.min()
+
+            # Connect event handling
+            def on_click(event) :
+                """ Print index and value of the clicked spot and set z to 
+                that index. """
+                self.poutput(('Clicked at pixel: {:} - z units: '
+                              '{:}').format(int(event.xdata), 
+                                            ind_to_energy(event.xdata)))
+                self.do_z(str(int(event.xdata)))
+            self.angintfig.canvas.mpl_connect('button_press_event', on_click)
+
+            # Plot
+            self.angintax.plot(indices, integrated)
+
+        # Case 2D data
+        else :
+            integrated = self.data[0].sum(1)
+            indices = range(len(integrated))
+
+            # Plot
+            self.angintax.plot(integrated, self.Y)
+
+        # Move this figure to the right of the main figure
         self.move_right()
+
+    """ Define the parser for :func: `do_cut`. This one has some 
+    sub-commands, so there's quite a bit more code."""
+    cursor_parser = \
+    argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    crsr_sbprsrs = cursor_parser.add_subparsers(dest='command')
+
+    # `get` subcommand
+    crsr_sbprsr_get = crsr_sbprsrs.add_parser('get', 
+                                              help=('Print the cursor '
+                                                    'coordinates.')) 
+    # `cut` subcommand
+    crsr_sbprsr_cut = crsr_sbprsrs.add_parser('cut', 
+                                              help=('Produce a cut at the '
+                                                    'current cursor position.'))
+    crsr_sbprsr_cut.add_argument('axis', nargs='?', choices=['x', 'y', 'both'],
+                                default='both',
+                                help='Select along which axis to take the cut.')
+    # `crop` subcommand
+    crsr_sbprsr_crop = crsr_sbprsrs.add_parser('crop', 
+                                               help=('Cut off parts of the '
+                                                     'data relative to the'
+                                                     'current cursor '
+                                                     'position.'))
+    crsr_sbprsr_crop.add_argument('direction', nargs='+', 
+                                  choices=['above', 'below', 'left', 'right', 
+                                           'a', 'b', 'l', 'r'],
+                                  help=('Choose which part of the data to crop. '
+                                        'You can specify several options at '
+                                        'once.'))
+
+    @cmd.with_category(ANALYSIS)
+    @cmd.with_argparser(cursor_parser)
+    def do_cursor(self, args) :
+        """ 
+        By default read out the cursor position on the main window. For 
+        additional functionality see `help` of the respective subcommands.
+        """
+        x, y = self.ax.get_cursor()
+        if x is None :
+            self.poutput('No cursor present. Click main plot to create one.')
+            return
+
+        command = args.command
+
+        # `get`: print the current cursor position
+        if command in [None, 'get'] :
+            self.poutput('Cursor at {:.4f} | {:.4f}.'.format(x, y))
+
+        # `cut`: create cuts of the data along the specified axis
+        elif command == 'cut' :
+            if args.axis is not 'x' :
+                self.do_cut('y {}'.format(y))
+            if args.axis is not 'y' :
+                self.do_cut('x {}'.format(x))
+
+        # `crop`: crop the data
+        elif command == 'crop' :
+            d = args.direction
+            if 'a' in d or 'above' in d :
+                #self.crop_data(1, y, 1)
+                self.crop_y_above = y
+            elif 'b' in d or 'below' in d :
+                #self.crop_data(1, y, -1)
+                self.crop_y_below = y
+            if 'l' in d or 'left' in d :
+                #self.crop_data(2, x, -1)
+                self.crop_x_above = x
+            elif 'r' in d or 'right' in d :
+                #self.crop_data(2, x, 1)
+                self.crop_x_below = x
+
+        self.plot()
+
+    def crop_data(self, dimension, value, direction=1) :
+        """ 
+        Cut off parts of the data above (`direction`=1) or below 
+        (`direction`=-1) the given `value` along the specified `dimension`. 
+        Following the convention from :module: `postprocessing 
+        <kustom.arpys.postprocessing>`, dimension 1 stands for the y- and 2 
+        for the x-axis.
+        """
+        # Crop y axis
+        if dimension==1 :
+            scale = self.Y
+        # Crop x axis
+        elif dimension==2 :
+            scale = self.X
+
+        # Find the index of the given value
+        index = np.argmin( np.abs( scale - value ) )
+
+        # Minor correction to get all numbers when negative array indexing
+        if direction == -1 and index > 0 :
+            index -= 1
+
+        # Crop the scale. The second `[::direction]` is to revert the order 
+        # back to original if it has been reversed by a `direction`=-1.
+        # If `direction` is +1, this part does nothing - and doesn't have to.
+        scale = scale[:index:direction][::direction]
+
+        # The awkward code may become clearer with above remark
+        if dimension==1 :
+            self.Y = scale
+            self.data = self.data[:,:index:direction,:][:,::direction,:]
+        elif dimension==2 :
+            self.X = scale
+            self.data = self.data[:,:,:index:direction][:,:,::direction]
 
     @cmd.with_category(VISUAL)
     def do_grid(self, arg=None) :
-        """ Toggle the plot grid. """
-        # ax.grid() only accepts 'on' or 'off'
-        if arg in [True, 1] :
-            arg = 'on'
-        elif arg in [False, 0] :
-            arg = 'off'
+        """ 
+        Toggle the plot grid. If no argument is given, change the current 
+        state from on to off or vice versa. Otherwise, accepted arguments are 
+        `on`, `1` or `off`, `0`, `none`.
+        """
+        if arg.lower() in ['on', '1'] :
+            self.grid_on = 1
+        elif arg.lower() in ['off', '0', 'none'] :
+            self.grid_on = 0
+        elif arg in ['', None] :
+            self.grid_on = (self.grid_on+1)%2
+        else :
+            self.poutput('Invalid input: `{}`.'.format(arg))
+            return
 
         self.poutput('Toggling grid.')
-        if arg in ['', None] :
-            self.ax.grid()
-        else :
-            self.ax.grid(arg)
+        self.plot()
 
     @cmd.with_category(VISUAL)
     def do_cscale(self, arg) :
@@ -417,24 +599,37 @@ class APCmd(cmd.Cmd) :
         self.vmax = float(arg)
         self.plot()
 
+    """ Define the parser for :func: `do_cmap`. This is only to provide 
+    tab-completion on colormap names. """
+    cmap_parser = \
+    argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    cmap_parser.add_argument('cmap', choices=CMAPS, default=DEFAULT_CMAP,
+                             help='Name of a matplotlib colormap.')
+
     @cmd.with_category(VISUAL)
-    def do_cmap(self, arg) :
+    @cmd.with_argparser(cmap_parser)
+    def do_cmap(self, args) :
         """ Select the colormap. Expects a matplotlib colormap name. """
-        # Default case
-        if arg=='' :
-            arg = DEFAULT_CMAP
-        self.cmap = arg
+        self.cmap = args.cmap
         self.plot()
 
     @cmd.with_category(VISUAL)
     def do_xlabel(self, arg) :
         """ Set the label of the x axis. """
-        self.ax.set_xlabel(arg)
+        self.xlabel = arg
+        self.plot()
 
     @cmd.with_category(VISUAL)
     def do_ylabel(self, arg) :
         """ Set the label of the y axis. """
-        self.ax.set_ylabel(arg)
+        self.ylabel = arg
+        self.plot()
+
+    @cmd.with_category(VISUAL)
+    def do_title(self, arg) :
+        """ Set the title of the figure. """
+        self.title = arg
+        self.plot()
 
     @cmd.with_category(VISUAL)
     def do_close_all(self, arg) :
@@ -454,6 +649,36 @@ class APCmd(cmd.Cmd) :
         """ Replot the data. """
         self.poutput('Plotting.')
         self.plot()
+
+    def do_reset(self, args) :
+        """ Retrieve the original uncropped, unprocessed data. """
+        self.data = self.original_data.copy()
+        self.X = self.original_X.copy()
+        self.Y = self.original_Y.copy()
+        self.crop_x_above = None
+        self.crop_y_above = None
+        self.crop_x_below = None
+        self.crop_y_below = None
+        self.normalization = NO_NORM
+        self.bg = NO_BG
+
+        self.plot()
+
+    def apply_cropping(self) :
+        """ 
+        Crop the data using the information stored in 
+        `self.crop_{x/y}_{above/below}`.
+        """
+        crop_values = [self.crop_x_above,
+                       self.crop_x_below,
+                       self.crop_y_above,
+                       self.crop_y_below]
+        dimension = [2, 2, 1, 1]
+        direction = [-1, 1, 1, -1]
+
+        for i, crop_value in enumerate(crop_values) :
+            if crop_value is not None :
+                self.crop_data(dimension[i], crop_value, direction[i])
 
     def apply_normalization(self) :
         """ 
@@ -484,13 +709,45 @@ class APCmd(cmd.Cmd) :
         else :
             self._warn_not_implemented(self.bg)
 
+    def apply_kspace_conversion(self) :
+        """ Carry out the angle to k-space conversions, if requested. """
+        # Shorthand for self.D
+        D = self.D
+
+        # Calculate kx
+        if self.convert_ang2k :
+            self.X, foo = pp.angle_to_k(D.angles, D.theta, D.phi, D.hv, D.E_b,
+                                        lattice_constant=self.lattice_constant,
+                                        shift=self.kx_shift,
+                                        degrees=True)
+
+        # Calculate kx
+        if self.convert_y_ang2k :
+            self.Y, foo = pp.angle_to_k(D.yscale, theta=D.phi, phi=D.theta, 
+                                        hv=D.hv, E_b=D.E_b,
+                                        lattice_constant=self.lattice_constant,
+                                        shift=self.ky_shift,
+                                        degrees=True)
+
+    def apply_plot_formatting(self) :
+        """ Apply grid, x- and y-labels, title, etc. to the figure. """
+        if self.grid_on :
+            self.ax.grid(self.grid_on)
+        self.ax.set_xlabel(self.xlabel)
+        self.ax.set_ylabel(self.ylabel)
+        self.ax.set_title(self.title)
+
     def plot(self, ax=None) :
         """ Replot the data applying the currently selected postporcessings. """
         # Reset to original data and generate a 2D slice from it
         self.data = self.original_data.copy()
+        self.X = self.original_X.copy()
+        self.Y = self.original_Y.copy()
+        self.apply_cropping()
         self.sliced = pp.make_map(self.data, self.z, self.integrate)
 
         # Postprocessing
+        self.apply_kspace_conversion()
         self.apply_normalization()
         self.apply_bg_subtraction()
         
@@ -500,6 +757,9 @@ class APCmd(cmd.Cmd) :
         ax.clear()
         ax.pcolormesh(self.X, self.Y, self.sliced, 
                       vmax=self.vmax*self.sliced.max(), cmap=self.cmap)
+
+        # Matplotlib stuff
+        self.apply_plot_formatting()
 
     @cmd.with_category(PROCESSING)
     def do_save(self, savename) :
@@ -524,6 +784,19 @@ class APCmd(cmd.Cmd) :
         # name already exists.
         dl.dump(self.D, savename)
                   
+    @cmd.with_category(VISUAL)
+    def do_png(self, savename) :
+        """
+        Save the figure as a png file under the given name. By default just 
+        uses the data filename with a png extension.
+        """
+        # Create default savename if necessary
+        if savename == '' :
+            savename = '.'.join(self.filename.split('.')[:-1] + ['png'])
+
+        self.ax.figure.savefig(savename)
+        self.poutput('Saved figure as {}.'.format(savename))
+
     def _warn_not_implemented(self, fcn) :
         """ Notify the user that feature or function `fcn` has not yet been 
         implemented. 
@@ -536,9 +809,6 @@ class APCmd(cmd.Cmd) :
 # +------+ #
     
 if __name__ == '__main__' :
-    from screeninfo import get_monitors
-    # Need the import to get the projection 'cursor'
-    from kustom import plotting as kplot
 
     # Set up the parser
     parser = argparse.ArgumentParser()
@@ -567,6 +837,7 @@ if __name__ == '__main__' :
     # Instantiate the CLI object
     apcmd = APCmd(ax, D, args.filename)
 
+    """
     # If data is 3D, initiate a second window with the intensity distribution
     N_z = D.data.shape[0]
     if N_z > 1 :
@@ -575,14 +846,17 @@ if __name__ == '__main__' :
 
         indices = np.arange(N_z)
         energies = D.zscale 
-        m = (energies.max()-energies.min()) / (indices.max()-indices.min())
+        try :
+            m = (energies.max()-energies.min()) / (indices.max()-indices.min())
+        except AttributeError :
+            pass
+
         ind_to_energy = lambda x : (x-indices.min())*m + energies.min()
 
         ifig = plt.figure(figsize=(4, 4), dpi=rcParams['figure.dpi'], 
                           num='Intensity; ' + args.filename)
         iax = ifig.add_subplot(111, projection='cursor')
         iax.plot(indices, intensities)
-        #iax.grid()
 
         # Add energy scale on top
         #iax_top = iax.twiny()
@@ -599,6 +873,7 @@ if __name__ == '__main__' :
 
         # Move the new window right of the main window
         apcmd.move_right()
+    """
 
     # Start the CLI
     apcmd.cmdloop()

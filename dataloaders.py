@@ -358,6 +358,7 @@ class Dataloader_SIS(Dataloader) :
         # we have a map. Otherwise just a sequence of cuts.
         # Case map
         elif shape[2] > self.min_cuts_for_map :
+            print('Dataloader PSI. Is a map?')
             x = shape[1]
             y = shape[2]
             N_E = shape[0]
@@ -401,7 +402,7 @@ class Dataloader_SIS(Dataloader) :
                data = data,
                xscale = xscale,
                yscale = yscale,
-               zscale = None,
+               zscale = energies,
                angles = angles,
                theta = theta,
                phi = phi,
