@@ -235,24 +235,41 @@ def normalize_per_segment(data, dim=0, minimum=False) :
 
     return data
 
-def normalize_per_integrated_segment(data, dim=0) :
+def normalize_per_integrated_segment(data, dim=0, profile=False, 
+                                     in_place=True) :
     """ Normalize each MDC/EDC by its integral.
 
     Parameters
     ----------
     data        : array-like; the input data with shape (l x m) or 
-                  (1 x l x m)
+                  (1 x l x m).
     dim         : int; along which dimension to normalize (0 or 1)
+    profile     : boolean; if True return a tuple (res, norm) instead of just 
+                  res.
+    in_place    : boolean; whether or not to update the input data in place. 
+                  This can be used if one is only interested in the 
+                  normalization profile and does not want to spend 
+                  computation time with actually changing the data (as might 
+                  be the case when processing FSMs). If this is False `data` 
+                  will not be in the output.
 
     Returns
     -------
-    res         : np.array; normalized version of input data in same shape
+    res         : np.array; normalized version of input data in same shape. 
+                  Only given if `in_place` is True.
+    norms       : np.array; 1D array of length X for dim=0 and Y for dim=1 of 
+                  normalization factors for each channel. Only given if 
+                  `profile` is True.
     """
     # Convert data if necessary
     data, d, l, m = convert_data(data)
 
     # Determine the length of the dimension along which to normalize
     length = data.shape[dim+1]
+
+    # Prepare a container for the normalization factors
+    if profile :
+        norms = np.zeros(length)
 
     # Get a reference to the respective row and divide it by its max 
     # value.
@@ -262,7 +279,17 @@ def normalize_per_integrated_segment(data, dim=0) :
         elif dim == 1 :
             row = data[:,:,i] 
 
+        # Integate
         integral = sum(row[0])
+
+        if profile : 
+            norms[i] = integral
+
+        # Nothing else to do if `in_place` is False
+        if not in_place :
+            continue
+
+        # Update the data values in-place
         # Suppress the warnings printed when division by zero happens in rows 
         # of zeros
         with np.errstate(invalid='raise') :
@@ -274,9 +301,9 @@ def normalize_per_integrated_segment(data, dim=0) :
                 row = row / integral
             except FloatingPointError as e :
                 # This error occurs when all values in the row and, 
-                # consequently, # its integral are 0. Just leave the row 
+                # consequently, its integral are 0. Just leave the row 
                 # unchanged in this case 
-                print(e)
+                #print(e)
                 pass
 
         # Copy the values back into the original data array
@@ -288,10 +315,23 @@ def normalize_per_integrated_segment(data, dim=0) :
     # Convert back to original shape, if necessary
     data = convert_data_back(data, d, l, m)
 
-    return data
+    # Prepare the output
+    return_value = []
+    if in_place :
+        return_value.append(data)
+    if profile :
+        return_value.append(norms)
 
-def normalize_above_fermi(data, ef_index=None, n=10, dist=0, inverted=False, 
-                          dim=1, profile=False) : 
+    # If just one object is given, avoid returning a len(1) tuple
+    if len(return_value) == 1 :
+        return_value = return_value[0]
+    else :
+        tuple(return_value)
+
+    return return_value
+
+def normalize_above_fermi(data, ef_index, n=10, dist=0, inverted=False, 
+                          dim=1, profile=False, in_place=True) : 
     """ Normalize data to the mean of the n smallest values above the Fermi 
     level.
 
@@ -319,7 +359,8 @@ def normalize_above_fermi(data, ef_index=None, n=10, dist=0, inverted=False,
     """
     # Prevent input data from being overwritten by creating a copy and 
     # convert data shape if necessary
-    data = data.copy()
+    if not in_place :
+        data = data.copy()
     data, d, l, m = convert_data(data)
 
     # Create a mini-function (with lambda) which extracts the right part of 
@@ -502,7 +543,7 @@ def subtract_bg_shirley(data, dim=0) :
 
                                E1
                                /
-        EDC'(E) = EDC(E) - s * | EDC(E') dE
+        EDC'(E) = EDC(E) - s * | EDC(e) de
                                /
                                E
 
@@ -588,6 +629,37 @@ def subtract_bg_kaminski(data) :
     #for e in range(500,600) :
     #    mdc = data[e]
     #    ax.plot(mdc, lw=1, color='k')
+
+def apply_to_map(data, func, dim=2, output=False, fargs=[], fkwargs={}) :
+# NOTE unfinished, untested
+    """ Apply a postprocessing function `func` which is designed to be 
+    applied to an `energy vs k` cut to each cut of a map. 
+
+    Parameters
+    ----------
+    data        : array; 3D array of shape (l x m x n) representing the data.
+                  For SIS data the dimensions are (energy x k x tilt)
+    func        : function; a function that can be applied to 2D data
+    """
+    n_cuts = data.shape[dim]
+    if dim == 0 :
+        get_cut = lambda i : data[i]
+    elif dim == 1 :
+        get_cut = lambda i : data[:,i]
+    elif dim == 2  :
+        get_cut = lambda i : data[:,:,i]
+
+    if output :
+        results = []
+
+    for i in range(n_cuts) :
+        cut = get_cut(i)
+        result = func(cut, *fargs, **fkwargs)
+        if output :
+            results.append(result)
+
+    if output :
+        return results
 
 # +--------------------------------+ #
 # | Derivatieves/Data manipulation | # ========================================
@@ -813,7 +885,7 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
     constant) using the formula:
 
         k_x = c1 * sqrt(hv - e*phi + E_B) * sin(theta_a + theta_m)
-        k_x = c1 * sqrt(hv - e*phi + E_B) * sin(phi_a + phi_m)
+        k_y = c1 * sqrt(hv - e*phi + E_B) * sin(phi_a + phi_m)
 
     with:
              c1 : numeric constant

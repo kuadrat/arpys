@@ -4,6 +4,8 @@
 arpes_plot.py
 A tool to plot ARPES data from the command line.
 
+KNOWN BUGS:
+
 TODO:
     - open new files from within APC
     - functionality for maps/3D data
@@ -14,7 +16,8 @@ TODO:
     - find a way for iPython to be non-blocking
     - re-open figure with `do_plot` if window has been closed >or< close app 
       on window close.
-    - record sequence of commands to replay (ideally on a new file)
+    - make kustom.arpys available from embedded ipython console without need 
+      to import
 """
 
 import argparse
@@ -22,6 +25,7 @@ import cmd2 as cmd
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm, rcParams
+from matplotlib.path import Path
 from screeninfo import get_monitors
 
 import kustom.arpys.dataloaders as dl
@@ -51,7 +55,7 @@ PROCESSING = 'Data Processing'
 ANALYSIS = 'Data analysis'
 
 # List of registered matplotlib colormaps
-CMAPS = [name for name in cm.datad]
+CMAPS = plt.colormaps()
 
 # +-----+ #
 # | CLI | # ====================================================================
@@ -76,11 +80,14 @@ class APCmd(cmd.Cmd) :
     convert_y_ang2k = False
     kx_shift = 0
     ky_shift = 0
+    y_shift = 0 # A shift of the y axis scale
     # Visual
     grid_on = False
     xlabel = ''
     ylabel = ''
     title = ''
+    # Other
+    record_file = None
 
     #_Cmd2_configuration________________________________________________________
     debug = True
@@ -127,9 +134,10 @@ class APCmd(cmd.Cmd) :
             self.Z = None
 
         # Set up path-completion for respective do_xxx commands by defining 
-        # complete_xxx
-        self.complete_save = self.path_complete
-        self.complete_png = self.path_complete
+        # self.complete_xxx = self.path_complete (a Cmd2 feature)
+        path_completables = ['save', 'png', 'record', 'playback']
+        for command in path_completables :
+            self.__setattr__('complete_'+command, self.path_complete)
 
         # Plot the initial data
         self.plot()
@@ -138,34 +146,7 @@ class APCmd(cmd.Cmd) :
         if self.is_three_d :
             self.do_integrate('')
 
-    def move_right(self) :
-        """ Move the last created figure to the right of the `main` figure. """
-        # Get the size of the main figure in inches and convert to pixels
-        size = self.ax.figure.get_size_inches()
-        dpi = rcParams['figure.dpi']
-        # Add the x location of the main window
-        x0 = int( self.ax.figure.canvas.manager.window.geometry().split('+')[1] )
-        width = int(x0 + size[0]*dpi)
-
-        # Get the figure manager of the most recently created (?) figure and 
-        # use it to move that figure
-        mngr = plt.get_current_fig_manager()
-        mngr.window.wm_geometry('+{}+{}'.format(width, 0))
-
-    def get_axes(self) :
-        """ 
-        Return two lists, one with the window-titles (`figure numbers`, 
-        though they are usually strings) of all figures open in APC and a 
-        second one with the corresponding axes instaces.
-
-        Returns
-        -------
-        names, axes  :: list, list; see description above.
-        """
-        axes = [plt.figure(i).axes[0] for i in plt.get_fignums()]
-        names = [ax.figure.canvas.get_window_title() for ax in axes]
-        return names, axes
-
+    #_Processing_and_data_manipulation__________________________________________
     @cmd.with_category(VISUAL)
     def do_copy(self, arg) :
         """ 
@@ -279,7 +260,7 @@ class APCmd(cmd.Cmd) :
             #zero_index = np.argmin(np.abs(self.Y))
             arg = -self.Y[ef_index]
 
-        self.Y += float(arg)
+        self.y_shift += float(arg)
         self.plot()
 
     """ Define the parser for :func: `do_z`. 
@@ -367,7 +348,7 @@ class APCmd(cmd.Cmd) :
         """
         Cut along the specified dimension and at the specified point and 
         present the result in a new figure.
-        Reminder: All matplotlib figures opened in APC) are accessible from 
+        Reminder: All matplotlib figures opened in APC are accessible from 
         iPython via `self.get_axes()`.
         """
         # Get the right axes scales
@@ -408,7 +389,7 @@ class APCmd(cmd.Cmd) :
         fig = plt.figure(num='Fig. {}: Cut along dim {}'.format(num, d))
         ax = fig.add_subplot(111)
         if self.is_three_d :
-            ax.pcolormesh(x, y, cut)
+            ax.pcolormesh(x, y, cut, cmap=self.cmap)
         else :
             ax.plot(x, cut[0])
         self.move_right()
@@ -462,7 +443,7 @@ class APCmd(cmd.Cmd) :
         # Move this figure to the right of the main figure
         self.move_right()
 
-    """ Define the parser for :func: `do_cut`. This one has some 
+    """ Define the parser for :func: `do_cursor`. This one has some 
     sub-commands, so there's quite a bit more code."""
     cursor_parser = \
     argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -509,6 +490,7 @@ class APCmd(cmd.Cmd) :
         # `get`: print the current cursor position
         if command in [None, 'get'] :
             self.poutput('Cursor at {:.4f} | {:.4f}.'.format(x, y))
+            return
 
         # `cut`: create cuts of the data along the specified axis
         elif command == 'cut' :
@@ -570,6 +552,41 @@ class APCmd(cmd.Cmd) :
             self.X = scale
             self.data = self.data[:,:,:index:direction][:,:,::direction]
 
+    @cmd.with_category(ANALYSIS)
+    def do_uncrop(self, arg) :
+        """ 
+        Uncrop the image and return to the original view range while leaving 
+        postprocessing and axes-conversions intact.
+        """
+        self.crop_x_above = None
+        self.crop_x_below = None
+        self.crop_y_above = None
+        self.crop_y_below = None
+        self.plot()
+
+    def do_roi(self, arg) :
+        self.ax.on_polygon_complete = self.get_mean_of_roi
+        self.ax.enter_draw_mode()
+
+    def get_mean_of_roi(self, vertices) :
+        print('[get_mean_of_roi]')
+        path = Path(vertices)
+        # NOTE Should take original data instead of sliced?
+        #pts = [path.vertices[0] for path in self.mesh.get_paths()] #SLOW
+        nx, ny = len(self.X), len(self.Y)
+        print(nx, ny, nx*ny)
+        pts = np.indices((nx, ny)).transpose(1,2,0)
+        pts = pts.reshape((nx*ny, 2))
+        print(pts)
+        print(pts.shape)
+        print(nx, ny, nx*ny)
+        print(len(path))
+        print(path)
+        # TODO Convert path from data coordinates to index coordinates!
+        inds = path.contains_points(pts)
+        print(sum(inds))
+
+    #_Plotting__________________________________________________________________
     @cmd.with_category(VISUAL)
     def do_grid(self, arg=None) :
         """ 
@@ -637,13 +654,6 @@ class APCmd(cmd.Cmd) :
         for fig in plt.get_fignums()[1:] :
             plt.close(fig)
 
-    def do_name(self, arg) :
-        """ Print the name of the currently opened file. """
-        self.poutput(self.filename)
-
-    def do_test(self, arg) :
-        self.poutput(arg)
-
     @cmd.with_category(VISUAL)
     def do_plot(self, arg) :
         """ Replot the data. """
@@ -659,6 +669,12 @@ class APCmd(cmd.Cmd) :
         self.crop_y_above = None
         self.crop_x_below = None
         self.crop_y_below = None
+        self.convert_ang2k = False
+        self.convert_y_ang2k = False
+        self.lattice_constant = 1
+        self.kx_shift = 0
+        self.ky_shift = 0
+        self.y_shift = 0
         self.normalization = NO_NORM
         self.bg = NO_BG
 
@@ -690,7 +706,26 @@ class APCmd(cmd.Cmd) :
         if self.normalization == NO_NORM :
             return
         elif self.normalization == INT_EDC_NORM :
-            self.sliced = pp.normalize_per_integrated_segment(self.sliced, dim=1)
+            # If we have a map, get the normalization profile and correctly 
+            # apply that to the slice.
+            if self.is_three_d :
+                # The cuts are along the x-dimension (at least for SIS data)
+                n_cuts = self.data.shape[2]
+                norms = []
+                for i in range(n_cuts) :
+                    norm = pp.normalize_per_integrated_segment(self.data[:,:,i], 
+                                                               dim=1, 
+                                                               profile=True, 
+                                                               in_place=False)
+                    norms.append(norm)
+                norms = np.array(norms)
+                norm = np.mean(norms, 0)
+                plt.figure()
+                plt.plot(norms.T)
+                plt.plot(norm, 'r--', lw=4)
+            else :
+                self.sliced = \
+                pp.normalize_per_integrated_segment(self.sliced, dim=1)
         else :
             self._warn_not_implemented(self.normalization)
 
@@ -742,7 +777,7 @@ class APCmd(cmd.Cmd) :
         # Reset to original data and generate a 2D slice from it
         self.data = self.original_data.copy()
         self.X = self.original_X.copy()
-        self.Y = self.original_Y.copy()
+        self.Y = self.original_Y.copy() + self.y_shift
         self.apply_cropping()
         self.sliced = pp.make_map(self.data, self.z, self.integrate)
 
@@ -754,13 +789,17 @@ class APCmd(cmd.Cmd) :
         if ax is None :
             ax = self.ax
         # Plot
-        ax.clear()
-        ax.pcolormesh(self.X, self.Y, self.sliced, 
-                      vmax=self.vmax*self.sliced.max(), cmap=self.cmap)
+        # NOTE ax.clear() sadly removes the cursor and polygon. But not 
+        # having it is a memory leak. Solution?
+        ax.clear() 
+        self.mesh = ax.pcolormesh(self.X, self.Y, self.sliced, 
+                                  vmax=self.vmax*self.sliced.max(), 
+                                  cmap=self.cmap, zorder=-9)
 
         # Matplotlib stuff
         self.apply_plot_formatting()
 
+    #_File_saving_______________________________________________________________
     @cmd.with_category(PROCESSING)
     def do_save(self, savename) :
         """ 
@@ -797,6 +836,106 @@ class APCmd(cmd.Cmd) :
         self.ax.figure.savefig(savename)
         self.poutput('Saved figure as {}.'.format(savename))
 
+    #_Record_and_playback_______________________________________________________
+    def do_record(self, filename) :
+        """ 
+        Start recording the following commands and write them to a file 
+        (filename given as argument to this command) for later playback (see 
+        command `playback`). 
+        Issue this command again (with no args) to stop recording.
+        """
+        # Stop recording if we were
+        if self.record_file :
+            self.close()
+            self.poutput('Stopped recording.')
+            return
+
+        # Otherwise, start recording
+        if filename == '' :
+            m = 'Please supply a filename to store the recorded commands in.'
+            self.poutput(m)
+            return
+        else :
+            self.record_file = open(filename, 'w')
+            self.poutput('Recording to {}.'.format(filename))
+
+    def do_playback(self, filename) :
+        """ Playback commands from a record file. """
+        if filename == '' :
+            m = 'Please supply a filename to store the recorded commands in.'
+            self.poutput(m)
+            return
+
+        self.close()
+        self.poutput('Playing back from file {}.'.format(filename))
+        with open(filename) as f:
+            # Put the commands from the record file into the command queue
+            self.cmdqueue.extend(f.read().splitlines())
+
+    def precmd(self, line) :
+        """ 
+        This is executed before every command. Convert input to lowercase 
+        and record commands, if we're recording. 
+        """
+        # Write command to record file
+        if self.record_file and 'playback' not in line.raw and \
+                                'record' not in line.raw :
+            print(line.raw, file=self.record_file)
+
+        # NOTE Could this affect UPPER CASE arguments for argparsers?
+        # Convert to lowercase
+        line.raw = line.raw.lower()
+
+        # Have to return the line so that it can be processed by the actual 
+        # command internally
+        return line
+
+    def close(self) :
+        """ Close the record file and effectively stop recording. """
+        if self.record_file :
+            self.record_file.close()
+            self.record_file = None
+
+    #_Miscellaneous_____________________________________________________________
+    def do_name(self, arg) :
+        """ Print the name of the currently opened file. """
+        self.poutput(self.filename)
+
+    def move_right(self) :
+        """ Move the last created figure to the right of the `main` figure. """
+        # Get the size of the main figure in inches and convert to pixels
+        size = self.ax.figure.get_size_inches()
+        dpi = rcParams['figure.dpi']
+        # Add the x location of the main window
+        x0 = int( self.ax.figure.canvas.manager.window.geometry().split('+')[1] )
+        width = int(x0 + size[0]*dpi)
+
+        # Get the figure manager of the most recently created (?) figure and 
+        # use it to move that figure
+        mngr = plt.get_current_fig_manager()
+        mngr.window.wm_geometry('+{}+{}'.format(width, 0))
+
+    def get_axes(self) :
+        """ 
+        Return two lists, one with the window-titles (`figure numbers`, 
+        though they are usually strings) of all figures open in APC and a 
+        second one with the corresponding axes instaces.
+
+        Returns
+        -------
+        names, axes  :: list, list; see description above.
+        """
+        axes = [plt.figure(i).axes[0] for i in plt.get_fignums()]
+        names = [ax.figure.canvas.get_window_title() for ax in axes]
+        return names, axes
+
+    def do_quit(self, *args, **kwargs) :
+        """ The Cmd2 package provides this command. Extend it by adding clean 
+        record file closing. 
+        """
+        self.close()
+        super().do_quit(*args, **kwargs)
+
     def _warn_not_implemented(self, fcn) :
         """ Notify the user that feature or function `fcn` has not yet been 
         implemented. 
@@ -821,7 +960,8 @@ if __name__ == '__main__' :
     # Plot the data
     plt.ion()
     fig = plt.figure(num=args.filename)
-    ax = fig.add_subplot(111, projection='cursor')
+    ax = fig.add_subplot(111, projection='cursorpoly')
+    ax.useblit = True
 
     # Move the figure to the right monitor, if it exists
     mngr = plt.get_current_fig_manager()
