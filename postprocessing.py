@@ -330,6 +330,16 @@ def normalize_per_integrated_segment(data, dim=0, profile=False,
 
     return return_value
 
+def norm_int_edc(data, profile=False) :
+    """ 
+    Shorthand for :func: `normalize_per_integrated_segment 
+    <kustom.arpys.postprocessing.normalize_per_integrated_segment>` with 
+    arguments
+    `dim=1, profile=False, in_place=True`.
+    Returns the normalized array.
+    """
+    return normalize_per_integrated_segment(data, dim=1, profile=profile)
+
 def normalize_above_fermi(data, ef_index, n=10, dist=0, inverted=False, 
                           dim=1, profile=False, in_place=True) : 
     """ Normalize data to the mean of the n smallest values above the Fermi 
@@ -536,7 +546,7 @@ def subtract_bg_matt(data, n=5, profile=False) :
     else :
         return data
 
-def subtract_bg_shirley(data, dim=0) :
+def subtract_bg_shirley(data, dim=0, profile=False, normindex=0) :
     """ Use an iterative approach for the background of an EDC as described in
     DOI:10.1103/PhysRevB.5.4709. Mathematically, the value of the EDC after 
     BG subtraction for energy E EDC'(E) can be expressed as follows :
@@ -563,7 +573,84 @@ def subtract_bg_shirley(data, dim=0) :
     data : np.array; input data with shape (l x m) or (1 x l x m) containing 
            an E(k) cut
     dim  : int; either 0 or 1. Determines whether the input is aranged as 
-           E(k) (m EDCs of length l) or k(E) (l EDCs of length m)
+           E(k) (m EDCs of length l, dim=0) or k(E) (l EDCs of length m, dim=1) 
+    profile : boolean; if True, a list of the background values for each MDC 
+              is returned additionally.
+    normindex : TESTING
+
+    Returns
+    -------
+    data : np.array; has the same dimensions as the input array.
+    profile : 1D-array; only returned as a tuple with data (`data, profile`) 
+              if argument `profile` was set to True. Contains the 
+              background profile, i.e. the background value for each MDC.
+    """
+    # Prevent original data from being overwritten by retaining a copy
+    data = data.copy()
+
+    data, d, l, m = convert_data(data)
+    
+    if dim == 0 :
+        nk = m
+        ne = l
+        get_edc = lambda k : data[0,:,k]
+    elif dim == 1 :
+        nk = l
+        ne = m
+        get_edc = lambda k : data[0,k]
+
+    # Take shirley bg from the angle-averaged EDC
+    average_edc = np.mean(data[0], dim+1) 
+
+    # Calculate the "normalization" prefactor
+    s = np.abs(average_edc[normindex] - average_edc[-1]) / average_edc.sum()
+
+    # Prepare a function that sums the EDC from a given index upwards
+    sum_from = np.frompyfunc(lambda e : average_edc[e:].sum(), 1, 1)
+    indices = np.arange(ne)
+    bg = s*sum_from(indices).astype(float)
+
+    # Subtract the bg profile from each EDC
+    for k in range(nk) :
+        edc = get_edc(k)
+        # Update data in-place
+        edc -= bg
+
+    data = convert_data_back(data, d, l, m)
+    if profile :
+        return data, bg
+    else :
+        return data
+
+def subtract_bg_shirley_old(data, dim=0, normindex=0) :
+    """ Use an iterative approach for the background of an EDC as described in
+    DOI:10.1103/PhysRevB.5.4709. Mathematically, the value of the EDC after 
+    BG subtraction for energy E EDC'(E) can be expressed as follows :
+
+                               E1
+                               /
+        EDC'(E) = EDC(E) - s * | EDC(e) de
+                               /
+                               E
+
+    where EDC(E) is the value of the EDC at E before bg subtraction, E1 is a 
+    chosen energy value (in our case the last value in the EDC) up to which 
+    the subtraction is applied and s is chosen such that EDC'(E0)=EDC'(E1) 
+    with E0 being the starting value of the bg subtraction (in our case the 
+    first value in the EDC).
+
+    In principle, this is an iterative method, so it should be applied 
+    repeatedly, until no appreciable change occurs through an iteration. In 
+    practice this convergence is reached in 4-5 iterations at most and even a 
+    single iteration may suffice.
+
+    Parameters
+    ----------
+    data : np.array; input data with shape (l x m) or (1 x l x m) containing 
+           an E(k) cut
+    dim  : int; either 0 or 1. Determines whether the input is aranged as 
+           E(k) (m EDCs of length l, dim=0) or k(E) (l EDCs of length m, dim=1) 
+    normindex : TESTING
 
     Returns
     -------
@@ -586,8 +673,10 @@ def subtract_bg_shirley(data, dim=0) :
     indices = np.arange(ne)
     for k in range(nk) :
         edc = get_edc(k)
+
         # Calculate the "normalization" prefactor
-        s = (edc[0] - edc[-1]) / edc.sum()
+        s = (edc[normindex] - edc[-1]) / edc.sum()
+
         # Prepare a function that sums the EDC from a given index upwards
         sum_from = np.frompyfunc(lambda e : edc[e:].sum(), 1, 1)
 
@@ -596,10 +685,6 @@ def subtract_bg_shirley(data, dim=0) :
 
     data = convert_data_back(data, d, l, m)
     return data
-
-def subtract_bg_gold(data) :
-    # @TODO Or should this be normalize?
-    pass
 
 def subtract_bg_kaminski(data) :
     """ Use the method of Kaminski et al. (DOI: 10.1103/PhysRevB.69.212509) 
@@ -734,7 +819,7 @@ def curvature(data, dx=1, dy=1, cx=1, cy=1) :
 
     Returns
     -------
-    res         : np.array; second derivative of input array in same dimensions
+    res         : np.array; curvature of input array in same dimensions
     """
     # Get the partial derivatives
     grad_x, grad_y, grad2_x, grad2_y = _derivatives(data, dx, dy)
@@ -869,7 +954,9 @@ def zero_crossings(x, direction=0) :
     return crossings
 
 def detect_fermi_level(edc, n_box, n_smooth, orientation=1) :
-    """ TODO """
+    """ This routine is more useful for detecting local extrema, not really 
+    for detecting steps. 
+    """
     smoothdev = smooth_derivative(edc, n_box, n_smooth)
     crossings = zero_crossings(smoothdev[::orientation])
     return crossings
@@ -981,6 +1068,30 @@ def step_function(x, step_x=0, flip=False) :
     np.frompyfunc(lambda x : step_function_core(x, step_x, flip), 1, 1)(x)
     return res.astype(float)
 
+def step_core(x, step_x=0, flip=False) :
+    """ Implement a step function f(x) with step at `step_x`:
+
+                / 0 if x < step_x
+        f(x) = {
+                \ 1 if x >= step_x
+
+    Confer also :func: `step_function_core`.
+    """
+    sign = -1 if flip else 1
+    if sign*x < sign*step_x :
+        result = 0
+    elif sign*x >= sign*step_x :
+        result = 1
+    return result
+
+def step_ufunc(x, step_x=0, flip=False) :
+    """ np.ufunc wrapper for step_core. Confer corresponding 
+    documentation. 
+    """
+    res = \
+    np.frompyfunc(lambda x : step_core(x, step_x, flip), 1, 1)(x)
+    return res.astype(float)
+
 def lorentzian(x, a=1, mu=0, gamma=1) :
     """ Implement a Lorentzian curve f(x) given by the expression
 
@@ -1055,7 +1166,7 @@ def gaussian_step(x, step_x=0, a=1, mu=0, sigma=1, flip=False, after_step=None) 
     f(x) = {
             \ after_step         if x >= step_x
 
-    where g(x) is the :func: gaussian.
+    where g(x) is the :func: `gaussian`.
 
     Parameters
     ----------

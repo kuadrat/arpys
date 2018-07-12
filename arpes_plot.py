@@ -7,12 +7,15 @@ A tool to plot ARPES data from the command line.
 KNOWN BUGS:
 
 TODO:
+    - `cursor crop` should work qith above AND below, not just one of the two
+      (same for left and right, obviously)
     - open new files from within APC
     - functionality for maps/3D data
       > maps need different normalization and bg subtraction routines
-    - fit functions to EDCs
     - shirley bg, and other norms and bgs (`above_fermi`)
     - Fermi level detection
+
+    - fit functions to EDCs
     - find a way for iPython to be non-blocking
     - re-open figure with `do_plot` if window has been closed >or< close app 
       on window close.
@@ -26,10 +29,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm, rcParams
 from matplotlib.path import Path
+from scipy.ndimage import filters
 from screeninfo import get_monitors
 
 import kustom.arpys.dataloaders as dl
 import kustom.arpys.postprocessing as pp
+import kustom.functions as kf
 # Need to import kustom.plotting to have projection='cursor' available
 from kustom import plotting as kplot
 
@@ -46,6 +51,10 @@ NO_NORM = 'off'
 FERMI_BG = 'above_fermi'
 PROFILE_BG = 'profile'
 NO_BG = 'off'
+
+LAPLACIAN_DERIVATIVE = 'laplacian'
+CURVATURE_DERIVATIVE = 'curvature'
+NO_DERIVATIVE = 'off'
 
 DEFAULT_CMAP = 'Blues'
 
@@ -64,9 +73,10 @@ CMAPS = plt.colormaps()
 class APCmd(cmd.Cmd) :
     """ (A)RPES (P)lot (C)o(m)man(d) line interpreter. """
     #_Initial_parameters________________________________________________________
-    # Porcessing
+    # Processing
     normalization = NO_NORM
     bg = NO_BG
+    derivative = NO_DERIVATIVE
     cmap = DEFAULT_CMAP
     vmax = 1
     z = 0
@@ -81,6 +91,8 @@ class APCmd(cmd.Cmd) :
     kx_shift = 0
     ky_shift = 0
     y_shift = 0 # A shift of the y axis scale
+    sigma_for_derivative = 10
+    dx_over_dy = None
     # Visual
     grid_on = False
     xlabel = ''
@@ -88,6 +100,8 @@ class APCmd(cmd.Cmd) :
     title = ''
     # Other
     record_file = None
+    angintax = None
+    cid = None
 
     #_Cmd2_configuration________________________________________________________
     debug = True
@@ -107,6 +121,9 @@ class APCmd(cmd.Cmd) :
         ========  ==============================================================
         """
         super().__init__(*args, use_ipython=True, **kwargs)
+
+        # Disable matplotlib toolbar
+        rcParams['toolbar'] = 'None'
 
         # Define the prompt and welcome messages
         self.prompt = self.colorize('[APC] ', 'cyan')
@@ -129,8 +146,10 @@ class APCmd(cmd.Cmd) :
         self.X = D.xscale.copy()
         self.Y = D.yscale.copy()
         try :
+            self.original_Z = D.zscale.copy()
             self.Z = D.zscale.copy()
         except AttributeError :
+            self.original_Z = None
             self.Z = None
 
         # Set up path-completion for respective do_xxx commands by defining 
@@ -145,6 +164,30 @@ class APCmd(cmd.Cmd) :
         # Plot the energy (z scale) distribution in 3D datasets
         if self.is_three_d :
             self.do_integrate('')
+
+    #_File_opening_and_initialization___________________________________________
+
+#    def do_open(self, arg=None) :
+#        D = dl.load_data(filename)
+#        # Plot the data
+#        plt.ion()
+#        fig = plt.figure(num=args.filename)
+#        self.ax = fig.add_subplot(111, projection='cursorpoly')
+#        ax.useblit = True
+#
+#        # Move the figure to the right monitor, if it exists
+#        mngr = plt.get_current_fig_manager()
+#        monitors = get_monitors()
+#        #height = int(monitors[0].height / 2)
+#        height = 0
+#        if len(monitors) > 1 :
+#            width = monitors[0].width
+#        else :
+#            width = 0
+#        mngr.window.wm_geometry('+{}+0'.format(width))
+#
+#        # Instantiate the CLI object
+#        apcmd = APCmd(ax, D, args.filename)
 
     #_Processing_and_data_manipulation__________________________________________
     @cmd.with_category(VISUAL)
@@ -201,6 +244,36 @@ class APCmd(cmd.Cmd) :
         # Apply the selected BG subtraction
         self.poutput('Applying background subtraction `{}`.'.format(method))
         self.bg = method
+        self.plot()
+
+    """ Define the parser for :func: `do_derivative`. """
+    derivative_parser = \
+    argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    derivative_parser.add_argument('method',
+                                   choices=[NO_DERIVATIVE, 
+                                            LAPLACIAN_DERIVATIVE, 
+                                            CURVATURE_DERIVATIVE], 
+                                   default=LAPLACIAN_DERIVATIVE)
+    derivative_parser.add_argument('-s', '--sigma', type=float, default=10,
+                                   help='Sigma for Gaussian filter to be \
+                                   applied before taking the derivative.')
+    derivative_parser.add_argument('-r', '--ratio', type=str, default='none',
+                                   help='Ratio between dx and dy. The actual \
+                                   step size is taken by default for these \
+                                   values, so one should only change them for \
+                                   testing purposes.')
+
+    @cmd.with_category(PROCESSING)
+    @cmd.with_argparser(derivative_parser)
+    def do_derivative(self, args) :
+        """
+        Apply a second derivative method to the data for better band 
+        visualization.
+        """
+        self.derivative = args.method
+        self.sigma_for_derivative = args.sigma
+        if args.ratio != 'none' :
+            self.dx_over_dy = float(args.ratio)
         self.plot()
 
     """ Define the parser for :func: `do_ang2k`. NOTE: By using this parser 
@@ -400,7 +473,11 @@ class APCmd(cmd.Cmd) :
         # Prepare the figure and axes
         self.angintfig = plt.figure(num='{} | Integrated'.format(self.filename),
                                     figsize=(4,4))
-        self.angintax = self.angintfig.add_subplot(111, projection='cursor')
+        # Clear or create the angintax
+        if self.angintax :
+            self.angintax.clear()
+        else :
+            self.angintax = self.angintfig.add_subplot(111, projection='cursor')
 
         # Handle cases for 3D and 2D data differently
         if self.is_three_d :
@@ -409,7 +486,7 @@ class APCmd(cmd.Cmd) :
 
             # Prepare for index to energy conversion
             indices = np.arange(self.data.shape[0])
-            energies = self.D.zscale 
+            energies = self.Z
             try :
                 m = (energies.max()-energies.min()) / \
                      (indices.max()-indices.min())
@@ -427,7 +504,13 @@ class APCmd(cmd.Cmd) :
                               '{:}').format(int(event.xdata), 
                                             ind_to_energy(event.xdata)))
                 self.do_z(str(int(event.xdata)))
-            self.angintfig.canvas.mpl_connect('button_press_event', on_click)
+
+            # Disconnect the previous event handler ...
+            if self.cid :
+                self.angintfig.canvas.mpl_disconnect(self.cid)
+            # ... and connect the new one
+            self.cid = self.angintfig.canvas.mpl_connect('button_press_event',
+                                                         on_click)
 
             # Plot
             self.angintax.plot(indices, integrated)
@@ -489,11 +572,15 @@ class APCmd(cmd.Cmd) :
 
         # `get`: print the current cursor position
         if command in [None, 'get'] :
-            self.poutput('Cursor at {:.4f} | {:.4f}.'.format(x, y))
+            xind = kf.indexof(x, self.X)
+            yind = kf.indexof(y, self.Y)
+            m = 'Cursor at x={:.4f} (index {}) | y={:.4f} (index {}).'
+            self.poutput(m.format(x, xind, y, yind))
             return
 
         # `cut`: create cuts of the data along the specified axis
         elif command == 'cut' :
+            # By default, i.e. with no arg given, create both cuts
             if args.axis is not 'x' :
                 self.do_cut('y {}'.format(y))
             if args.axis is not 'y' :
@@ -586,6 +673,25 @@ class APCmd(cmd.Cmd) :
         inds = path.contains_points(pts)
         print(sum(inds))
 
+    def do_roll_axes(self, arg) :
+        if not self.is_three_d :
+            self._warn_not_implemented('roll_axes for 2D data')
+            return
+        # Change the order of dimensions in the data
+        self.original_data = np.moveaxis(self.original_data, [0,1,2], [1,2,0])
+        # Change the x-, y- and z-scales accordingly
+        old_Z = self.original_Z.copy()
+        old_Y = self.original_Y.copy()
+        self.original_Z = self.original_X.copy()
+        self.original_Y = old_Z
+        self.original_X = old_Y
+
+        self.plot()
+        self.do_integrate('')
+
+        print(self.original_data.shape)
+        print(self.original_Z.shape, self.original_Y.shape, self.original_X.shape)
+
     #_Plotting__________________________________________________________________
     @cmd.with_category(VISUAL)
     def do_grid(self, arg=None) :
@@ -677,6 +783,8 @@ class APCmd(cmd.Cmd) :
         self.y_shift = 0
         self.normalization = NO_NORM
         self.bg = NO_BG
+        self.derivative = NO_DERIVATIVE
+        self.dx_over_dy = None
 
         self.plot()
 
@@ -732,7 +840,7 @@ class APCmd(cmd.Cmd) :
     def apply_bg_subtraction(self) :
         """ 
         Apply the currently selected background subtraction method (as stored 
-        in `self.bg`) to the data `self.data`. This is just a series of 
+        in `self.bg`) to the data `self.sliced`. This is just a series of 
         if-else blocks. The actual magic is defined in :module: 
         `postprocessing <kustom.arpys.postprocessing>`.
         """
@@ -764,6 +872,42 @@ class APCmd(cmd.Cmd) :
                                         shift=self.ky_shift,
                                         degrees=True)
 
+    def apply_derivative(self) :
+        """
+        Apply the currently selected derivative metho to the data `self.sliced`.
+        """
+        if self.derivative == NO_DERIVATIVE :
+            return
+
+        # Smooth the data with a Gaussian filter to reduce the effect of 
+        # noise on the second derivative
+        smoothed = filters.gaussian_filter(self.sliced, 
+                                           sigma=self.sigma_for_derivative) 
+        # Get the distances in x and y (x and y are swapped because our data 
+        # is [z,y,x])
+        dx = self.Y[1] - self.Y[0]
+        if self.dx_over_dy :
+            dy = dx / self.dx_over_dy
+        else :
+            dy = self.X[1] - self.X[0]
+
+        # Apply the requested derivative operation
+        if self.derivative == LAPLACIAN_DERIVATIVE :
+            laplacian = -pp.laplacian(smoothed, dx, dy)
+
+            # Only take the positive values of the sign-inverted laplacian
+            laplacian[np.where(laplacian<0)] = 0
+            self.sliced = laplacian
+
+        elif self.derivative == CURVATURE_DERIVATIVE :
+           
+            # Calculate the curvature
+            curvature = -pp.curvature(smoothed, dx=dy, dy=dx, cx=dy, cy=dx)
+
+            # Only take the positive values of the sign-inverted curvature
+            curvature[np.where(curvature<0)] = 0
+            self.sliced = curvature
+
     def apply_plot_formatting(self) :
         """ Apply grid, x- and y-labels, title, etc. to the figure. """
         if self.grid_on :
@@ -778,6 +922,8 @@ class APCmd(cmd.Cmd) :
         self.data = self.original_data.copy()
         self.X = self.original_X.copy()
         self.Y = self.original_Y.copy() + self.y_shift
+        if self.original_Z is not None :
+            self.Z = self.original_Z.copy() # Not used here directly, but useful to do
         self.apply_cropping()
         self.sliced = pp.make_map(self.data, self.z, self.integrate)
 
@@ -785,6 +931,7 @@ class APCmd(cmd.Cmd) :
         self.apply_kspace_conversion()
         self.apply_normalization()
         self.apply_bg_subtraction()
+        self.apply_derivative()
         
         if ax is None :
             ax = self.ax
@@ -792,9 +939,9 @@ class APCmd(cmd.Cmd) :
         # NOTE ax.clear() sadly removes the cursor and polygon. But not 
         # having it is a memory leak. Solution?
         ax.clear() 
+        vmax = max(self.sliced.min(), self.vmax*self.sliced.max())
         self.mesh = ax.pcolormesh(self.X, self.Y, self.sliced, 
-                                  vmax=self.vmax*self.sliced.max(), 
-                                  cmap=self.cmap, zorder=-9)
+                                  vmax=vmax, cmap=self.cmap, zorder=-9)
 
         # Matplotlib stuff
         self.apply_plot_formatting()
