@@ -7,8 +7,6 @@ A tool to plot ARPES data from the command line.
 KNOWN BUGS:
 
 TODO:
-    - `cursor crop` should work qith above AND below, not just one of the two
-      (same for left and right, obviously)
     - open new files from within APC
     - functionality for maps/3D data
       > maps need different normalization and bg subtraction routines
@@ -21,6 +19,9 @@ TODO:
       on window close.
     - make kustom.arpys available from embedded ipython console without need 
       to import
+BUGS:
+    - `cursor crop` should work qith above AND below, not just one of the two
+      (same for left and right, obviously)
 """
 
 import argparse
@@ -29,6 +30,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm, rcParams
 from matplotlib.path import Path
+from matplotlib.colors import PowerNorm
 from scipy.ndimage import filters
 from screeninfo import get_monitors
 
@@ -77,14 +79,8 @@ class APCmd(cmd.Cmd) :
     normalization = NO_NORM
     bg = NO_BG
     derivative = NO_DERIVATIVE
-    cmap = DEFAULT_CMAP
-    vmax = 1
     z = 0
     integrate = 0
-    crop_x_above = None
-    crop_x_below = None
-    crop_y_above = None
-    crop_y_below = None
     lattice_constant = 1
     convert_ang2k = False
     convert_y_ang2k = False
@@ -93,7 +89,14 @@ class APCmd(cmd.Cmd) :
     y_shift = 0 # A shift of the y axis scale
     sigma_for_derivative = 10
     dx_over_dy = None
+    crop_x_above = None
+    crop_x_below = None
+    crop_y_above = None
+    crop_y_below = None
     # Visual
+    cmap = DEFAULT_CMAP
+    vmax = 1
+    gamma = 1
     grid_on = False
     xlabel = ''
     ylabel = ''
@@ -316,6 +319,27 @@ class APCmd(cmd.Cmd) :
         self.convert_y_ang2k = True
 
         self.plot()
+
+    @cmd.with_category(PROCESSING)
+    def do_symmetrize(self, args) :
+        """ TODO For now, this uses the polygon drawing mode to allow 
+        selecting a symmetrization axis.
+        """
+        # Connect the callback of the axes polygon-draw mode
+        self.ax.on_polygon_complete = self.symmetrize
+        self.ax.enter_draw_mode()
+
+    def symmetrize(self, vertices) :
+        self.v = vertices
+        print(vertices)
+        P0 = vertices[0]
+        P1 = vertices[1]
+        p0 = [kf.indexof(P0[0], self.X), kf.indexof(P0[1], self.Y)]
+        p1 = [kf.indexof(P1[0], self.X), kf.indexof(P1[1], self.Y)]
+        transformed = pp.symmetrize_around(self.sliced, p0, p1)
+        fig, ax = plt.subplots(1)
+        ax.pcolormesh(transformed)
+        self.ax.remove_polygon()
 
     @cmd.with_category(PROCESSING)
     def do_shift_y(self, arg) :
@@ -718,9 +742,23 @@ class APCmd(cmd.Cmd) :
         """ Adjust the maximum of the colorscale to arg*max(data). """
         # Default case
         if arg=='' :
-            arg=1
+            arg = 1
         self.vmax = float(arg)
         self.plot()
+
+    @cmd.with_category(VISUAL)
+    def do_gamma(self, arg) :
+        """ 
+        Get (no argument) or set the exponent in the power-law colorscale 
+        mapping c = x^gamma. 
+        The default value gamma=1 corresponds to a linear mapping.
+        """
+        if arg=='' :
+            # Output the current value
+            self.poutput('gamma = {}'.format(self.gamma))
+        else :
+            self.gamma = float(arg)
+            self.plot()
 
     """ Define the parser for :func: `do_cmap`. This is only to provide 
     tab-completion on colormap names. """
@@ -824,13 +862,10 @@ class APCmd(cmd.Cmd) :
                     norm = pp.normalize_per_integrated_segment(self.data[:,:,i], 
                                                                dim=1, 
                                                                profile=True, 
-                                                               in_place=False)
+                                                               in_place=True)
                     norms.append(norm)
                 norms = np.array(norms)
                 norm = np.mean(norms, 0)
-                plt.figure()
-                plt.plot(norms.T)
-                plt.plot(norm, 'r--', lw=4)
             else :
                 self.sliced = \
                 pp.normalize_per_integrated_segment(self.sliced, dim=1)
@@ -941,7 +976,8 @@ class APCmd(cmd.Cmd) :
         ax.clear() 
         vmax = max(self.sliced.min(), self.vmax*self.sliced.max())
         self.mesh = ax.pcolormesh(self.X, self.Y, self.sliced, 
-                                  vmax=vmax, cmap=self.cmap, zorder=-9)
+                                  vmax=vmax, cmap=self.cmap, zorder=-9,
+                                  norm=PowerNorm(gamma=self.gamma))
 
         # Matplotlib stuff
         self.apply_plot_formatting()
