@@ -7,7 +7,7 @@ shape and form.
 
 import h5py
 import numpy as np
-import os.path
+import os
 import pickle
 import pyfits
 from argparse import Namespace
@@ -542,6 +542,97 @@ class Dataloader_ADRESS(Dataloader) :
               }"""
         return res
 
+class Dataloader_CASSIOPEE(Dataloader) :
+    """ CASSIOPEE beamline at SOLEIL synchrotron, Paris. """
+    name = 'CASSIOPEE'
+
+    def load_data(self, filename) :
+        if os.path.isfile(filename) :
+            return self.load_from_file(filename)
+        else :
+            return self.load_from_dir(filename)
+
+    def load_from_dir(self, dirname) :
+        all_filenames = os.listdir(dirname)
+        filenames = []
+        # Remove all non-data files
+        for name in all_filenames :
+            if 'ROI' in name :
+                filenames.append(name)
+
+        unordered = {}
+        i_min = np.inf
+        i_max = -np.inf
+
+        # Get metadata from first file in list
+        skip, energy, angles, hv = self.get_metadata(dirname+filenames[0]) 
+
+        for name in filenames :
+            # Keep track of the min and max indices in the directory
+            i = int(name.split('_')[1])
+            if i < i_min : i_min = i
+            if i > i_max : i_max = i
+            
+            # Get the data of cut i
+            this_cut = np.loadtxt(dirname+name, skiprows=skip+1)[:,1:]
+            unordered.update({i: this_cut})
+
+        # Properly rearrange the cuts
+        data = []
+        for i in range(i_min, i_max) :
+            data.append(unordered[i])
+        data = np.array(data)
+        # For a map, we expect output of the form (Energy, k_para, k_perp), 
+        # currently it is (tilt, energy, theta)
+        data = np.moveaxis(data, 0, 1)
+
+        res = Namespace(
+            data = data,
+            xscale = angles,
+            yscale = np.arange(i_min, i_max),
+            zscale = energy,
+            angles = angles,
+            theta = 1,
+            phi = 1,
+            E_b = 0,
+            hv = hv)
+        return res
+
+    def load_from_file(self, filename) :
+        i, energy, angles, hv = self.get_metadata(filename)
+        data0 = np.loadtxt(filename, skiprows=i+1)
+        angles_from_data = data0[:,0]
+        data = np.array([data0[:,1:]])
+
+        res = Namespace(
+            data = data,
+            xscale = angles,
+            yscale = energy,
+            zscale = None,
+            angles = angles,
+            theta = 1,
+            phi = 1,
+            E_b = 0,
+            hv = hv)
+
+        return res
+
+    def get_metadata(self, filename) :
+        with open(filename, 'r') as f :
+            for i,line in enumerate(f.readlines()) :
+                if line.startswith('Dimension 1 scale=') :
+                    energy = line.split('=')[-1].split()
+                    energy = np.array(energy, dtype=float)
+                elif line.startswith('Dimension 2 scale=') :
+                    angles = line.split('=')[-1].split()
+                    angles = np.array(angles, dtype=float)
+                elif line.startswith('Excitation Energy') :
+                    hv = float(line.split('=')[-1])
+                elif line.startswith('inputA') :
+                    # this seems to be the last line before the data
+                    break
+        return i, energy, angles, hv
+
 # +-------+ #
 # | Tools | # ==================================================================
 # +-------+ #
@@ -551,6 +642,7 @@ all_dls = [
            Dataloader_SIS,
            Dataloader_ADRESS,
            Dataloader_ALS,
+            Dataloader_CASSIOPEE,
            Dataloader_Pickle
           ]
 
@@ -680,11 +772,18 @@ if __name__ == '__main__' :
 #    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/014_HSscan_nodal_428eV.h5'
 #    ns = adress.load_data(path)
     
-    D = Namespace(a=0, b=1)
-    dump(D, 'foo.p')
+#    D = Namespace(a=0, b=1)
+#    dump(D, 'foo.p')
 
-    add_attributes('foo.p', ('c', 2), ['d', 'three'])
+#    add_attributes('foo.p', ('c', 2), ['d', 'three'])
 
-    dl = Dataloader_Pickle()
-    D = dl.load_data('foo.p')
-    print(D)
+#    dl = Dataloader_Pickle()
+#    D = dl.load_data('foo.p')
+#    print(D)
+
+    D = load_data('/home/kevin/qmap/experiments/2018_07_CASSIOPEE/S1_FSM/FS_1_ROI1_.txt')
+    import matplotlib.pyplot as plt
+
+    plt.pcolormesh(D.xscale, D.yscale, D.data[0])
+    plt.show()
+
