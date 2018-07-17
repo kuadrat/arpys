@@ -11,6 +11,7 @@ import os
 import pickle
 import pyfits
 from argparse import Namespace
+from errno import ENOENT
 from warnings import catch_warnings, simplefilter
 
 class Dataloader() :
@@ -642,7 +643,7 @@ all_dls = [
            Dataloader_SIS,
            Dataloader_ADRESS,
            Dataloader_ALS,
-            Dataloader_CASSIOPEE,
+           Dataloader_CASSIOPEE,
            Dataloader_Pickle
           ]
 
@@ -651,6 +652,10 @@ def load_data(filename, exclude=None) :
     """ Try to load some dataset 'filename' by iterating through `all_dls` 
     and appliyng the respective dataloader's load_data method. If it works: 
     great. If not, try with the next dataloader. """
+    # Sanity check: does the given path even exist in the filesystem?
+    if not os.path.exists(filename) :
+        raise FileNotFoundError(ENOENT, os.strerror(ENOENT), filename) 
+
     # If only a single string is given as exclude, pack it into a list
     if exclude is not None and type(exclude)==str :
         exclude = [exclude]
