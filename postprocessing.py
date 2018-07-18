@@ -3,6 +3,7 @@
 Contains different tools to post-process (ARPES) data. 
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 import warnings
 from scipy import ndimage
@@ -1497,4 +1498,79 @@ def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4,
         return kx, ky, symmetrized, product
     else :
         return kx, ky, symmetrized
+
+def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=10) :
+    """
+    Plot all (or only the ones specified by `zs`) cuts along dimension `dim` 
+    on separate subplots onto matplotlib figures.
+    ============================================================================
+    data
+    dim
+    zs
+    max_ppf
+    max_nfigs
+    ============================================================================
+    """
+    # Create a list of all indices in case no list (`zs`) is given
+    if zs is None :
+        zs = np.arange(data.shape[dim])
+
+    # The total number of plots and figures to be created
+    n_plots = len(zs)
+    n_figs = int( np.ceil(n_plots/max_ppf) )
+    if n_figs > max_nfigs :
+        n_figs = max_nfigs
+        warnings.warn((
+        'Number of necessary figures n_figs ({0}) > max_nfigs ({1}).' +
+        'Setting n_figs to {1}.').format( n_figs, max_nfigs))
+
+    # If we have just one figure, make the subplots as big as possible by 
+    # setting the number of subplots per row (ppr) to a reasonable value
+    if n_figs == 1 :
+        ppr = int( np.ceil(np.sqrt(n_plots)) )
+    else :
+        ppr = int( np.ceil(np.sqrt(max_ppf)) )
+
+    # Depending on the dimension we need to extract the cuts differently. 
+    # Account for this by moving the axes
+    x = np.arange(len(data.shape))
+    data = np.moveaxis(data, x, np.roll(x, dim))
+    if dim%2 : data = data.T
+
+    figures = []
+    for i in range(n_figs) :
+        # Create the figure with pyplot 
+        fig = plt.figure()
+        start = i*ppr*ppr
+        stop = (i+1)*ppr*ppr
+        # Iterate over the cuts that go on this figure
+        for j,z in enumerate(zs[start:stop]) :
+            # Create the axes and extract the cut
+            ax = fig.add_subplot(ppr, ppr, j+1)
+            cut = data[z]
+            ax.pcolormesh(cut)
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+            ax.set_title(z)
+
+        figures.append(fig)
+
+    return figures
+
+# +---------+ #
+# | Testing | # ================================================================
+# +---------+ #
+
+if __name__ == '__main__' :    
+    from matplotlib import pyplot
+    import arpys as arp
+    filename = ('/home/kevin/Documents/qmap/experiments/2018_07_CASSIOPEE/' + 
+                'CaMnSb/S3_hv50_hv100_T230')
+    D = arp.dl.load_data(filename)
+
+#    pyplot.ion()
+    figs = plot_cuts(D.data, dim=1)
+    print(len(figs))
+    pyplot.show()
+
 
