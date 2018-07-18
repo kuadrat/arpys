@@ -1,8 +1,52 @@
 #!/usr/bin/python
 """
 Provides several Dataloader objects which open different kinds of data files 
-- typically acquired at different sources - and crunch them into the same 
-shape and form.
+- typically acquired at different sources (i.e. beamlines at various 
+synchrotrons) - and crunch them into the same shape and form.
+The output form is an argparse.Namespace object like this:
+```
+    Namespace(data,
+              xscale,
+              yscale,
+              zscale,
+              angles,
+              theta,
+              phi,
+              E_b,
+              hv)
+```
+Where the entries are as follows:
+
+======  ========================================================================
+data    np.array of shape (z,y,x); this has to be a 3D array even for 2D data 
+        - z=1 in that case. x, y and z are the lengths of the x-, y- and 
+        z-scales, respectively. The convention (z,y,x) is used over (x,y,z) 
+        as a consequence of matplotlib.pcolormesh transposing the data when 
+        plotting.
+xscale  np.array of shape(x); the x axis corresponding to the data.
+yscale  np.array of shape(y); the y axis corresponding to the data.
+zscale  np.array of shape(z); the z axis corresponding to the data.
+angles  1D np.array; corresponding angles on the momentum axis of the 
+        analyzer. Depending on the beamline (analyzer slit orientation) this 
+        is expressed as theta or tilt. Usually coincides with either of x-, 
+        y- and zscales.
+theta   float or 1D np.array; the value of theta (or tilt in rotated analyzer 
+        slit orientation). Is mostly used for angle-to-k conversion.
+phi     float; value of the azimuthal angle phi. Mostly used for angle-to-k 
+        conversion.
+E_b     float; typical binding energy for the electrons represented in the 
+        data. In principle there is not just a single binding energy but as 
+        this is only used in angle-to-k conversion, where the typical 
+        variations of the order <10eV doen't matter it suffices to give an 
+        average or maximum value.
+hv      float or 1D np.array; the used photon energy in the scan(s). In Case 
+        of a hv-scan, this obviously coincides with one of the x-, y- or 
+        z-scales.
+======  ========================================================================
+
+Note that any change in the output structure has consequences for all 
+programs and routines that receive from a dataloader (which is pretty much 
+everything in this module) and previously pickled files.
 """
 
 import h5py
@@ -15,9 +59,15 @@ from errno import ENOENT
 from warnings import catch_warnings, simplefilter
 
 class Dataloader() :
-    """ Base dataloader class (interface) from which others inherit some 
-    methods (specifically the __repr__() function). """
+    """ 
+    Base dataloader class (interface) from which others inherit some 
+    methods (specifically the __repr__() function). 
+    The `date` attribute should indicate the last date that this specific 
+    dataloader worked properly for files of its type (as beamline filetypes 
+    may vary with time).
+    """
     name = 'Base'
+    date = ''
 
     def __init__(self, *args, **kwargs) :
         pass
@@ -31,7 +81,8 @@ class Dataloader() :
         print(s, *messages)
 
 class Dataloader_Pickle(Dataloader) :
-    """ Load data that has been saved using python's `pickle` module. ARPES 
+    """ 
+    Load data that has been saved using python's `pickle` module. ARPES 
     pickle files are assumed to just contain the data namespace the way it 
     would be returned by any Dataloader of this module. 
     """
@@ -44,7 +95,8 @@ class Dataloader_Pickle(Dataloader) :
         return filedata
 
 class Dataloader_ALS(Dataloader) :
-    """ Object that allows loading and saving of ARPES data from the  
+    """ 
+    Object that allows loading and saving of ARPES data from the  
     beamline at ALS, Berkely, which is in .fits format. 
     """
     name = 'ALS'
@@ -222,19 +274,6 @@ class Dataloader_ALS(Dataloader) :
                E_b = E_b,
                hv = hv
         )
-        """
-            {
-               'data': data,
-               'xscale': xscale,
-               'yscale': yscale,
-               'zscale': zscale,
-               'angles': angles,
-               'theta': theta,
-               'phi': phi,
-               'E_b': E_b,
-               'hv': hv
-              }
-        """
         return res
     
     def load_cut(self) :
@@ -251,7 +290,8 @@ class Dataloader_ALS(Dataloader) :
         return data
 
     def load_map(self, swept) :
-        """ Read data from a 'map', i.e. several energy vs k slices and bring 
+        """ 
+        Read data from a 'map', i.e. several energy vs k slices and bring 
         them in the right shape for the gui, which is 
         (energy, k_parallel, k_perpendicular)
         """
@@ -282,7 +322,8 @@ class Dataloader_ALS(Dataloader) :
         return data
 
     def load_hv_scan(self) :
-        """ Read data from a hv scan, i.e. a series of energy vs k cuts 
+        """ 
+        Read data from a hv scan, i.e. a series of energy vs k cuts 
         (shape (n_kx, n_energy), each belonging to a different photon energy 
         hv. The returned shape in this case must be 
         (photon_energies, energy, k)
@@ -307,7 +348,8 @@ class Dataloader_ALS(Dataloader) :
         return data
 
 class Dataloader_SIS(Dataloader) :
-    """ Object that allows loading and saving of ARPES data from the SIS 
+    """ 
+    Object that allows loading and saving of ARPES data from the SIS 
     beamline at PSI which is in hd5 format. 
     """
     name = 'SIS'
@@ -324,7 +366,8 @@ class Dataloader_SIS(Dataloader) :
         self.datfile = h5py.File(filename, 'r')
 
     def load_data(self, filename) :
-        """ Extract and return the actual 'data', i.e. the recorded map/cut. 
+        """ 
+        Extract and return the actual 'data', i.e. the recorded map/cut. 
         Also return labels which provide some indications what the data means.
         """
         # Note: x and y are a bit confusing here as the hd5 file has a 
@@ -410,22 +453,11 @@ class Dataloader_SIS(Dataloader) :
                E_b = E_b,
                hv = hv
         )
-        """{
-               'data': data,
-               'xscale': xscale,
-               'yscale': yscale,
-               'zscale': None,
-               'angles': angles,
-               'theta': theta,
-               'phi': phi,
-               'E_b': E_b,
-               'hv': hv
-              }"""
-
         return res
 
     def make_scale(self, limits, nstep) :
-        """ Helper function to construct numbers starting from limits[0] 
+        """ 
+        Helper function to construct numbers starting from limits[0] 
         and going in steps of limits[1] for nstep steps.
         """
         start = limits[0]
@@ -439,7 +471,7 @@ class Dataloader_ADRESS(Dataloader) :
 
    def load_data(self, filename) :
         h5file = h5py.File(filename, 'r')
-        # The actual numbers are in the field: 'Matrix'
+        # The actual data is in the field: 'Matrix'
         matrix = h5file['Matrix']
 
         # The scales can be extracted from the matrix' attributes
@@ -459,8 +491,10 @@ class Dataloader_ADRESS(Dataloader) :
         # Fcn to build the x, y (, z) ranges (maybe outsource this fcn 
         # definition)
         def start_step_n(start, step, n) :
-            """ Return an array that starts at value `start` and goes `n` 
-            steps of `step`. """
+            """ 
+            Return an array that starts at value `start` and goes `n` 
+            steps of `step`. 
+            """
             end = start + n*step
             return np.linspace(start, end, n)
 
@@ -498,9 +532,11 @@ class Dataloader_ADRESS(Dataloader) :
         yscale = start_step_n(ystart, ystep, shape[1])
 
         def convert_raw(raw) :
-            """ Try to convert a string which is expected to be either just a 
+            """
+            Try to convert a string which is expected to be either just a 
             decimal number or a MATLAB-like range expression 
-            (START:STEP:STOP) to either a float or an np.array. """
+            (START:STEP:STOP) to either a float or an np.array. 
+            """
             if ':' in raw :
                 # raw is of the form start:step:end
                 start, step, end = [float(n) for n in raw.split(':')]
@@ -530,44 +566,58 @@ class Dataloader_ADRESS(Dataloader) :
                E_b = E_b,
                hv = hv
         )
-        """{
-               'data': data,
-               'xscale': xscale,
-               'yscale': yscale,
-               'zscale': zscale,
-               'angles': angles,
-               'theta': theta,
-               'phi': phi,
-               'E_b': E_b,
-               'hv': hv
-              }"""
         return res
 
 class Dataloader_CASSIOPEE(Dataloader) :
     """ CASSIOPEE beamline at SOLEIL synchrotron, Paris. """
     name = 'CASSIOPEE'
+    date = '18.07.2018'
 
     def load_data(self, filename) :
+        """ 
+        Single cuts are stored as two files: One file contians the data and 
+        the other the metadata. Maps, hv scans and other `external 
+        loop`-scans are stored as a directory containing these two files for 
+        each cut/step of the external loop. Thus, this dataloader 
+        distinguishes between directories and single files and changes its 
+        behaviour accordingly.
+        """
         if os.path.isfile(filename) :
             return self.load_from_file(filename)
         else :
             return self.load_from_dir(filename)
 
     def load_from_dir(self, dirname) :
+        """
+        Load 3D data from a directory as it is output by the IGOR macro used 
+        at CASSIOPEE. The dir is assumed to contain two files for each cut:
+
+            BASENAME_INDEX_i.txt     -> beamline related metadata
+            BASENAME_INDEX_ROI1_.txt -> data and analyzer related metadata
+
+        To be more precise, the assumptions made on the filenames in the 
+        directory are:
+            - the INDEX is surrounded by underscores (`_`) and appears after 
+              the first underscore.
+            - the string `ROI` appears in the data filename.
+        """
+        # Get the all filenames in the dir
         all_filenames = os.listdir(dirname)
-        filenames = []
         # Remove all non-data files
+        filenames = []
         for name in all_filenames :
             if 'ROI' in name :
                 filenames.append(name)
 
-        unordered = {}
-        i_min = np.inf
-        i_max = -np.inf
-
         # Get metadata from first file in list
         skip, energy, angles, hv = self.get_metadata(dirname+filenames[0]) 
 
+        # Get the data from each cut separately. This happens in the order 
+        # they appear in os.listdir() which is usually not what we want -> a 
+        # reordering is necessary later.
+        unordered = {}
+        i_min = np.inf
+        i_max = -np.inf
         for name in filenames :
             # Keep track of the min and max indices in the directory
             i = int(name.split('_')[1])
@@ -584,7 +634,7 @@ class Dataloader_CASSIOPEE(Dataloader) :
             data.append(unordered[i])
         data = np.array(data)
         # For a map, we expect output of the form (Energy, k_para, k_perp), 
-        # currently it is (tilt, energy, theta)
+        # currently it is (tilt, energy, theta) -> reshape with moveaxis
         data = np.moveaxis(data, 0, 1)
 
         res = Namespace(
@@ -600,8 +650,10 @@ class Dataloader_CASSIOPEE(Dataloader) :
         return res
 
     def load_from_file(self, filename) :
+        """ Load just a single cut. """
         i, energy, angles, hv = self.get_metadata(filename)
         data0 = np.loadtxt(filename, skiprows=i+1)
+        # The first column in the datafile contains the angles
         angles_from_data = data0[:,0]
         data = np.array([data0[:,1:]])
 
@@ -619,6 +671,19 @@ class Dataloader_CASSIOPEE(Dataloader) :
         return res
 
     def get_metadata(self, filename) :
+        """ 
+        Extract some of the metadata stored in a CASSIOPEE output text file. 
+        Also try to detect the line number below which the data starts (for 
+        np.loadtxt's skiprows.
+
+        Returns:
+        ======  ================================================================
+        i       int; last line number still containing metadata.
+        energy  1D np.array; energy (y-axis) values.
+        angles  1D np.array; angle (x-axis) values.
+        hv      float; photon energy for this cut.
+        ======  ================================================================
+        """
         with open(filename, 'r') as f :
             for i,line in enumerate(f.readlines()) :
                 if line.startswith('Dimension 1 scale=') :
@@ -649,9 +714,13 @@ all_dls = [
 
 # Function to try all dataloaders in all_dls
 def load_data(filename, exclude=None) :
-    """ Try to load some dataset 'filename' by iterating through `all_dls` 
+    """
+    Try to load some dataset 'filename' by iterating through `all_dls` 
     and appliyng the respective dataloader's load_data method. If it works: 
-    great. If not, try with the next dataloader. """
+    great. If not, try with the next dataloader. 
+    Collects and prints all raised exceptions in case that no dataloader 
+    succeeded.
+    """ 
     # Sanity check: does the given path even exist in the filesystem?
     if not os.path.exists(filename) :
         raise FileNotFoundError(ENOENT, os.strerror(ENOENT), filename) 
@@ -697,7 +766,8 @@ def load_data(filename, exclude=None) :
 
 # Function to create a python pickle file from a data namespace
 def dump(D, filename, force=False) :
-    """ Wrapper for :func: `pickle.dump()`. Does not overwrite if a file of 
+    """ 
+    Wrapper for :func: `pickle.dump()`. Does not overwrite if a file of 
     the given name already exists, unless :param: `force` is True.
 
     ========  ==================================================================
@@ -723,7 +793,8 @@ def dump(D, filename, force=False) :
     print(message)
 
 def update_namespace(D, *attributes) :
-    """ Add arbitrary attributes to a :class: `Namespace <argparse.Namespace>`.
+    """ 
+    Add arbitrary attributes to a :class: `Namespace <argparse.Namespace>`.
 
     ==========  ================================================================
     D           argparse.Namespace; the namespace holding the data and 

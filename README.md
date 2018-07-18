@@ -27,7 +27,7 @@ angle-to-k conversion,...)
 Can be used as a program from the command line (possibly after a `chmod 755 
 arpes_plot.py`) by
 ```Bash
-arpes_plot.py <path-to-data>
+$ arpes_plot.py <path-to-data>
 ```
 
 pit

@@ -4,9 +4,8 @@
 arpes_plot.py
 A tool to plot ARPES data from the command line.
 
-KNOWN BUGS:
-
 TODO:
+    - create overview figure of a 3D scan (display all cuts)
     - open new files from within APC
       > functionality to save and load states initiated
         > probably need to take special care of figures and axes;
@@ -24,7 +23,8 @@ TODO:
       on window close.
     - make kustom.arpys available from embedded ipython console without need 
       to import
-BUGS:
+
+KNOWN BUGS:
     - `cursor crop` should work qith above AND below, not just one of the two
       (same for left and right, obviously)
 """
