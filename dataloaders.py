@@ -56,7 +56,17 @@ import pickle
 import pyfits
 from argparse import Namespace
 from errno import ENOENT
+from igor import binarywave
 from warnings import catch_warnings, simplefilter
+
+# Fcn to build the x, y (, z) ranges (maybe outsource this fcn definition)
+def start_step_n(start, step, n) :
+    """ 
+    Return an array that starts at value `start` and goes `n` 
+    steps of `step`. 
+    """
+    end = start + n*step
+    return np.linspace(start, end, n)
 
 class Dataloader() :
     """ 
@@ -96,7 +106,7 @@ class Dataloader_Pickle(Dataloader) :
 
 class Dataloader_ALS(Dataloader) :
     """ 
-    Object that allows loading and saving of ARPES data from the  
+    Object that allows loading and saving of ARPES data from the MAESTRO
     beamline at ALS, Berkely, which is in .fits format. 
     """
     name = 'ALS'
@@ -488,16 +498,6 @@ class Dataloader_ADRESS(Dataloader) :
         data = np.array(matrix, dtype=float)
         shape = data.shape
 
-        # Fcn to build the x, y (, z) ranges (maybe outsource this fcn 
-        # definition)
-        def start_step_n(start, step, n) :
-            """ 
-            Return an array that starts at value `start` and goes `n` 
-            steps of `step`. 
-            """
-            end = start + n*step
-            return np.linspace(start, end, n)
-
         # 'IGORWaveUnits' contains a list of the form 
         # ['', 'degree', 'eV', units[3]]. The first three elements should 
         # always be the same, but the third one may vary or not even exist. 
@@ -585,6 +585,7 @@ class Dataloader_CASSIOPEE(Dataloader) :
         if os.path.isfile(filename) :
             return self.load_from_file(filename)
         else :
+            if not filename.endswith('/') : filename += '/'
             return self.load_from_dir(filename)
 
     def load_from_dir(self, dirname) :
@@ -650,7 +651,77 @@ class Dataloader_CASSIOPEE(Dataloader) :
         return res
 
     def load_from_file(self, filename) :
-        """ Load just a single cut. """
+        """ 
+        Load just a single cut. However, at CASSIOPEE they output .ibw files 
+        if the cut does not belong to a scan...
+        """
+        if filename.endswith('.ibw') :
+            return self.load_from_ibw(filename)
+        else :
+            return self.load_from_txt(filename)
+
+    def load_from_ibw(self, filename) :
+        """
+        Load scan data from an IGOR binary wave file. Luckily someone has 
+        already written an interface for this (the python `igor` package).
+        """
+        wave = binarywave.load(filename)['wave']
+        data = np.array([wave['wData']])
+
+        # The `header` contains some metadata
+        header = wave['wave_header']
+        nDim = header['nDim']
+        steps = header['sfA']
+        starts = header['sfB']
+
+        # Construct the x and y scales from start, stop and n
+        yscale = start_step_n(starts[0], steps[0], nDim[0])
+        xscale = start_step_n(starts[1], steps[1], nDim[1])
+
+        # Convert `note`, which is a bytestring of ASCII characters that 
+        # contains some metadata, to a list of strings
+        note = wave['note']
+        note = note.decode('ASCII').split('\r')
+
+        # Now the extraction fun begins. Most lines are of the form 
+        # `Some-kind-of-name=some-value`
+        metadata = dict()
+        for line in note :
+            # Split at '='. If it fails, we are not in a line that contains 
+            # useful information
+            try :
+                name, val = line.split('=')
+            except ValueError :
+                continue
+            # Put the pair in a dictionary for later access
+            metadata.update({name: val})
+#            # Now check if the name is any of the keywords we are interested in
+#            if name=='Excitation Energy' :
+#                hv = val
+#            elif name=='Detector First X-Channel' :
+#                x0 = val
+#            elif name=='Detector Last X-Channel' :
+#                x1 = val
+#            elif name=='Detector First Y-Channel' :
+#                y0 = val
+#            elif name=='Detector Last Y-Channel' :
+#                y1 = val
+#            elif :
+        
+        hv = metadata['Excitation Energy']
+        res = Namespace(
+                data = data,
+                xscale = xscale,
+                yscale = yscale,
+                zscale = None,
+                angles = xscale,
+                theta = 0,
+                phi = 0,
+                E_b = 0,
+                hv = hv)
+        return res
+
+    def load_from_txt(self, filename) :
         i, energy, angles, hv = self.get_metadata(filename)
         data0 = np.loadtxt(filename, skiprows=i+1)
         # The first column in the datafile contains the angles
