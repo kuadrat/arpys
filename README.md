@@ -40,13 +40,21 @@ tools/
 ------
 
 A set of little scripts and command-line tools for specific jobs.
+Confer each tools respective documentation for more info.
 
-### gui.py
+#### gui.py
 
-A GUI which allows to take quick looks at cuts and maps. Only GUI and 
-plotting functionality is defined in this file - all data analysis tools are 
-used from other files in this module (dataloaders.py, postprocessing.py).
+[Deprecated] A GUI which allows to take quick looks at cuts and maps. This is 
+built with tkinter and matplotlib and, consequently, is rather slow.
+In most cases `arpes_plot.py` should be used instead.
 
+#### apc
+
+A link to `arpes_plot.py`
+
+#### bandcharacters.py
+
+A tool to plot the band characters from a wien2k DFT calculation.
 
 scripts/
 --------
