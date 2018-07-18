@@ -6,6 +6,7 @@ Contains different tools to post-process (ARPES) data.
 import matplotlib.pyplot as plt
 import numpy as np
 import warnings
+from matplotlib.colors import PowerNorm
 from scipy import ndimage
 
 from utilities import constants
@@ -1499,17 +1500,24 @@ def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4,
     else :
         return kx, ky, symmetrized
 
-def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=10) :
+def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=4, **kwargs) :
     """
     Plot all (or only the ones specified by `zs`) cuts along dimension `dim` 
     on separate subplots onto matplotlib figures.
-    ============================================================================
-    data
-    dim
-    zs
-    max_ppf
-    max_nfigs
-    ============================================================================
+    =========  =================================================================
+    data       3D np.array with shape (z,y,x); the data cube.
+    dim        int; one of (0,1,2). Dimension along which to take the cuts.
+    zs         1D np.array; selection of indices along dimension `dim`. Only 
+               the given indices will be plotted.
+    max_ppf    int; maximum number of *p*lots *p*er *f*igure.
+    max_nfigs  int; maximum number of figures that are created. If more would 
+               be necessary to display all plots, a warning is issued but the 
+               additional figures are just not created.
+    kwargs     dict; keyword arguments passed on to :func: `pcolormesh 
+               <matplotlib.axes._subplots.AxesSubplot.pcolormesh>`. 
+               Additionally, the kwarg `gamma` for power-law color mapping 
+               is accepted.
+    =========  =================================================================
     """
     # Create a list of all indices in case no list (`zs`) is given
     if zs is None :
@@ -1537,6 +1545,12 @@ def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=10) :
     data = np.moveaxis(data, x, np.roll(x, dim))
     if dim%2 : data = data.T
 
+    # Extract additional kwarg from kwargs
+    if 'gamma' in kwargs :
+        gamma = kwargs.pop('gamma')
+    else :
+        gamma = 1
+
     figures = []
     for i in range(n_figs) :
         # Create the figure with pyplot 
@@ -1548,7 +1562,7 @@ def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=10) :
             # Create the axes and extract the cut
             ax = fig.add_subplot(ppr, ppr, j+1)
             cut = data[z]
-            ax.pcolormesh(cut)
+            ax.pcolormesh(cut, norm=PowerNorm(gamma=gamma), **kwargs)
             ax.set_xticklabels([])
             ax.set_yticklabels([])
             ax.set_title(z)

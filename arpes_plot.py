@@ -739,7 +739,48 @@ class APCmd(cmd.Cmd) :
         print(self.original_data.shape)
         print(self.original_Z.shape, self.original_Y.shape, self.original_X.shape)
 
+    @cmd.with_category(ANALYSIS)
+    def do_reset(self, args) :
+        """ Retrieve the original uncropped, unprocessed data. """
+        self.data = self.original_data.copy()
+        self.X = self.original_X.copy()
+        self.Y = self.original_Y.copy()
+        self.crop_x_above = None
+        self.crop_y_above = None
+        self.crop_x_below = None
+        self.crop_y_below = None
+        self.convert_ang2k = False
+        self.convert_y_ang2k = False
+        self.lattice_constant = 1
+        self.kx_shift = 0
+        self.ky_shift = 0
+        self.y_shift = 0
+        self.normalization = NO_NORM
+        self.bg = NO_BG
+        self.derivative = NO_DERIVATIVE
+        self.dx_over_dy = None
+
+        self.plot()
+
     #_Plotting__________________________________________________________________
+    @cmd.with_category(VISUAL)
+    def do_all_cuts(self, arg=None) :
+        # TODO: allow passing of plotting kwargs and, more importantly, zs
+        # TODO: also, max_nfigs, etc.
+        """
+        Show plots of all cuts along the current z direction.
+        """
+        if arg=='' :
+            arg = 0
+        dim = int(arg)
+
+        # Pass the same kwargs as the main plot receives
+        kwargs = dict(gamma=self.gamma, cmap=self.cmap)
+
+        # Since pyplot's interactive mode is on, these figures will be 
+        # automatically opened and stay open
+        figs = pp.plot_cuts(self.data, dim=dim, **kwargs)
+
     @cmd.with_category(VISUAL)
     def do_grid(self, arg=None) :
         """ 
@@ -825,28 +866,6 @@ class APCmd(cmd.Cmd) :
     def do_plot(self, arg) :
         """ Replot the data. """
         self.poutput('Plotting.')
-        self.plot()
-
-    def do_reset(self, args) :
-        """ Retrieve the original uncropped, unprocessed data. """
-        self.data = self.original_data.copy()
-        self.X = self.original_X.copy()
-        self.Y = self.original_Y.copy()
-        self.crop_x_above = None
-        self.crop_y_above = None
-        self.crop_x_below = None
-        self.crop_y_below = None
-        self.convert_ang2k = False
-        self.convert_y_ang2k = False
-        self.lattice_constant = 1
-        self.kx_shift = 0
-        self.ky_shift = 0
-        self.y_shift = 0
-        self.normalization = NO_NORM
-        self.bg = NO_BG
-        self.derivative = NO_DERIVATIVE
-        self.dx_over_dy = None
-
         self.plot()
 
     def apply_cropping(self) :
