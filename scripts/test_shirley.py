@@ -3,7 +3,7 @@
 import argparse
 import matplotlib.pyplot as plt
 
-import kustom.arpys as arp
+import arpys as arp
 
 # Prepare argument parsing
 # ==============================================================================

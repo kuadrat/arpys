@@ -9,9 +9,9 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from kustom.arpys import dataloaders as dl
-from kustom.arpys import postprocessing as pp
-from kustom import plotting as kplot
+from arpys import dataloaders as dl
+from arpys import postprocessing as pp
+from arpys.utilities import plotting as kplot
 
 # Set up parser
 # ==============================================================================

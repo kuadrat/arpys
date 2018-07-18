@@ -39,11 +39,11 @@ from matplotlib.colors import PowerNorm
 from scipy.ndimage import filters
 from screeninfo import get_monitors
 
-import kustom.arpys.dataloaders as dl
-import kustom.arpys.postprocessing as pp
-import kustom.functions as kf
+import arpys.dataloaders as dl
+import arpys.postprocessing as pp
+import arpys.utilities.functions as kf
 # Need to import kustom.plotting to have projection='cursor' available
-from kustom import plotting as kplot
+from arpys.utilities import plotting as kplot
 
 # +--------------------------+ #
 # | Parameters and constants | # ===============================================

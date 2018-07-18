@@ -8,10 +8,10 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 
 # Absolute imports are better than relative ones, apparently
-from kustom.arpys import dataloaders as dl
+from arpys import dataloaders as dl
 #from kustom.arpys.pit.widgets.kimageview.KImageView import *
-from kustom.arpys.pit.imageplot import *
-from kustom.arpys.pit.cursor import Cursor
+from arpys.pit.imageplot import *
+from arpys.pit.cursor import Cursor
 
 appStyle="""
 QMainWindow{

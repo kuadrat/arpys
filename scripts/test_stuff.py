@@ -3,8 +3,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from kustom.arpys import dl, pp
-from kustom.functions import testarray
+from arpys import dl, pp
+from arpys.utilities.functions import testarray
 
 # Create some test-data
 d = testarray(3, 5, 7).astype(float)
@@ -30,9 +30,10 @@ d = np.array([
 D = d.copy()
 
 # Apply normalization to the map
-#pp.apply_to_map(d, pp.normalize_per_integrated_segment, dim=2, fkwargs=dict(dim=0))
-profile = pp.apply_to_map(d, pp.normalize_above_fermi, dim=0, output=True, fargs=[1], 
-                fkwargs=dict(n=1, inverted=True, profile=True, dim=2))
+profile = pp.apply_to_map(d, pp.normalize_per_integrated_segment, dim=2, 
+                          fkwargs=dict(dim=0))
+#profile = pp.apply_to_map(d, pp.normalize_above_fermi, dim=0, output=True, fargs=[1], 
+#                fkwargs=dict(n=1, inverted=True, profile=True, dim=2))
 
 print(profile)
 
