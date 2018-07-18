@@ -19,7 +19,7 @@ import os
 import numpy as np
 
 from pyqtgraph.Qt import QtCore, QtGui
-from arpys.pit.KImageViewTemplate_pyqt import *
+from kustom.arpys.pit.KImageViewTemplate_pyqt import *
     
 from pyqtgraph.graphicsItems.ImageItem import *
 from pyqtgraph.graphicsItems.ROI import *

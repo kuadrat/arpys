@@ -12,10 +12,10 @@ from matplotlib import rcParams
 from matplotlib.pyplot import get_cmap
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 
-from arpys.dataloaders import *
-import arpys.dataloaders as dl
-import arpys.utilities.plotting as kplot
-import arpys.postprocessing as pp
+from dataloaders import *
+import dataloaders as dl
+import kustom.plotting as kplot
+import postprocessing as pp
 
 # +------------+ #
 # | Parameters | # =============================================================

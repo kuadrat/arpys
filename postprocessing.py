@@ -7,7 +7,7 @@ import numpy as np
 import warnings
 from scipy import ndimage
 
-from utilities import constants
+from kustom import constants
 
 # +------------+ #
 # | Decorators | # ============================================================

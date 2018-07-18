@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from arpys import pp
+from kustom.arpys import pp
 
 # Create some test data
 N = 1000
