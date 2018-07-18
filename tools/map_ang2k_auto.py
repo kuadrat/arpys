@@ -39,14 +39,8 @@ parser.add_argument('-t', '--theta', type=float, default=0,
 parser.add_argument('-v', '--vmax', type=float, default=1,
                    help='Colorbar scaling percentage (0-1).')
 
-parser.add_argument('-c', '--cmap', type=str, default='bone_r',
+parser.add_argument('-c', '--cmap', type=str, default='magma_r',
                    help='Name of matplotlib colormap.')
-
-parser.add_argument('-C', '--clean', default=True, action='store_false',
-                   help='Whether to cut off unsymmetrized parts.')
-
-parser.add_argument('-D', '--debug', default=False,
-                   help='Toggle debug mode.')
 
 args = parser.parse_args()
 
@@ -63,22 +57,39 @@ phi = ns.phi
 hv = ns.hv
 E_b = ns.E_b
 
-kx, foo = pp.angle_to_k(xscale, theta, phi, hv, E_b, 
-                       lattice_constant=args.lattice_constant, 
-                       shift=args.xshift, degrees=True)
-
-ky, foo = pp.angle_to_k(yscale, theta=phi, phi=theta, hv=hv, E_b=E_b, 
-                       lattice_constant=args.lattice_constant, 
-                       shift=args.yshift, degrees=True)
 
 mp = pp.make_slice(data, d=0, i=args.index, integrate=args.integrate)
 
-KX, KY, sym_mp = pp.symmetrize_map(kx, ky, mp, clean=args.clean, 
-                                   debug=args.debug)
+f=[] 
+xshifts = np.arange(2.5, 3.5, 0.05) 
+xshifts = np.arange(-45, 46, 45) 
+yshifts = np.arange(-90, 91, 45) 
 
-if 0 in sym_mp.shape :
-    print('Symmetrization failed.')
-    KX, KY, sym_mp = kx, ky, mp
+def scan_xy_shifts(xshifts, yshifts, theta=theta, phi=phi, hv=hv, E_b=E_b, 
+                   lattice_constant=args.lattice_constant, degrees=True) :
+    pass
+
+for xshift in xshifts :
+    print(xshift)
+    kx, foo = pp.angle_to_k(xscale, theta, phi, hv, E_b, 
+                       lattice_constant=args.lattice_constant, 
+                       shift=xshift, degrees=True)
+    f.append([])
+    for yshift in yshifts :
+        ky, foo = pp.angle_to_k(yscale, theta=phi, phi=theta, hv=hv, E_b=E_b, 
+                       lattice_constant=args.lattice_constant, 
+                       shift=yshift, degrees=True)
+
+        KX, KY, sym_m, overlap = pp.symmetrize_map(kx, ky, mp, clean=True, 
+                                                   overlap=True, debug=False)
+        print(overlap)
+        f[-1].append(overlap)
+
+fig, ax = plt.subplots()
+ax.pcolormesh(f)
+plt.show()
+import sys
+sys.exit()
 
 if args.theta :
     kx, ky = pp.rotate_xy(kx, ky, args.theta)
@@ -86,20 +97,18 @@ if args.theta :
 
 # Plotting
 # ==============================================================================
-figtitle = 'x: {}, y: {} - {}'.format(args.xshift, args.yshift, args.filename)
-fig, (ax0, ax1, ax2) = plt.subplots(nrows=1, ncols=3, num=figtitle, 
-                                    figsize=(15,5))
+fig, (ax0, ax1, ax2) = plt.subplots(nrows=1, ncols=3, figsize=(15,5))
 
 try :
     cmap = plt.get_cmap(args.cmap)
-except Exception :
-    cmap = 'bone_r'
+except Exception as e :
+    print(e)
+    cmap = 'magma_r'
 
 vmax1 = args.vmax*mp.max()
-#vmax2 = args.vmax*sym_mp.max()
-vmax2 = sym_mp.max()
+vmax2 = args.vmax*sym_mp.max()
 kwargs1 = dict(vmin=0, vmax=vmax1)
-kwargs2 = dict(vmin=sym_mp.min(), vmax=vmax2)
+kwargs2 = dict(vmin=0, vmax=vmax2)
 for kwargs in [kwargs1, kwargs2] :
     kwargs.update(dict(cmap=cmap))
 

@@ -65,10 +65,10 @@ class Cursor() :
         # Find out which orientation we're currently in and change 
         # accordingly 
         orientations = ['horizontal', 'vertical']
-        # `i` will be the index of the orientation we currently don't have
+        # `i` will hbe the index of the orientation we currently don't have
         i = (orientations.index(self.orientation) + 1) % 2
         self.orientation = orientations[i]
-        print(self.orientation)
+
         #self.updateEndpoints()
 
     def getArrayRegion(self, *args, **kwargs) :
@@ -90,6 +90,19 @@ class FooCursor(pg.ROI) :
             pos = [0,0]
         #ROI.__init__(self, pos, [1,1], **kwargs)
         super().__init__(pos=pos, size=[1,1], **kwargs)
+
+
+
+
+
+
+
+
+
+
+
+
+
         self.imagePlot = imagePlot
 
         # Get the first letter of the `orientation` argument in lowercase

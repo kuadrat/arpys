@@ -5,6 +5,7 @@ Contains different tools to post-process (ARPES) data.
 
 import numpy as np
 import warnings
+from scipy import ndimage
 
 from kustom import constants
 
@@ -1261,6 +1262,91 @@ def rotate_xy(xscale, yscale, theta=45) :
             yr[i,j] = vr[1]
 
     return xr, yr
+
+def symmetrize_around(data, p0, p1) :
+    """ TODO p0, p1: indices of points """
+    # Data has to be 2D and dimensions (y, x) (which is flipped by pcolormesh)
+    ny, nx = data.shape
+
+    # Create coordinate arrays
+    original_x = np.arange(nx, dtype=float)
+    original_y = np.arange(ny, dtype=float)
+
+    # Build the linear function that defines the line through the selected 
+    # points
+    m = (p1[1] - p0[1]) / (p1[0] - p0[0])
+    print('P0: ', p0, '\nP1: ', p1)
+    print('m: ', m)
+    y0 = p1[1] - m*p1[0]
+    x0 = -y0/m
+    def line(x) :
+        return m*x +y0
+    def inverse_line(y) :
+        return (y - y0)/m
+
+    # Find the intersect of the line with the data boundary
+    ileft = [0, line(0)]
+    iright = [nx, line(nx)]
+    ibot = [inverse_line(0), 0]
+    itop = [inverse_line(ny), ny]
+
+    # Determine which of these intersects are actually in the visible range
+    # (there are 6 possible cases)
+    if ibot[0] >= 0 and ibot[0] < nx :
+        if ileft[1] > 0 and ileft[1] <= ny :
+            i0 = ileft
+            i1 = ibot
+        elif itop[0] > 0 and itop[0] <= nx :
+            i0 = ibot
+            i1 = itop
+        elif iright[1] > 0 and iright[1] <= ny :
+            i0 = ibot
+            i1 = iright
+    elif ileft[1] >= 0 and ileft[1] < ny :
+        if itop[0] > 0 and itop[0] <= nx :
+            i0 = ileft
+            i1 = itop
+        else :
+            i0 = ileft
+            i1 = iright
+    else :
+        i0 = itop
+        i1 = iright
+
+    # Find the middle point of the line
+    line_center = [0.5*(i1[i] + i0[i]) for i in range(2)]
+
+    # Build the mirror matrix
+    phi = np.arctan(1/m)
+    T = np.array([[np.cos(2*phi), np.sin(2*phi)],
+                  [np.sin(2*phi),-np.cos(2*phi)]])
+
+    # Transform the coordinates
+    # 1) Shift origin to the central point of the part of the mirror line 
+    # that lies within the data range
+    xshift = line_center[0]
+    x = original_x - xshift
+    yshift = line_center[1]
+    y = original_y - yshift
+    print('xshift, yshift: ', xshift, yshift)
+    print('original_x.min(), original_x.max(): ', original_x.min(), original_x.max())
+    print('x.min(), x.max(): ', x.min(), x.max())
+    print('y.min(), y.max(): ', y.min(), y.max())
+    # 2 Create coordinate vectors
+    X, Y = [a.flatten() for a in np.meshgrid(x, y)]
+    v0 = np.stack((X, Y))
+    # 3) Take the matrix product
+    v1 = T.dot(v0)
+    # 4) Shift origin back
+    xt = v1[0] + xshift
+    yt = v1[1] + yshift
+    print('xt.min(), xt.max(): ', xt.min(), xt.max())
+    print('yt.min(), yt.max(): ', yt.min(), yt.max())
+
+    transformed = ndimage.map_coordinates(data, [yt, xt]).reshape(ny, nx)
+#    transformed = ndimage.map_coordinates(data, [xt, yt]).reshape(ny, nx)
+    return transformed[::-1,::-1]
+#    return transformed
 
 def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4, 
                    debug=False) :

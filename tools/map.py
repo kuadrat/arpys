@@ -88,7 +88,7 @@ parser.add_argument('--shading',
                     help='Matplotlib shading argument (flat or gouraud)')
 
 parser.add_argument('--figsize',
-                    type=int, default=[5, 5],
+                    type=int, default=[10, 5],
                     help='Size of figure in inches.')
 
 parser.add_argument('-d', '--debug',
@@ -99,13 +99,13 @@ args = parser.parse_args()
 
 # Prepare plotting
 # ==============================================================================
-fig = plt.figure(figsize=args.figsize)
-ax = fig.add_subplot(111, projection='cursor')
+fig = plt.figure(num=args.filename, figsize=args.figsize)
+ax = fig.add_subplot(121, projection='cursor')
 
 # Second figure for intensity selection
 ifigsize = (4, 4)
-ifig = plt.figure(figsize=ifigsize)
-iax = ifig.add_subplot(111, projection='cursor')
+#ifig = plt.figure(figsize=ifigsize)
+iax = fig.add_subplot(122, projection='cursor')
 
 # Load data
 # ==============================================================================
@@ -200,7 +200,7 @@ def on_cursor_change(event) :
     ax.pcolormesh(d0, **kwargs)
     ax.figure.canvas.draw()
     
-ifig.canvas.mpl_connect('button_release_event', on_cursor_change)
+fig.canvas.mpl_connect('button_release_event', on_cursor_change)
 
 vmax_max_level = 1
 vmax_step_level = 0.1
@@ -224,7 +224,7 @@ def on_key_press(event) :
 
 # Connect the callback
 fig.canvas.mpl_connect('key_press_event', on_key_press)
-ifig.canvas.mpl_connect('key_press_event', on_key_press)
+fig.canvas.mpl_connect('key_press_event', on_key_press)
 
 plt.show()
 

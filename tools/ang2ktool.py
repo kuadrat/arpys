@@ -70,5 +70,6 @@ ax0.plot(angles+args.shift, kx)
 ax1.pcolormesh(angles+args.shift, yscale, data[0], vmin=0, vmax=vmax, cmap=cmap)
 ax2.pcolormesh(kx, yscale, data[0], vmin=0, vmax=vmax, cmap=cmap)
 ax2.grid(axis='x')
+ax2.set_xlabel('units of pi/a')
 
 plt.show()

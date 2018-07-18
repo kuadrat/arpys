@@ -8,6 +8,11 @@ KNOWN BUGS:
 
 TODO:
     - open new files from within APC
+      > functionality to save and load states initiated
+        > probably need to take special care of figures and axes;
+          also, currently, only values that have been changed from the 
+          default are saved in a state! (only the ones that appear in 
+          self.__dict__)
     - functionality for maps/3D data
       > maps need different normalization and bg subtraction routines
     - shirley bg, and other norms and bgs (`above_fermi`)
@@ -106,6 +111,9 @@ class APCmd(cmd.Cmd) :
     angintax = None
     cid = None
 
+    #_Session_management________________________________________________________
+    states = dict()
+
     #_Cmd2_configuration________________________________________________________
     debug = True
     locals_in_py = True
@@ -191,6 +199,21 @@ class APCmd(cmd.Cmd) :
 #
 #        # Instantiate the CLI object
 #        apcmd = APCmd(ax, D, args.filename)
+
+    def save_state(self, name) :
+        """ Save all instance variables to a dict which can be recovered at a 
+        later time. 
+        """
+        state = dict()
+        for key,val in self.__dict__.items() :
+            state.update({key: val})
+        self.states.update({self.filename: state})
+
+    def load_state(self, name) :
+        """ Recover a previously saved state. """
+        state = self.states[name]
+        for key,val in state.items() :
+            self.__setattr__(key, val)
 
     #_Processing_and_data_manipulation__________________________________________
     @cmd.with_category(VISUAL)

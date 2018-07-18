@@ -85,9 +85,9 @@ class MainWindow(QtGui.QMainWindow) :
         self.align()
         self.show()
 
-        self.defineKeys()
+        #self.defineKeys()
 
-    def defineKeys()
+    def defineKeys() :
         pass
 
     def onImageChange(self) :
@@ -128,9 +128,12 @@ class MainWindow(QtGui.QMainWindow) :
     def keyPressEvent(self, event) :
         """ Define all responses to keyboard presses. """
         key = event.key()
-        if key is QtCore.Qt.Key_R :
-            self.cursor.flipOrientation()
+        print(key, type(key))
+        if key == QtCore.Qt.Key_R :
+            print('is R')
+            self.roi.flipOrientation()
         else :
+            print('not R')
             event.ignore()
             return
         event.accept()
@@ -138,6 +141,7 @@ class MainWindow(QtGui.QMainWindow) :
 if __name__ == '__main__' :
     app = QtGui.QApplication([])
     filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00428.fits'
+    #filename = '/home/kevin/Documents/qmap/materials/Bi2201/2018_06_SIS/20180609_0007.h5'
     #filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00398.fits'
     #filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00399.fits'
     main_window = MainWindow()
