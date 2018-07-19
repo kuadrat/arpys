@@ -54,10 +54,11 @@ import numpy as np
 import os
 import pickle
 import pyfits
+import re
 from argparse import Namespace
 from errno import ENOENT
 from igor import binarywave
-from warnings import catch_warnings, simplefilter
+from warnings import catch_warnings, simplefilter, warn
 
 # Fcn to build the x, y (, z) ranges (maybe outsource this fcn definition)
 def start_step_n(start, step, n) :
@@ -412,7 +413,7 @@ class Dataloader_SIS(Dataloader) :
         # we have a map. Otherwise just a sequence of cuts.
         # Case map
         elif shape[2] > self.min_cuts_for_map :
-            print('Dataloader PSI. Is a map?')
+            self.print_m('Is a map?')
             x = shape[1]
             y = shape[2]
             N_E = shape[0]
@@ -573,6 +574,10 @@ class Dataloader_CASSIOPEE(Dataloader) :
     name = 'CASSIOPEE'
     date = '18.07.2018'
 
+    # Possible scantypes
+    HV = 'hv'
+    FSM = 'FSM'
+
     def load_data(self, filename) :
         """ 
         Single cuts are stored as two files: One file contians the data and 
@@ -611,7 +616,7 @@ class Dataloader_CASSIOPEE(Dataloader) :
                 filenames.append(name)
 
         # Get metadata from first file in list
-        skip, energy, angles, hv = self.get_metadata(dirname+filenames[0]) 
+        skip, energy, angles = self.get_metadata(dirname+filenames[0]) 
 
         # Get the data from each cut separately. This happens in the order 
         # they appear in os.listdir() which is usually not what we want -> a 
@@ -634,15 +639,31 @@ class Dataloader_CASSIOPEE(Dataloader) :
         for i in range(i_min, i_max) :
             data.append(unordered[i])
         data = np.array(data)
-        # For a map, we expect output of the form (Energy, k_para, k_perp), 
-        # currently it is (tilt, energy, theta) -> reshape with moveaxis
-        data = np.moveaxis(data, 0, 1)
+
+        # Get the z-axis from the metadata files
+        scantype, outer_loop, hv = self.get_outer_loop(dirname, filenames) 
+        self.print_m('Scantype: {}'.format(scantype))
+        if scantype == self.HV :
+            yscale = energy
+            zscale = outer_loop
+            hv = outer_loop
+        elif scantype == self.FSM :
+            yscale = outer_loop
+            zscale = energy
+            # For a map, we expect output of the form (Energy, k_para, 
+            # k_perp), currently it is (tilt, energy, theta) -> reshape 
+            # with moveaxis
+            data = np.moveaxis(data, 0, 1)
+        else :
+            yscale = energy
+            zscale = np.arange(data.shape[0])
+        xscale = angles
 
         res = Namespace(
             data = data,
-            xscale = angles,
-            yscale = np.arange(i_min, i_max),
-            zscale = energy,
+            xscale = xscale,
+            yscale = yscale,
+            zscale = zscale,
             angles = angles,
             theta = 1,
             phi = 1,
@@ -695,19 +716,8 @@ class Dataloader_CASSIOPEE(Dataloader) :
                 continue
             # Put the pair in a dictionary for later access
             metadata.update({name: val})
-#            # Now check if the name is any of the keywords we are interested in
-#            if name=='Excitation Energy' :
-#                hv = val
-#            elif name=='Detector First X-Channel' :
-#                x0 = val
-#            elif name=='Detector Last X-Channel' :
-#                x1 = val
-#            elif name=='Detector First Y-Channel' :
-#                y0 = val
-#            elif name=='Detector Last Y-Channel' :
-#                y1 = val
-#            elif :
         
+        # NOTE Unreliabel hv
         hv = metadata['Excitation Energy']
         res = Namespace(
                 data = data,
@@ -722,7 +732,7 @@ class Dataloader_CASSIOPEE(Dataloader) :
         return res
 
     def load_from_txt(self, filename) :
-        i, energy, angles, hv = self.get_metadata(filename)
+        i, energy, angles = self.get_metadata(filename)
         data0 = np.loadtxt(filename, skiprows=i+1)
         # The first column in the datafile contains the angles
         angles_from_data = data0[:,0]
@@ -737,8 +747,7 @@ class Dataloader_CASSIOPEE(Dataloader) :
             theta = 1,
             phi = 1,
             E_b = 0,
-            hv = hv)
-
+            hv = 1)
         return res
 
     def get_metadata(self, filename) :
@@ -764,11 +773,81 @@ class Dataloader_CASSIOPEE(Dataloader) :
                     angles = line.split('=')[-1].split()
                     angles = np.array(angles, dtype=float)
                 elif line.startswith('Excitation Energy') :
-                    hv = float(line.split('=')[-1])
+                    # NOTE this hv does not reflect the actually used hv
+#                    hv = float(line.split('=')[-1])
+                    pass
                 elif line.startswith('inputA') :
                     # this seems to be the last line before the data
                     break
-        return i, energy, angles, hv
+        return i, energy, angles
+
+    def get_outer_loop(self, dirname, filenames) :
+        """
+        Try to determine the scantype and the corresponding z-axis scale from 
+        the additional metadata textfiles. These follow the assumptions made 
+        in :func: `self.load_from_dir`. Additionally, the MONOCHROMATOR 
+        section must come before the UNDULATOR section as in both sections we 
+        have a key `hv` but only the former makes sense.
+        Return a string for the scantype, the extracted z-scale and the value 
+        for hv for of non-hv-scans (scantype, zscale, hvs[0]) or (None, 
+        None, hvs[0]) in case of failure.
+        """
+        # Step 1) Extract metadata from metadata file
+        # Prepare containers
+        indices, xs, ys, zs, thetas, phis, tilts, hvs = ([], [], [], [], [], 
+                                                         [], [], [])
+        containers = [indices, xs, ys, zs, thetas, phis, tilts, hvs] 
+        for name in filenames :
+            # Get the index of the file
+            index = int(name.split('_')[1])
+
+            # Build the metadata-filename by substituting the ROI part with i
+            metafile = re.sub(r'_ROI.?_', '_i', name)
+
+            # The values are separated from the names by a `:`
+            splitchar = ':'
+
+            # Read in the file
+            with open(dirname + metafile, 'r') as f :
+                for line in f.readlines() :
+                    if line.startswith('x (mm)') :
+                        x = float(line.split(splitchar)[-1])
+                    elif line.startswith('y (mm)') :
+                        y = float(line.split(splitchar)[-1])
+                    elif line.startswith('z (mm)') :
+                        z = float(line.split(splitchar)[-1])
+                    elif line.startswith('theta (deg)') :
+                        theta = float(line.split(splitchar)[-1])
+                    elif line.startswith('phi (deg)') :
+                        phi = float(line.split(splitchar)[-1])
+                    elif line.startswith('tilt (deg)') :
+                        tilt = float(line.split(splitchar)[-1])
+                    elif line.startswith('hv (eV)') :
+                        hv = float(line.split(splitchar)[-1])
+                    elif line.startswith('UNDULATOR') :
+                        break
+            # NOTE The order of this list has to match the order of the 
+            # containers
+            values = [index, x, y, z, theta, phi, tilt, hv]
+            for i,container in enumerate(containers) :
+                container.append(values[i])
+
+        # Step 2) Check which parameters vary to determine scantype
+        if hvs[1] != hvs[0] :
+            scantype = self.HV
+            zscale = hvs
+        elif thetas[1] != thetas[0] :
+            scantype = self.FSM
+            zscale = thetas
+        else :
+            scantype = None
+            zscale = None
+
+        # Step 3) Put zscale in order and return
+        if zscale is not None :
+            zscale = np.array(zscale)[np.argsort(indices)]
+
+        return scantype, zscale, hvs[0]
 
 # +-------+ #
 # | Tools | # ==================================================================
@@ -784,7 +863,7 @@ all_dls = [
           ]
 
 # Function to try all dataloaders in all_dls
-def load_data(filename, exclude=None) :
+def load_data(filename, exclude=None, suppress_warnings=False) :
     """
     Try to load some dataset 'filename' by iterating through `all_dls` 
     and appliyng the respective dataloader's load_data method. If it works: 
@@ -805,7 +884,8 @@ def load_data(filename, exclude=None) :
 
     # Suppress warnings
     with catch_warnings() :
-        simplefilter('ignore')
+        if suppress_warnings :
+            simplefilter('ignore')
         for dataloader in all_dls :
             # Instantiate a dataloader object
             dl = dataloader()
@@ -824,7 +904,14 @@ def load_data(filename, exclude=None) :
                 # Try the next dl
                 continue
 
-            # Reaching this point must mean we succeeded
+            # Reaching this point must mean we succeeded. Print warnings from 
+            # this dataloader, if any occurred
+            print('Loaded data with {}.'.format(dl))
+            try :
+                print(dl, ': ', exceptions[dl])
+            except KeyError :
+                pass
+            
             return namespace
 
     # Reaching this point means something went wrong. Print all exceptions.
