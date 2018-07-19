@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import warnings
 from matplotlib.colors import PowerNorm
+from matplotlib.patheffects import withStroke
 from scipy import ndimage
 
 from utilities import constants
@@ -1511,8 +1512,9 @@ def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=4, **kwargs) :
                the given indices will be plotted.
     max_ppf    int; maximum number of *p*lots *p*er *f*igure.
     max_nfigs  int; maximum number of figures that are created. If more would 
-               be necessary to display all plots, a warning is issued but the 
-               additional figures are just not created.
+               be necessary to display all plots, a warning is issued and 
+               only every N'th plot is created, where N is chosen such that 
+               the whole 'range' of plots is represented on the figures. 
     kwargs     dict; keyword arguments passed on to :func: `pcolormesh 
                <matplotlib.axes._subplots.AxesSubplot.pcolormesh>`. 
                Additionally, the kwarg `gamma` for power-law color mapping 
@@ -1527,10 +1529,19 @@ def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=4, **kwargs) :
     n_plots = len(zs)
     n_figs = int( np.ceil(n_plots/max_ppf) )
     if n_figs > max_nfigs :
-        n_figs = max_nfigs
+        # Only plot every nth plot
+        nth = round(n_plots/(max_ppf*max_nfigs))
+        # Get the right English suffix depending on the value of nth
+        if nth <= 3 :
+            suffix = ['st', 'nd', 'rd'][nth-1]
+        else :
+            suffix = 'th'
         warnings.warn((
         'Number of necessary figures n_figs ({0}) > max_nfigs ({1}).' +
-        'Setting n_figs to {1}.').format( n_figs, max_nfigs))
+        'Setting n_figs to {1} and only plotting every {2}`{3} cut.').format( 
+            n_figs, max_nfigs, nth, suffix))
+        n_figs = max_nfigs
+        n_plots = max_ppf*n_figs
 
     # If we have just one figure, make the subplots as big as possible by 
     # setting the number of subplots per row (ppr) to a reasonable value
@@ -1543,13 +1554,15 @@ def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=4, **kwargs) :
     # Account for this by moving the axes
     x = np.arange(len(data.shape))
     data = np.moveaxis(data, x, np.roll(x, dim))
-    if dim%2 : data = data.T
 
     # Extract additional kwarg from kwargs
     if 'gamma' in kwargs :
         gamma = kwargs.pop('gamma')
     else :
         gamma = 1
+
+    # Define the beginnings of the plot in figure units
+    margins = dict(left=0, right=1, bottom=0, top=1)
 
     figures = []
     for i in range(n_figs) :
@@ -1559,14 +1572,21 @@ def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=4, **kwargs) :
         stop = (i+1)*ppr*ppr
         # Iterate over the cuts that go on this figure
         for j,z in enumerate(zs[start:stop]) :
-            # Create the axes and extract the cut
+            # Try to extract the cut and create the axes 
+            cut_index = z*nth
+            try :
+                cut = data[cut_index]
+            except IndexError :
+                continue
             ax = fig.add_subplot(ppr, ppr, j+1)
-            cut = data[z]
             ax.pcolormesh(cut, norm=PowerNorm(gamma=gamma), **kwargs)
             ax.set_xticklabels([])
             ax.set_yticklabels([])
-            ax.set_title(z)
+            label = ax.text(0, 0, str(cut_index), size=10)
+            label.set_path_effects([withStroke(linewidth=2, foreground='w', 
+                                               alpha=0.5)])
 
+        fig.subplots_adjust(hspace=0.01, wspace=0.01, **margins)
         figures.append(fig)
 
     return figures

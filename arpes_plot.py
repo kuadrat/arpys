@@ -73,6 +73,22 @@ ANALYSIS = 'Data analysis'
 # List of registered matplotlib colormaps
 CMAPS = plt.colormaps()
 
+# +-------+ #
+# | Tools | # ==================================================================
+# +-------+ #
+
+class StoreDictKeyPair(argparse.Action):
+    """ 
+    A default argparse.Action that allows storing a list of comma-seperated 
+    key=value pairs given over the command line. 
+    """
+    def __call__(self, parser, namespace, values, option_string=None):
+         my_dict = {}
+         for kv in values.split(","):
+             k,v = kv.split("=")
+             my_dict[k] = v
+         setattr(namespace, self.dest, my_dict)
+
 # +-----+ #
 # | CLI | # ====================================================================
 # +-----+ #
@@ -724,20 +740,22 @@ class APCmd(cmd.Cmd) :
         if not self.is_three_d :
             self._warn_not_implemented('roll_axes for 2D data')
             return
-        # Change the order of dimensions in the data
-        self.original_data = np.moveaxis(self.original_data, [0,1,2], [1,2,0])
-        # Change the x-, y- and z-scales accordingly
-        old_Z = self.original_Z.copy()
-        old_Y = self.original_Y.copy()
-        self.original_Z = self.original_X.copy()
-        self.original_Y = old_Z
-        self.original_X = old_Y
 
+        self.poutput('Old shape: {}'.format(self.original_data.shape))
+
+        # Change the order of dimensions in the data
+        self.original_data = np.moveaxis(self.original_data, [0,1,2], [2,0,1])
+        # Change the x-, y- and z-scales accordingly (carry out a swap operation)
+        old_Z = self.original_Z.copy()
+        self.original_Z = self.original_Y.copy()
+        self.original_Y = self.original_X.copy()
+        self.original_X = old_Z
+
+        # Replot and recreate the 'integrated spectrum' helper plot
         self.plot()
         self.do_integrate('')
 
-        print(self.original_data.shape)
-        print(self.original_Z.shape, self.original_Y.shape, self.original_X.shape)
+        self.poutput('New shape: {}'.format(self.original_data.shape))
 
     @cmd.with_category(ANALYSIS)
     def do_reset(self, args) :
@@ -763,23 +781,40 @@ class APCmd(cmd.Cmd) :
         self.plot()
 
     #_Plotting__________________________________________________________________
+    """ Define the parser for :func: `do_all_cuts`. """
+    all_cuts_parser = \
+    argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    all_cuts_parser.add_argument('-d', '--dim', type=int, default=0, 
+                                 choices=[0, 1, 2],
+                                 help=('Dimension along which to take the cuts.'))
+    all_cuts_parser.add_argument('-F', '--max_nfigs', type=int, default=4, 
+                                 help=('Maximum number of figures to generate.'))
+    all_cuts_parser.add_argument('-k', '--kwargs', action=StoreDictKeyPair,
+                                 help=('Keyword arguments to pcolormesh.'))
+#    all_cuts_parser.add_argument('-z', '--zs', default=None, nargs='?',
+#                                 help=('List of indeces along the dimension ' +
+#                                 'to take cuts from.'))
+
     @cmd.with_category(VISUAL)
-    def do_all_cuts(self, arg=None) :
-        # TODO: allow passing of plotting kwargs and, more importantly, zs
-        # TODO: also, max_nfigs, etc.
+    @cmd.with_argparser(all_cuts_parser)
+    def do_all_cuts(self, args) :
         """
         Show plots of all cuts along the current z direction.
+        This makes use of :func: `plot_cuts <arpys.postprocessing.plot_cuts>`,
+        so confer its documentation for info on some arguments.
         """
-        if arg=='' :
-            arg = 0
-        dim = int(arg)
+        dim = args.dim
 
         # Pass the same kwargs as the main plot receives
         kwargs = dict(gamma=self.gamma, cmap=self.cmap)
+        if args.kwargs is not None :
+            kwargs.update(args.kwargs)
 
         # Since pyplot's interactive mode is on, these figures will be 
         # automatically opened and stay open
-        figs = pp.plot_cuts(self.data, dim=dim, **kwargs)
+        figs = pp.plot_cuts(self.data, dim=dim, max_nfigs=args.max_nfigs, 
+                            **kwargs)
 
     @cmd.with_category(VISUAL)
     def do_grid(self, arg=None) :
