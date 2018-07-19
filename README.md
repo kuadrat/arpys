@@ -56,16 +56,6 @@ A link to `arpes_plot.py`
 
 A tool to plot the band characters from a wien2k DFT calculation.
 
-scripts/
---------
-
-Rough scripts etc. for testing. Don't really need to be on the repository...
-
-data/
------
-
-Contains some sample data for testing.
-
 utilities/
 ----------
 
@@ -73,4 +63,6 @@ A submodule that contains some custom python code that the original author
 used on his system and got incorporated into arpys.
 arpys mostly needs the axes subclasses and some small helper functions from 
 there.
+This is actually just a copy of another module that is hosted at 
+`git@github.com:kuadrat/kustom.git`.
 
