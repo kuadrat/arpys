@@ -5,7 +5,6 @@ arpes_plot.py
 A tool to plot ARPES data from the command line.
 
 TODO:
-    - create overview figure of a 3D scan (display all cuts)
     - open new files from within APC
       > functionality to save and load states initiated
         > probably need to take special care of figures and axes;
@@ -241,7 +240,13 @@ class APCmd(cmd.Cmd) :
         `self.get_axes()`.
         """
         if arg=='' :
-            arg = 'Copy of {}'.format(self.filename)
+            # Figure out how many copies exist by counting the number of 
+            # figtitles starting with 'Copy' (Does not count user-named copies)
+            names, axes = self.get_axes()
+            n_copies = 0
+            for i, name in enumerate(names) :
+                if name.startswith('Copy') : n_copies += 1
+            arg = 'Copy of {} - {}'.format(self.filename, n_copies+1)
         fig, ax = plt.subplots(num=arg)
         self.plot(ax)
         self.move_right()
@@ -566,7 +571,7 @@ class APCmd(cmd.Cmd) :
                 self.poutput(('Clicked at pixel: {:} - z units: '
                               '{:}').format(int(event.xdata), 
                                             ind_to_energy(event.xdata)))
-                self.do_z(str(int(event.xdata)))
+                self.do_z(str(int(event.xdata)) + ' ' + str(self.integrate))
 
             # Disconnect the previous event handler ...
             if self.cid :

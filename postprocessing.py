@@ -1528,6 +1528,7 @@ def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=4, **kwargs) :
     # The total number of plots and figures to be created
     n_plots = len(zs)
     n_figs = int( np.ceil(n_plots/max_ppf) )
+    nth = 1
     if n_figs > max_nfigs :
         # Only plot every nth plot
         nth = round(n_plots/(max_ppf*max_nfigs))
