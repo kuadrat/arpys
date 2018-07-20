@@ -10,7 +10,7 @@ from matplotlib.colors import PowerNorm
 from matplotlib.patheffects import withStroke
 from scipy import ndimage
 
-from utilities import constants
+from arpys.utilities import constants
 
 # +------------+ #
 # | Decorators | # ============================================================

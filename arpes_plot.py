@@ -1,5 +1,4 @@
 #!/usr/bin/python
-
 """
 arpes_plot.py
 A tool to plot ARPES data from the command line.
@@ -24,6 +23,7 @@ TODO:
       to import
 
 KNOWN BUGS:
+    - something wrong with gamma for `all_cuts`
     - `cursor crop` should work qith above AND below, not just one of the two
       (same for left and right, obviously)
 """
