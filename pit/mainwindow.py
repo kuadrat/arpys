@@ -7,27 +7,36 @@ import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.console
 from pyqtgraph.Qt import QtGui, QtCore
-from qtconsole.rich_ipython_widget import RichIPythonWidget
+from qtconsole.rich_ipython_widget import RichIPythonWidget, RichJupyterWidget
 from qtconsole.inprocess import QtInProcessKernelManager
 
 # Absolute imports are better than relative ones, apparently
 import arpys as arp
 from arpys import dl, pp
 #from kustom.arpys.pit.widgets.kimageview.KImageView import *
-from arpys.pit.imageplot import *
+from arpys.pit.cmaps import cmaps
 from arpys.pit.cursor import Cursor
+from arpys.pit.imageplot import *
 from arpys.pit.utilities import TracedVariable
 
-appStyle="""
+app_style="""
 QMainWindow{
     background-color: black;
     }
 """
 
-class EmbedIPython(RichIPythonWidget):
-    """ From ~/Documents/foo/pyqtgraph/ipython_console2.py """
+console_style = """
+color: rgb(255, 255, 255);
+background-color: rgb(0, 0, 0);
+border: 1px solid rgb(50, 50, 50);
+"""
+
+DEFAULT_CMAP = 'kocean'
+
+class EmbedIPython(RichJupyterWidget):
+    """ Some voodoo to get an ipython console in a Qt application. """
     def __init__(self, **kwarg):
-        super(RichIPythonWidget, self).__init__()
+        super(RichJupyterWidget, self).__init__()
         self.kernel_manager = QtInProcessKernelManager()
         self.kernel_manager.start_kernel()
         self.kernel = self.kernel_manager.kernel
@@ -45,12 +54,14 @@ class MainWindow(QtGui.QMainWindow) :
 
     def __init__(self, filename=None, background='default') :
         super().__init__()
-        self.setStyleSheet(appStyle)
+        # Aesthetics
+        self.setStyleSheet(app_style)
+        self.set_cmap(DEFAULT_CMAP)
 
         self.initUI()
         
         # Connect signal handling
-        self.main_plot.sig_image_changed.connect(self.onImageChange)
+        self.main_plot.sig_image_changed.connect(self.on_image_change)
 
         if filename is not None :
             self.prepare_data(filename)
@@ -67,11 +78,13 @@ class MainWindow(QtGui.QMainWindow) :
         """
         self.data.set_value(data)
 
-    def set_image(self, image, *args, **kwargs) :
+    def set_image(self, image=None, *args, **kwargs) :
         """ Wraps the underlying ImagePlot3d's set_image method.
         See :func: `<arpys.pit.imageplot.ImagePlot3d.set_image>`.
         """
-        self.main_plot.set_image(image, *args, **kwargs)
+        if image is None :
+            image = self.main_plot.image_data
+        self.main_plot.set_image(image, *args, lut=self.lut, **kwargs)
 
     def prepareData(self, filename) :
         """ Load the specified data and prepare some parts of it (caching).
@@ -79,11 +92,11 @@ class MainWindow(QtGui.QMainWindow) :
         """
         self.D = dl.load_data(filename)
         self.data = TracedVariable(self.D.data)
-        def onDataChange() :
+        def on_data_change() :
             """ Callback for change of self.data. """
             self.set_image(self.get_data(), axes=(1,2))
             self.update()
-        self.data.sig_value_changed.connect(onDataChange)
+        self.data.sig_value_changed.connect(on_data_change)
 
         self.set_image(self.get_data(), axes=(1,2))
 
@@ -109,6 +122,7 @@ class MainWindow(QtGui.QMainWindow) :
 #        self.console = pyqtgraph.console.ConsoleWidget(namespace=namespace)
         self.console = EmbedIPython(**namespace)
         self.console.kernel.shell.run_cell('%pylab qt')
+        self.console.setStyleSheet(console_style)
 
         # Creat the scalebar for the z dimension and connect to main_plot's z
         self.zscale = Scalebar()
@@ -116,7 +130,7 @@ class MainWindow(QtGui.QMainWindow) :
 
         # Add ROI to the main ImageView
         self.roi = Cursor(self.main_plot)
-        self.onImageChange()
+        self.on_image_change()
 
         # Align all the gui elements
         self.align()
@@ -127,10 +141,9 @@ class MainWindow(QtGui.QMainWindow) :
     def defineKeys() :
         pass
 
-    def onImageChange(self) :
+    def on_image_change(self) :
         """ Recenter the ROI. """
         self.roi.initialize()
-
         # Reconnect signal handling
         self.roi.roi.sigRegionChanged.connect(self.update)
 
@@ -158,9 +171,43 @@ class MainWindow(QtGui.QMainWindow) :
             print(e)
             return
 
-        # Convert np.array `xcut` to an ImageItem set it as `xcut_plot`'s Image
+        # Convert np.array `xcut` to an ImageItem and set it as `xcut_plot`'s 
+        # Image
         cut_image = pg.ImageItem(cut)
-        self.cut_plot.set_image(cut)
+        self.cut_plot.set_image(cut, lut=self.lut)
+
+    def set_cmap(self, cmap) :
+        """ Set the colormap to *cmap* where *cmap* is one of the names 
+        registered in `<arpys.pit.cmaps>` which includes all matplotlib and 
+        kustom cmaps.
+        """
+        try :
+            self.cmap = cmaps[cmap]
+        except KeyError :
+            print('Invalid colormap name. Use one of: ')
+            print(cmaps.keys())
+        self.lut = self.cmap.getLookupTable()
+        self.redraw_plots()
+
+    def set_alpha(self, alpha) :
+        """ Set the alpha value of the currently used cmap. *alpha* can be a 
+        single float or an array of length ``len(self.cmap.color)``.
+        """
+        self.cmap.set_alpha(alpha)
+        self.lut = self.cmap.getLookupTable()
+        self.redraw_plots()
+
+    def redraw_plots(self) :
+        """ Redraw plotted data to reflect changes in data or its colors. """
+        try :
+            # Redraw main plot
+            self.set_image()
+            # Redraw cut plot
+            self.update()
+        except AttributeError :
+            # In some cases (namely initialization) the mainwindow is not 
+            # defined yet
+            pass
 
     def keyPressEvent(self, event) :
         """ Define all responses to keyboard presses. """
@@ -181,9 +228,8 @@ if __name__ == '__main__' :
 #    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00428.fits'
     #filename = '/home/kevin/Documents/qmap/materials/Bi2201/2018_06_SIS/20180609_0007.h5'
     #filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00398.fits'
-    #filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00399.fits'
-#    filename = '~/qmap/experiments/2018_07_CASSIOPEE/CaMnSb/S3_FSM_fine_hv75_T65//'
-    filename = '/home/kevin/qmap/experiments/2018_07_CASSIOPEE/CaMnSb/S3_FSM_fine_hv75_T65'
+    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00399.fits'
+#    filename = '/home/kevin/qmap/experiments/2018_07_CASSIOPEE/CaMnSb/S3_FSM_fine_hv75_T65'
 
     main_window = MainWindow()
     main_window.prepareData(filename)
