@@ -6,8 +6,8 @@ from pyqtgraph import Qt as qt #import QtCore
 from pyqtgraph.graphicsItems.ImageItem import ImageItem
 from pyqtgraph.widgets import PlotWidget, GraphicsView
 
-from .utilities import TracedVariable
-from cursor import Cursor
+from arpys.pit.utilities import TracedVariable
+from arpys.pit.cursor import Cursor
 
 class ImagePlot(pg.PlotWidget) :
     """
@@ -16,7 +16,7 @@ class ImagePlot(pg.PlotWidget) :
     the nice pyqtgraph axes panning/rescaling/zooming functionality.
     """
     image = None
-    sigImageChanged = qt.QtCore.Signal()
+    sig_image_changed = qt.QtCore.Signal()
 
     def __init__(self, image=None, parent=None, background='default', 
                  **kwargs) :
@@ -31,9 +31,9 @@ class ImagePlot(pg.PlotWidget) :
         """
         super().__init__(parent=parent, background=background, **kwargs) 
         if image is not None :
-            self.setImage(image)
+            self.set_image(image)
 
-    def removeImage(self) :
+    def remove_image(self) :
         """ Removes the current image using the parent's :func: `removeItem` 
         function. 
         """
@@ -41,7 +41,7 @@ class ImagePlot(pg.PlotWidget) :
             self.removeItem(self.image)
         self.image = None
 
-    def setImage(self, image, *args, **kwargs) :
+    def set_image(self, image, *args, **kwargs) :
         """ Expects both, np.arrays and pg.ImageItems as input and sets them 
         correctly to this PlotWidget's Image with `addItem`. Also makes sure 
         there is only one Image by deleting the previous image.
@@ -63,21 +63,21 @@ class ImagePlot(pg.PlotWidget) :
             raise Exception(message)
 
         # Replace the image
-        self.removeImage()
+        self.remove_image()
         self.image = image
         self.addItem(image)
 
-        self.sigImageChanged.emit()
+        self.sig_image_changed.emit()
 
-    def fixViewRange(self) :
+    def fix_viewrange(self) :
         """ Prevent zooming out by fixing the limits of the ViewBox. """
         [[xMin, xMax], [yMin, yMax]] = self.viewRange()
         self.setLimits(xMin=xMin, xMax=xMax, yMin=yMin, yMax=yMax,
                       maxXRange=xMax-xMin, maxYRange=yMax-yMin)
 
-    def releaseViewRange(self) :
-        """ Undo the effects of :func: `fixViewRange 
-        <pit.imageplot.ImagePlot.fixViewRange>`
+    def release_viewrange(self) :
+        """ Undo the effects of :func: `fix_viewrange 
+        <pit.imageplot.ImagePlot.fix_viewrange>`
         """
         self.setLimits(xMin=-inf,
                        xMax=inf,
@@ -85,10 +85,6 @@ class ImagePlot(pg.PlotWidget) :
                        yMax=inf,
                        maxXRange=inf,
                        maxYRange=inf)
-
-    def getImage(self) :
-        """ Getter method for self.image. """
-        return self.image
 
 #class ImagePlot3d(ImagePlot, qt.QtGui.QGraphicsWidget):
 class ImagePlot3d(ImagePlot):
@@ -104,40 +100,40 @@ class ImagePlot3d(ImagePlot):
         arguments.  
         """ 
         # Initialize self.z before the call to super() because super's 
-        # __init__ will call self.setImage which accesses self.z
+        # __init__ will call self.set_image which accesses self.z
         z = TracedVariable()
-        self.registerTracedVar(z)
+        self.register_traced_variable(z)
         super().__init__(parent=parent, background=background, **kwargs) 
         if image is not None :
-            self.setImage(image, axes)
+            self.set_image(image, axes)
 
-    def registerTracedVar(self, tracedVariable) :
+    def register_traced_variable(self, traced_variable) :
         """ Set self.z to the given TracedVariable instance and connect the 
         relevant slots to the signals. 
         """
-        self.z = tracedVariable
-        self.z.sigValueChanged.connect(self.zChanged)
+        self.z = traced_variable
+        self.z.sig_value_changed.connect(self.on_z_change)
 
     def sizeHint(self) :
-        """ NOTE: Doesn't seem to do much. """
+        # NOTE: Doesn't seem to do much.
         size = qt.QtCore.QSize(378, 310)
         return size
 
-    def setImage(self, image, axes=(0,1), **imageKwargs) :
+    def set_image(self, image, axes=(0,1), **image_kwargs) :
         """ As opposed to :class: `ImagePlot <pit.imageplot.ImagePlot>` (i.e.
         the parent), this only accepts 3D np.arrays. Also determines the z 
         range and resets the `z` value to 0.
 
-        ===========  ===========================================================
-        image        3D np.ndarray; the data of which slices are to be 
-                     displayed.
-        axes         tuple of int; axis indices of the x and y axis to be 
-                     used. For example if axis=(0,2) then the shape of 
-                     `image` is assumed to be (x,z,y).
-        imageKwargs  keyword arguments that are passed on to :class:
-                     `ImageItem <pyqtgraph.graphicsItems.ImageItem.ImageItem>` 
-                     when creating ImageItems from the data.
-        ===========  ===========================================================
+        ============  ==========================================================
+        image         3D np.ndarray; the data of which slices are to be 
+                      displayed.
+        axes          tuple of int; axis indices of the x and y axis to be 
+                      used. For example if axis=(0,2) then the shape of 
+                      *image* is assumed to be (x,z,y).
+        image_kwargs  keyword arguments that are passed on to :class:
+                      `ImageItem <pyqtgraph.graphicsItems.ImageItem.ImageItem>` 
+                      when creating ImageItems from the data.
+        ============  ==========================================================
         """
         # Test the shape of the input
         if image.ndim is not 3 :
@@ -165,25 +161,25 @@ class ImagePlot3d(ImagePlot):
 
         self.image_data = image
         self.axes = axes
-        self.imageKwargs = imageKwargs
+        self.image_kwargs = image_kwargs
 
         # Initialize z to 0, taking the first slice of the data
         self.z.set_value(0)
-        self.updateImageSlice()
+        self.update_image_slice()
 
         # Fix the scales to prevent zooming out
-        self.fixViewRange()
+        self.fix_viewrange()
         
-        self.sigImageChanged.emit()
+        self.sig_image_changed.emit()
 
-    def updateImageSlice(self) :
+    def update_image_slice(self) :
         """ Update the currently displayed image slice by deleting the old 
         `self.image` and using :func: `addItem 
         <pit.imageplot.ImagePlot3d.addItem>' to set the newly displayed image 
         according to the current value of `self.z`.
         """
         # Clear plot from the old ImageItem
-        self.removeImage()
+        self.remove_image()
 
         # Extract the slice from the image data, depending on how our axes 
         # are defined
@@ -196,13 +192,13 @@ class ImagePlot3d(ImagePlot):
             image = self.image_data[:,:,z]
 
         # Convert to ImageItem and add
-        self.image = ImageItem(image, **self.imageKwargs)
+        self.image = ImageItem(image, **self.image_kwargs)
         self.addItem(self.image)
 
-    def zChanged(self, caller=None) :
-        """ Callback to the :signal: `sigZChanged`. Ensure self.z does not go 
+    def on_z_change(self, caller=None) :
+        """ Callback to the :signal: `sig_z_changed`. Ensure self.z does not go 
         out of bounds and update the Image slice with a call to :func: 
-        `updateImageSlice <arpys.pit.imageplot.ImagePlot3d.updateImageSlice>`.
+        `update_image_slice <arpys.pit.imageplot.ImagePlot3d.update_image_slice>`.
         """
         # Ensure z doesn't go out of bounds
         z = self.z.get_value()
@@ -212,7 +208,7 @@ class ImagePlot3d(ImagePlot):
             # emitting the signal from inside a slot (function connected to 
             # that signal)
             self.z.set_value(clipped_z)
-        self.updateImageSlice()
+        self.update_image_slice()
 
     def keyPressEvent(self, event) :
         """ Handle keyboard input. """
@@ -246,7 +242,7 @@ class Scalebar(pg.PlotWidget) :
         # The position of the slider is stored with a TracedVariable
         initial_pos = 0
         pos = TracedVariable(initial_pos)
-        self.registerTracedVar(pos)
+        self.register_traced_variable(pos)
 
         # Set up the slider
         self.slider = pg.InfiniteLine(initial_pos, movable=True)
@@ -263,14 +259,14 @@ class Scalebar(pg.PlotWidget) :
         self.setMouseEnabled(False, False)
 
         # Initialize range to [0, 1]
-        self.setBounds(initial_pos, initial_pos + 1)
+        self.set_bounds(initial_pos, initial_pos + 1)
 
         # Set the speed at which the slider moves on mousewheel scroll
         # in units of % of total range
         self.wheel_sensitivity = 0.5
 
         # Connect a slot (callback) to dragging and clicking events
-        self.slider.sigDragged.connect(self.onPositionChange)
+        self.slider.sigDragged.connect(self.on_position_change)
         # sigMouseReleased seems to not work (maybe because sigDragged is used)
         #self.sigMouseReleased.connect(self.onClick)
         # The inherited mouseReleaseEvent is probably used for sigDragged 
@@ -293,51 +289,51 @@ class Scalebar(pg.PlotWidget) :
         self.pos.set_value(self.pos.get_value() + sign * 
                            self.wheel_frames) 
 
-    def registerTracedVar(self, tracedVariable) :
+    def register_traced_variable(self, traced_variable) :
         """ Set self.pos to the given TracedVariable instance and connect the 
         relevant slots to the signals. This can be used to share a 
         TracedVariable among widgets.
         """
-        self.pos = tracedVariable
-        self.pos.sigValueChanged.connect(self.setPosition)
-        self.pos.sigAllowedValuesChanged.connect(self.onAllowedValuesChange)
+        self.pos = traced_variable
+        self.pos.sig_value_changed.connect(self.set_position)
+        self.pos.sig_allowed_values_changed.connect(self.on_allowed_values_change)
         # Set the bounds to the current values of this TracedVar, if existent
-        #self.onAllowedValuesChanged()
+        #self.on_allowed_values_changed()
 
     def onClick(self, *args) :
         """ For testing. """
         print(args)
         print('Clicked')
 
-    def onPositionChange(self) :
+    def on_position_change(self) :
         """ Callback for the :signal: `sigDragged 
         <pyqtgraph.InfiniteLine.sigDragged>`. Set the value of the 
         TracedVariable instance self.pos to the current slider position. 
         """
         current_pos = self.slider.value()
-        # NOTE pos.set_value emits signal sigValueChanged which may lead to 
+        # NOTE pos.set_value emits signal sig_value_changed which may lead to 
         # duplicate processing of the position change.
         self.pos.set_value(current_pos)
 
-    def onAllowedValuesChange(self) :
-        """ Callback for the :signal: `sigAllowedValuesChanged
-        <pyqtgraph.utilities.TracedVariable.sifAllowedValuesChanged>`. With a 
-        change of the allowed values in the TracedVariable, we should update 
-        our bounds accordingly.
+    def on_allowed_values_change(self) :
+        """ Callback for the :signal: `sig_allowed_values_changed
+        <pyqtgraph.utilities.TracedVariable.sig_allowed_values_changed>`. 
+        With a change of the allowed values in the TracedVariable, we should 
+        update our bounds accordingly.
         """
         # If the allowed values were reset, just exit
         if self.pos.allowed_values is None : return
 
         lower = self.pos.min_allowed
         upper = self.pos.max_allowed
-        self.setBounds(lower, upper)
+        self.set_bounds(lower, upper)
 
         # When the bounds update, the mousewheelspeed should change accordingly
         self.wheel_frames = 0.01 * self.wheel_sensitivity * (upper-lower)
 
-    def setPosition(self) :
-        """ Callback for the :signal: `sigValueChanged 
-        <arpys.pit.utilities.TracedVariable.sigValueChanged>`. Whenever the 
+    def set_position(self) :
+        """ Callback for the :signal: `sig_value_changed 
+        <arpys.pit.utilities.TracedVariable.sig_value_changed>`. Whenever the 
         value of this TracedVariable is updated (possibly from outside this 
         Scalebar object), put the slider to the appropriate position.
         """
@@ -351,7 +347,7 @@ class Scalebar(pg.PlotWidget) :
         self.setMinimumSize(width, height)
         self.setMaximumSize(width, height)
 
-    def setBounds(self, lower, upper) :
+    def set_bounds(self, lower, upper) :
         """ Set both, the displayed area of the axis as well as the the range 
         in which the slider (InfiniteLine) can be dragged to the interval 
         [lower, upper]. 
@@ -364,6 +360,8 @@ class ImagePlotWidget(qt.QtGui.QWidget) :
     """ A widget that contains an :class: `ImagePlot3d 
     <arpys.pit.imageplot.ImagePlot3d> as its main element accompanied by a 
     scalebar representing the z dimension. 
+
+    .. :deprecated:
     """
 
     default_geometry = (0, 50, 400, 400)
@@ -378,20 +376,20 @@ class ImagePlotWidget(qt.QtGui.QWidget) :
         # Explicitly wrap methods and attributes from ImagePlot3d
         # NOTE: If you change this list, update the documentation above as 
         # well.
-        for m in ['z', 'zChanged', 'image_data', 'setImage',
-                  'removeImage', 'updateImageSlice'] :
+        for m in ['z', 'on_z_change', 'image_data', 'set_image',
+                  'remove_image', 'update_image_slice'] :
             setattr(self, m, getattr(self.imagePlot3d, m))
 
         # Use a GridLayout to align the widgets
-        self.buildLayout()
+        self.build_layout()
 
         # Set the initial size and screen position
         self.setGeometry(*self.default_geometry)
 
         # Build and add the scalebar
-        self.createScalebar()
+        self.create_scalebar()
 
-    def buildLayout(self) :
+    def build_layout(self) :
         """ """
         self.layout = qt.QtGui.QGridLayout()
         self.setLayout(self.layout)
@@ -403,7 +401,7 @@ class ImagePlotWidget(qt.QtGui.QWidget) :
         self.imagePlot3d.setMinimumSize(200,200)
         self.layout.addWidget(self.imagePlot3d, 0, 0, 3, 1)
 
-    def createScalebar(self) :
+    def create_scalebar(self) :
         self.pi = pg.PlotWidget()
         self.pi.setMaximumSize(10000, 100)
         self.layout.addWidget(self.pi, 4, 0, 1, 1)

@@ -11,26 +11,27 @@ class TracedVariable(qt.QtCore.QObject) :
     In order to use pyqt's signals, this has to be a subclass of :class: 
     `QObject <pyqtgraph.Qt.QtCore.QObject>`.
     
-    =============== ============================================================
-    __value         the python object represented by this TracedVariable 
-                    instance. Should never be accessed directly but only 
-                    through the getter and setter methods.
-    sigValueChanged :class: `Signal <pyqtgraph.Qt.QtCore.Signal>`; the signal 
-                    that is emitted whenever :attr: self.__value is changed.
-    sigValueRead    :class: `Signal <pyqtgraph.Qt.QtCore.Signal>`; the signal 
-                    that is emitted whenever :attr: self.__value is read.
-    sigAllowedValuesChanged
-                    :class: `Signal <pyqtgraph.Qt.QtCore.Signal>`; the signal 
-                    that is emitted whenever :attr: self.allowed_values are set
-                    or unset.
-    allowed_values  :class: `array <numpy.ndarray>`; a sorted list of all values
-                    that self.__value can assume. If set, all tries to set the 
-                    value will automatically set it to the closest allowed one.
-    =============== ============================================================
+    =================  =========================================================
+    __value            the python object represented by this TracedVariable 
+                       instance. Should never be accessed directly but only 
+                       through the getter and setter methods.
+    sig_value_changed  :class: `Signal <pyqtgraph.Qt.QtCore.Signal>`; the signal 
+                       that is emitted whenever :attr: self.__value is changed.
+    sig_value_read     :class: `Signal <pyqtgraph.Qt.QtCore.Signal>`; the signal 
+                       that is emitted whenever :attr: self.__value is read.
+    sig_allowed_values_changed
+                       :class: `Signal <pyqtgraph.Qt.QtCore.Signal>`; the signal 
+                       that is emitted whenever :attr: self.allowed_values 
+                       are set or unset.
+    allowed_values     :class: `array <numpy.ndarray>`; a sorted list of all 
+                       values that self.__value can assume. If set, all tries 
+                       to set the value will automatically set it to the 
+                       closest allowed one.
+    =================  =========================================================
     """
-    sigValueChanged = qt.QtCore.Signal()
-    sigValueRead = qt.QtCore.Signal()
-    sigAllowedValuesChanged = qt.QtCore.Signal()
+    sig_value_changed = qt.QtCore.Signal()
+    sig_value_read = qt.QtCore.Signal()
+    sig_allowed_values_changed = qt.QtCore.Signal()
     allowed_values = None
 
     def __init__(self, value=None) :
@@ -42,31 +43,31 @@ class TracedVariable(qt.QtCore.QObject) :
         return '<TracedVariable({})>'.format(self.__value)
 
     def set_value(self, value=None) :
-        """ Emit sigValueChanged and set the internal self.__value. """
+        """ Emit sig_value_changed and set the internal self.__value. """
         # Choose the closest allowed value
         if self.allowed_values is not None :
             value = self.find_closest_allowed(value)
         self.__value = value
-        self.sigValueChanged.emit()
+        self.sig_value_changed.emit()
 
     def get_value(self) :
-        """ Emit sigValueChanged and return the internal self.__value. 
+        """ Emit sig_value_changed and return the internal self.__value. 
         NOTE: the signal is emitted here before the caller actually receives 
         the return value. This could lead to unexpected behaviour. """
-        self.sigValueRead.emit()
+        self.sig_value_read.emit()
         return self.__value
 
     def on_change(self, callback) :
         """ Convenience wrapper for :class: `Signal 
         <pyqtgraph.Qt.QtCore.Signal>`'s 'connect'. 
         """
-        self.sigValueChanged.connect(callback)
+        self.sig_value_changed.connect(callback)
 
     def on_read(self, callback) :
         """ Convenience wrapper for :class: `Signal 
         <pyqtgraph.Qt.QtCore.Signal>`'s 'connect'. 
         """
-        self.sigValueRead.connect(callback)
+        self.sig_value_read.connect(callback)
 
     def set_allowed_values(self, values=None) :
         """ Define a set/range/list of values that are allowed for this 
@@ -102,7 +103,7 @@ class TracedVariable(qt.QtCore.QObject) :
             self.min_allowed = values[0]
             self.max_allowed = values[-1]
 
-        self.sigAllowedValuesChanged.emit()
+        self.sig_allowed_values_changed.emit()
 
     def find_closest_allowed(self, value) :
         """ Return the value of the element in self.allowed_values (if set) 
