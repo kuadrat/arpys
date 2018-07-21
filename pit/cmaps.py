@@ -17,6 +17,8 @@ class pit_cmap(ColorMap) :
         """ Set the value of alpha for the whole colormap to *alpha* where 
         *alpha* can be a float or an array of length ``len(self.color)``.
         """
+        # Reset the cache in pyqtgraph.Colormap
+        self.stopsCache = dict()
         self.color[:,-1] = alpha
 
 def convert_matplotlib_to_pyqtgraph(matplotlib_cmap, alpha=0.5) :

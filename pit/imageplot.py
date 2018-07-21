@@ -161,18 +161,17 @@ class ImagePlot3d(ImagePlot):
 
         self.image_data = image
         self.axes = axes
-        self.image_kwargs = image_kwargs
 
         # Initialize z to 0, taking the first slice of the data
         self.z.set_value(0)
-        self.update_image_slice()
+        self.update_image_slice(**image_kwargs)
 
         # Fix the scales to prevent zooming out
         self.fix_viewrange()
         
         self.sig_image_changed.emit()
 
-    def update_image_slice(self) :
+    def update_image_slice(self, **image_kwargs) :
         """ Update the currently displayed image slice by deleting the old 
         `self.image` and using :func: `addItem 
         <pit.imageplot.ImagePlot3d.addItem>' to set the newly displayed image 
@@ -191,6 +190,9 @@ class ImagePlot3d(ImagePlot):
         elif self.zaxis == 2 :
             image = self.image_data[:,:,z]
 
+        if image_kwargs != {} :
+            self.image_kwargs = image_kwargs
+
         # Convert to ImageItem and add
         self.image = ImageItem(image, **self.image_kwargs)
         self.addItem(self.image)
@@ -205,8 +207,8 @@ class ImagePlot3d(ImagePlot):
         clipped_z = clip(z, self.zmin, self.zmax)
         if z != clipped_z :
             # NOTE this leads to unnecessary signal emitting. Should avoid 
-            # emitting the signal from inside a slot (function connected to 
-            # that signal)
+            # emitting the signal from inside a slot (slot: function 
+            # connected to that signal)
             self.z.set_value(clipped_z)
         self.update_image_slice()
 

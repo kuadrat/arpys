@@ -51,6 +51,7 @@ class MainWindow(QtGui.QMainWindow) :
     # width, height
     size = (1200, 800)
     data = None
+    axes = (1,2)
 
     def __init__(self, filename=None, background='default') :
         super().__init__()
@@ -80,7 +81,8 @@ class MainWindow(QtGui.QMainWindow) :
 
     def set_image(self, image=None, *args, **kwargs) :
         """ Wraps the underlying ImagePlot3d's set_image method.
-        See :func: `<arpys.pit.imageplot.ImagePlot3d.set_image>`.
+        See :func: `<arpys.pit.imageplot.ImagePlot3d.set_image>`. *image* can 
+        be *None* in order to just update the plot with a new colormap.
         """
         if image is None :
             image = self.main_plot.image_data
@@ -92,16 +94,17 @@ class MainWindow(QtGui.QMainWindow) :
         """
         self.D = dl.load_data(filename)
         self.data = TracedVariable(self.D.data)
-        def on_data_change() :
-            """ Callback for change of self.data. """
-            self.set_image(self.get_data(), axes=(1,2))
-            self.update()
-        self.data.sig_value_changed.connect(on_data_change)
+#        def on_data_change() :
+#            """ Callback for change of self.data. """
+#            self.set_image(self.get_data(), axes=self.axes)
+#            self.update()
+#        self.data.sig_value_changed.connect(on_data_change)
+        self.data.sig_value_changed.connect(self.redraw_plots)
 
-        self.set_image(self.get_data(), axes=(1,2))
-
-        # Put the data in the main IMV and take the first cuts
-        self.update()
+#        self.set_image(self.get_data(), axes=self.axes)
+#        # Put the data in the main IMV and take the first cuts
+#        self.update()
+        self.redraw_plots(image=self.get_data())
 
     def initUI(self) :
         # Set the window title
@@ -162,11 +165,10 @@ class MainWindow(QtGui.QMainWindow) :
 
     def update(self) :
         """ Take cuts of the data along the ROI. """
-        axes = (1,2)
         try :
             cut = self.roi.getArrayRegion(self.get_data(), 
                                           self.main_plot.image, 
-                                          axes=axes)
+                                          axes=self.axes)
         except Exception as e :
             print(e)
             return
@@ -197,11 +199,11 @@ class MainWindow(QtGui.QMainWindow) :
         self.lut = self.cmap.getLookupTable()
         self.redraw_plots()
 
-    def redraw_plots(self) :
+    def redraw_plots(self, image=None) :
         """ Redraw plotted data to reflect changes in data or its colors. """
         try :
             # Redraw main plot
-            self.set_image()
+            self.set_image(image, axes=self.axes)
             # Redraw cut plot
             self.update()
         except AttributeError :
@@ -226,9 +228,9 @@ class MainWindow(QtGui.QMainWindow) :
 if __name__ == '__main__' :
     app = QtGui.QApplication([])
 #    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00428.fits'
-    #filename = '/home/kevin/Documents/qmap/materials/Bi2201/2018_06_SIS/20180609_0007.h5'
-    #filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00398.fits'
-    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00399.fits'
+#    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2018_06_SIS/20180609_0007.h5'
+    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00398.fits'
+#    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00399.fits'
 #    filename = '/home/kevin/qmap/experiments/2018_07_CASSIOPEE/CaMnSb/S3_FSM_fine_hv75_T65'
 
     main_window = MainWindow()
