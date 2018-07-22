@@ -3,6 +3,8 @@ The `view` part of the Image Tool. Basically implements the layout of one PIT
 window.
 """
 
+import logging
+
 import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.console
@@ -10,14 +12,29 @@ from pyqtgraph.Qt import QtGui, QtCore
 from qtconsole.rich_ipython_widget import RichIPythonWidget, RichJupyterWidget
 from qtconsole.inprocess import QtInProcessKernelManager
 
-# Absolute imports are better than relative ones, apparently
 import arpys as arp
 from arpys import dl, pp
-#from kustom.arpys.pit.widgets.kimageview.KImageView import *
 from arpys.pit.cmaps import cmaps
 from arpys.pit.cursor import Cursor
 from arpys.pit.imageplot import *
 from arpys.pit.utilities import TracedVariable
+
+# +----------------+ #
+# | Set up logging | # =========================================================
+# +----------------+ #
+
+logger = logging.getLogger('pit')
+logger.setLevel(logging.DEBUG)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('[%(levelname)s][%(name)s]%(message)s')
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+logger.propagate = False
+
+# +------------------------+ #
+# | Appearance definitions | # =================================================
+# +------------------------+ #
 
 app_style="""
 QMainWindow{
@@ -44,6 +61,10 @@ class EmbedIPython(RichJupyterWidget):
         self.kernel.shell.push(kwarg)
         self.kernel_client = self.kernel_manager.client()
         self.kernel_client.start_channels()
+
+# +-----------------------+ #
+# | Main class definition | # ==================================================
+# +-----------------------+ #
 
 class MainWindow(QtGui.QMainWindow) :
     
@@ -88,23 +109,21 @@ class MainWindow(QtGui.QMainWindow) :
             image = self.main_plot.image_data
         self.main_plot.set_image(image, *args, lut=self.lut, **kwargs)
 
-    def prepareData(self, filename) :
+    def prepare_data(self, filename) :
         """ Load the specified data and prepare some parts of it (caching).
         @TODO Maybe add a 'loading...' notification.
         """
+        logger.debug('prepare_data()')
         self.D = dl.load_data(filename)
         self.data = TracedVariable(self.D.data)
-#        def on_data_change() :
-#            """ Callback for change of self.data. """
-#            self.set_image(self.get_data(), axes=self.axes)
-#            self.update()
-#        self.data.sig_value_changed.connect(on_data_change)
+
+        # Connect signal handling so changes in data are immediately reflected
         self.data.sig_value_changed.connect(self.redraw_plots)
 
-#        self.set_image(self.get_data(), axes=self.axes)
-#        # Put the data in the main IMV and take the first cuts
-#        self.update()
         self.redraw_plots(image=self.get_data())
+
+#        self.main_plot.set_xscale(self.D.yscale)
+#        self.main_plot.setYRange(self.D.yscale)
 
     def initUI(self) :
         # Set the window title
@@ -148,7 +167,7 @@ class MainWindow(QtGui.QMainWindow) :
         """ Recenter the ROI. """
         self.roi.initialize()
         # Reconnect signal handling
-        self.roi.roi.sigRegionChanged.connect(self.update)
+        self.roi.sig_region_changed.connect(self.update_cut)
 
     def align(self) :
         """ Align all the GUI elements in the QLayout. """
@@ -163,12 +182,12 @@ class MainWindow(QtGui.QMainWindow) :
         # Console
         l.addWidget(self.console, 1, 1)
 
-    def update(self) :
+    def update_cut(self) :
         """ Take cuts of the data along the ROI. """
         try :
-            cut = self.roi.getArrayRegion(self.get_data(), 
-                                          self.main_plot.image, 
-                                          axes=self.axes)
+            cut = self.roi.get_array_region(self.get_data(), 
+                                            self.main_plot.image_item, 
+                                            axes=self.axes)
         except Exception as e :
             print(e)
             return
@@ -205,7 +224,7 @@ class MainWindow(QtGui.QMainWindow) :
             # Redraw main plot
             self.set_image(image, axes=self.axes)
             # Redraw cut plot
-            self.update()
+            self.update_cut()
         except AttributeError :
             # In some cases (namely initialization) the mainwindow is not 
             # defined yet
@@ -218,7 +237,7 @@ class MainWindow(QtGui.QMainWindow) :
         #print(key, type(key))
         #if key == QtCore.Qt.Key_R :
         #    print('is R')
-        #    self.roi.flipOrientation()
+        #    self.roi.flip_orientation()
         #else :
         #    print('not R')
         #    event.ignore()
@@ -233,7 +252,8 @@ if __name__ == '__main__' :
 #    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00399.fits'
 #    filename = '/home/kevin/qmap/experiments/2018_07_CASSIOPEE/CaMnSb/S3_FSM_fine_hv75_T65'
 
+    logger.info(filename)
     main_window = MainWindow()
-    main_window.prepareData(filename)
+    main_window.prepare_data(filename)
     app.exec_()
 

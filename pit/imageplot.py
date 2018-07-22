@@ -1,7 +1,9 @@
 """ matplotlib pcolormesh equivalent in pyqtgraph (more or less) """
 
-from numpy import clip, inf, ndarray, inf
+import logging
+
 import pyqtgraph as pg
+from numpy import clip, inf, ndarray, inf
 from pyqtgraph import Qt as qt #import QtCore
 from pyqtgraph.graphicsItems.ImageItem import ImageItem
 from pyqtgraph.widgets import PlotWidget, GraphicsView
@@ -9,14 +11,26 @@ from pyqtgraph.widgets import PlotWidget, GraphicsView
 from arpys.pit.utilities import TracedVariable
 from arpys.pit.cursor import Cursor
 
+logger = logging.getLogger('pit.'+__name__)
+
 class ImagePlot(pg.PlotWidget) :
     """
     A PlotWidget which mostly contains a single 2D image (intensity 
     distribution) or a 3D array (distribution of RGB values) as well as all 
     the nice pyqtgraph axes panning/rescaling/zooming functionality.
+
+    ============================================================================
+    *Signals*
+    sig_image_changed  emitted whenever the image is updated
+    sig_axes_changed   emitted when the axes are updated
+    ============================================================================
     """
-    image = None
+    image_item = None
+    image_kwargs = {}
+    xlim = None
+    ylim = None
     sig_image_changed = qt.QtCore.Signal()
+    sig_axes_changed = qt.QtCore.Signal()
 
     def __init__(self, image=None, parent=None, background='default', 
                  **kwargs) :
@@ -37,9 +51,9 @@ class ImagePlot(pg.PlotWidget) :
         """ Removes the current image using the parent's :func: `removeItem` 
         function. 
         """
-        if self.image is not None :
-            self.removeItem(self.image)
-        self.image = None
+        if self.image_item is not None :
+            self.removeItem(self.image_item)
+        self.image_item = None
 
     def set_image(self, image, *args, **kwargs) :
         """ Expects both, np.arrays and pg.ImageItems as input and sets them 
@@ -60,20 +74,79 @@ class ImagePlot(pg.PlotWidget) :
         if not isinstance(image, ImageItem) :
             message = '''`image` should be a np.array or pg.ImageItem instance,
             not {}'''.format(type(image))
-            raise Exception(message)
+            raise TypeError(message)
 
         # Replace the image
         self.remove_image()
-        self.image = image
+        self.image_item = image
+        logger.info('Setting image.')
         self.addItem(image)
+#        self._set_axes()
 
         self.sig_image_changed.emit()
 
+    def set_xscale(self, xscale) :
+        """ Set the xscale of the plot. *xscale* is an array of the length 
+        ``len(self.image_item.shape[0])``.
+        """
+        # Sanity check
+        if len(xscale) != self.image_item.image.shape[0] :
+            raise TypeError('Shape of xscale does not match data dimensions.')
+
+        self.xscale = xscale
+        # 'Autoscale' the image to the xscale
+        self.xlim = (xscale[0], xscale[-1])
+
+        self._set_axes()
+
+    def set_yscale(self, yscale) :
+        """ Set the yscale of the plot. *yscale* is an array of the length 
+        ``len(self.image_item.image.shape[1])``.
+        """
+         # Sanity check
+        if len(yscale) != self.image_item.image.shape[1] :
+            raise TypeError('Shape of yscale does not match data dimensions.')
+
+        self.yscale = yscale
+        # 'Autoscale' the image to the xscale
+        self.ylim = (yscale[0], yscale[-1])
+
+        self._set_axes()
+
+    def _set_axes(self) :
+        """ Transform the image such that it matches the desired x and y 
+        scales.
+        """
+        # Get image dimensions and requested origin (x0,y0) and top right 
+        # corner (x1, y1)
+        nx, ny = self.image_item.image.shape
+        if self.xlim is not None :
+            x0, x1 = self.xlim
+        else :
+            x0, x1 = 0, nx-1
+        if self.ylim is not None :
+            y0, y1 = self.ylim
+        else :
+            y0, y1 = 0, ny-1
+        # Calculate the scaling factors
+        sx = (x1-x0)/nx
+        sy = (y1-y0)/ny
+        # Define a transformation matrix that scales and translates the image 
+        # such that it appears at the coordinates that match our x and y axes.
+        transform = qt.QtGui.QTransform()
+        transform.scale(sx, sy)
+        # Carry out the translation in scaled coordinates
+        transform.translate(x0/sx, y0/sy)
+        # Finally, apply the transformation to the imageItem
+        self.image_item.setTransform(transform)
+
+        self.sig_axes_changed.emit()
+
     def fix_viewrange(self) :
         """ Prevent zooming out by fixing the limits of the ViewBox. """
-        [[xMin, xMax], [yMin, yMax]] = self.viewRange()
-        self.setLimits(xMin=xMin, xMax=xMax, yMin=yMin, yMax=yMax,
-                      maxXRange=xMax-xMin, maxYRange=yMax-yMin)
+        [[x_min, x_max], [y_min, y_max]] = self.viewRange()
+        self.setLimits(xMin=x_min, xMax=x_max, yMin=y_min, yMax=y_max,
+                      maxXRange=x_max-x_min, maxYRange=y_max-y_min)
 
     def release_viewrange(self) :
         """ Undo the effects of :func: `fix_viewrange 
@@ -168,15 +241,16 @@ class ImagePlot3d(ImagePlot):
 
         # Fix the scales to prevent zooming out
         self.fix_viewrange()
-        
+      
         self.sig_image_changed.emit()
 
     def update_image_slice(self, **image_kwargs) :
         """ Update the currently displayed image slice by deleting the old 
-        `self.image` and using :func: `addItem 
+        `self.image_item` and using :func: `addItem 
         <pit.imageplot.ImagePlot3d.addItem>' to set the newly displayed image 
         according to the current value of `self.z`.
         """
+        logger.debug('update_image_slice()')
         # Clear plot from the old ImageItem
         self.remove_image()
 
@@ -194,8 +268,9 @@ class ImagePlot3d(ImagePlot):
             self.image_kwargs = image_kwargs
 
         # Convert to ImageItem and add
-        self.image = ImageItem(image, **self.image_kwargs)
-        self.addItem(self.image)
+        self.image_item = ImageItem(image, **self.image_kwargs)
+#        self._set_axes()
+        self.addItem(self.image_item)
 
     def on_z_change(self, caller=None) :
         """ Callback to the :signal: `sig_z_changed`. Ensure self.z does not go 

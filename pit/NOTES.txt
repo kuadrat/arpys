@@ -1,9 +1,19 @@
-Current step:
-* add a 3D array slicing ROI
+ToDo's
+======
+* don't reset views (z and cursor position) when changing visual properties 
+  (cmap, alpha)
+* correct axes limits
+* roll axes (i.e. change X-Y, Y-Z, Z-X representations)
+* colormap powerlaw scaling (*gamma*)
+* compare files -> session management?
+* a 3D array slicing ROI
   \- implement a proper class for that (Cursor) EDIT: this is too time 
     consuming, just use a draggable LineSegmentROI instead.
-* add colorbar histogram widget
+* postprocessing
+* reset to raw data (retain copy of original)
+* colorbar histogram widget
 
 
-Notes:
+Notes
+=====
 maybe TracedVariable with allowed_values should be subclassed

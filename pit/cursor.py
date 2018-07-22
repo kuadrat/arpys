@@ -1,7 +1,11 @@
 
+import logging
+
 import pyqtgraph as pg
 from pyqtgraph import QtGui, Point
 from pyqtgraph.functions import affineSlice
+
+logger = logging.getLogger('pit.'+__name__)
 
 class Cursor() :
     """ Wrapper class allowing easy adding and removing of :class: 
@@ -12,20 +16,31 @@ class Cursor() :
     and
     has-a PlotWidget
     and handles interactions between the two.
+
+    ==================  ========================================================
+    *Signals*
+    sig_region_changed  wraps the underlying :class: `LineSegmentROI 
+                        <pyqtgraph.LineSegmentROI>`'s sigRegionChange. 
+                        Emitted whenever the ROI is moved or changed.
+    ==================  ========================================================
     """
 
-    def __init__(self, plotWidget=None, orientation='horizontal') :
-        if plotWidget :
-            self.addToPlot(plotWidget)
+    def __init__(self, plot_widget=None, orientation='horizontal') :
+        if plot_widget :
+            self.add_to_plot(plot_widget)
         self.orientation = orientation
         self.roi = None
 
-    def addToPlot(self, plotWidget) :
+    def add_to_plot(self, plot_widget) :
         """ Add this cursor to a :class: `PlotWidget <pyqtgraph.PlotWidget>`.
         This is effectively implemented by setting this :class: `Cursor 
-        <arpys.pit.cursor.Cursor>`s plot attribute to the given plotWidget.
+        <arpys.pit.cursor.Cursor>`s plot attribute to the given *plot_widget*.
         """
-        self.plot = plotWidget
+        self.plot = plot_widget
+        # Signal connection: whenever the viewRange changes , the roi should 
+        # be updated
+#        self.plot.sigRangeChanged.connect(self.initialize)
+#        self.plot.sig_axes_changed.connect(self.initialize)
 
     def initialize(self, orientation=None) :
         # Change the orientation if one is given
@@ -37,6 +52,32 @@ class Cursor() :
 
         # Put a new LineSegmentROI in the center of the plot in the right 
         # orientation
+        lower_left, upper_right = self.calculate_endpoints()
+        self.roi = pg.LineSegmentROI([lower_left, upper_right], pen='m')
+        self.plot.addItem(self.roi, ignoreBounds=True)
+
+        # Reconnect signal handling
+        # Wrap the LineSegmentROI's sigRegionChanged
+        self.sig_region_changed = self.roi.sigRegionChanged
+        self.plot.sig_axes_changed.connect(self.recenter)
+
+    def recenter(self) :
+        """ Put the ROI in the center of the current plot. """
+        logger.info('Recentering ROI.')
+        lower_left, upper_right = self.calculate_endpoints()
+        self.roi.setPos(lower_left, update=False)
+        self.roi.setSize(upper_right)
+
+    def calculate_endpoints(self) :
+        """ Get sensible initial values for the endpoints of the :class: 
+        LineSegmentROI from the :class: PlotWidget's current view range.  
+        Depending on the state of `self.orientation` these endpoints 
+        correspond either to a vertical or horizontal line centered at the 
+        center of the plot and spanning exactly the whole plot range.
+
+        Returns a tuple of len(2) lists: (lower_left, top_right) 
+        corresponding to the  two endpoints.
+        """
         # Get the current range of the plot
         [[xmin, xmax], [ymin, ymax]] = self.plot.viewRange()
         x = 0.5*(xmax-xmin)
@@ -50,15 +91,9 @@ class Cursor() :
             lower_left = [x, ymin]
             upper_right = [x, ymax]
 
-        self.roi = pg.LineSegmentROI([lower_left, upper_right], pen='m')
-        self.plot.addItem(self.roi, ignoreBounds=True)
+        return lower_left, upper_right
 
-        # Reconnect signal handling
-        #self.roi.sigRegionChanged.connect(self.update)
-        # Wrap the LineSegmentROI's sigRegionChanged
-        self.sigRegionChanged = self.roi.sigRegionChanged
-
-    def flipOrientation(self) :
+    def flip_orientation(self) :
         """ Change the cursor's orientation from vertical to horitontal or 
         vice-versa and re-initialize it in the new orientation.
         """
@@ -68,15 +103,15 @@ class Cursor() :
         # `i` will be the index of the orientation we currently don't have
         i = (orientations.index(self.orientation) + 1) % 2
         self.orientation = orientations[i]
-        print(self.orientation)
+        logger.info('New orientation: {}'.format(self.orientation))
         #self.updateEndpoints()
 
-    def getArrayRegion(self, *args, **kwargs) :
+    def get_array_region(self, *args, **kwargs) :
         """ Wrapper for :attr: `self.roi.getArrayRegion`. """
         return self.roi.getArrayRegion(*args, **kwargs)
  
 class FooCursor(pg.ROI) :
-    """ :DEPRECATED:
+    """ .. :deprecated:
     A straight cursor that can be dragged over a plot. Inherits from 
     :class: `ROI <pyqtgraph.ROI>` such that 
     functionalities like :func: `getArrayRegion 
