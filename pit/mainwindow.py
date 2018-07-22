@@ -84,6 +84,7 @@ class MainWindow(QtGui.QMainWindow) :
         
         # Connect signal handling
         self.main_plot.sig_image_changed.connect(self.on_image_change)
+        self.cutline.sig_initialized.connect(self.on_cutline_initialized)
 
         if filename is not None :
             self.prepare_data(filename)
@@ -151,7 +152,7 @@ class MainWindow(QtGui.QMainWindow) :
         self.zscale.register_traced_variable(self.main_plot.z)
 
         # Add ROI to the main ImageView
-        self.roi = Cursor(self.main_plot)
+        self.cutline = Cursor(self.main_plot)
         self.on_image_change()
 
         # Align all the gui elements
@@ -164,10 +165,12 @@ class MainWindow(QtGui.QMainWindow) :
         pass
 
     def on_image_change(self) :
-        """ Recenter the ROI. """
-        self.roi.initialize()
-        # Reconnect signal handling
-        self.roi.sig_region_changed.connect(self.update_cut)
+        """ Recenter the cutline. :deprecated?:"""
+        self.cutline.initialize()
+
+    def on_cutline_initialized(self) :
+        """ Need to reconnect the signal to the cut_plot. """
+        self.cutline.sig_region_changed.connect(self.update_cut)
 
     def align(self) :
         """ Align all the GUI elements in the QLayout. """
@@ -183,9 +186,10 @@ class MainWindow(QtGui.QMainWindow) :
         l.addWidget(self.console, 1, 1)
 
     def update_cut(self) :
-        """ Take cuts of the data along the ROI. """
+        """ Take cuts of the data along the cutline. """
+        logger.debug('update_cut')
         try :
-            cut = self.roi.get_array_region(self.get_data(), 
+            cut = self.cutline.get_array_region(self.get_data(), 
                                             self.main_plot.image_item, 
                                             axes=self.axes)
         except Exception as e :
@@ -237,7 +241,7 @@ class MainWindow(QtGui.QMainWindow) :
         #print(key, type(key))
         #if key == QtCore.Qt.Key_R :
         #    print('is R')
-        #    self.roi.flip_orientation()
+        #    self.cutline.flip_orientation()
         #else :
         #    print('not R')
         #    event.ignore()

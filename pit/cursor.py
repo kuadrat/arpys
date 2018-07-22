@@ -2,12 +2,13 @@
 import logging
 
 import pyqtgraph as pg
+from pyqtgraph import Qt as qt
 from pyqtgraph import QtGui, Point
 from pyqtgraph.functions import affineSlice
 
 logger = logging.getLogger('pit.'+__name__)
 
-class Cursor() :
+class Cursor(qt.QtCore.QObject) :
     """ Wrapper class allowing easy adding and removing of :class: 
     `LineSegmentROI <pyqtgraph.LineSegmentROI>`s to a :class: `PlotWidget 
     <pyqtgraph.PlotWidget>`.
@@ -17,15 +18,24 @@ class Cursor() :
     has-a PlotWidget
     and handles interactions between the two.
 
+    Needs to inherit from :class: `QObject <pyqtgraph.Qt.QtCore.QObject>` in 
+    order to have signals.
+
     ==================  ========================================================
     *Signals*
     sig_region_changed  wraps the underlying :class: `LineSegmentROI 
                         <pyqtgraph.LineSegmentROI>`'s sigRegionChange. 
                         Emitted whenever the ROI is moved or changed.
+    sig_initialized     emitted when a new :class: 
+                        `LineSegmentROI <pyqtgraph.LineSegmentROI>` has been 
+                        created and assigned as this :class: `Cursor`'s `roi`.
     ==================  ========================================================
     """
 
-    def __init__(self, plot_widget=None, orientation='horizontal') :
+    sig_initialized = qt.QtCore.Signal()
+
+    def __init__(self, plot_widget=None, orientation='horizontal', **kwargs) :
+        super().__init__(**kwargs)
         if plot_widget :
             self.add_to_plot(plot_widget)
         self.orientation = orientation
@@ -43,6 +53,7 @@ class Cursor() :
 #        self.plot.sig_axes_changed.connect(self.initialize)
 
     def initialize(self, orientation=None) :
+        """ Emits :signal: `sig_initialized`. """
         # Change the orientation if one is given
         if orientation :
             self.orientation = orientation
@@ -53,20 +64,24 @@ class Cursor() :
         # Put a new LineSegmentROI in the center of the plot in the right 
         # orientation
         lower_left, upper_right = self.calculate_endpoints()
-        self.roi = pg.LineSegmentROI([lower_left, upper_right], pen='m')
+        self.roi = pg.LineSegmentROI(positions=[lower_left, upper_right], 
+                                     pen='m')
+#        self.roi.setPos(lower_left)
         self.plot.addItem(self.roi, ignoreBounds=True)
 
         # Reconnect signal handling
         # Wrap the LineSegmentROI's sigRegionChanged
         self.sig_region_changed = self.roi.sigRegionChanged
-        self.plot.sig_axes_changed.connect(self.recenter)
+        self.plot.sig_axes_changed.connect(self.initialize)
+
+        self.sig_initialized.emit()
 
     def recenter(self) :
         """ Put the ROI in the center of the current plot. """
         logger.info('Recentering ROI.')
         lower_left, upper_right = self.calculate_endpoints()
-        self.roi.setPos(lower_left, update=False)
-        self.roi.setSize(upper_right)
+#        self.roi.setPos(lower_left, update=False)
+#        self.roi.setSize(upper_right)
 
     def calculate_endpoints(self) :
         """ Get sensible initial values for the endpoints of the :class: 
@@ -91,6 +106,8 @@ class Cursor() :
             lower_left = [x, ymin]
             upper_right = [x, ymax]
 
+        logger.debug('lower_left: {}, upper_right: {}'.format(lower_left, 
+                                                              upper_right))
         return lower_left, upper_right
 
     def flip_orientation(self) :

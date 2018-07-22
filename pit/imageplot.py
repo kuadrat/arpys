@@ -47,6 +47,8 @@ class ImagePlot(pg.PlotWidget) :
         if image is not None :
             self.set_image(image)
 
+        self.sig_axes_changed.connect(self.fix_viewrange)
+
     def remove_image(self) :
         """ Removes the current image using the parent's :func: `removeItem` 
         function. 
@@ -79,7 +81,7 @@ class ImagePlot(pg.PlotWidget) :
         # Replace the image
         self.remove_image()
         self.image_item = image
-        logger.info('Setting image.')
+        logger.debug('Setting image.')
         self.addItem(image)
 #        self._set_axes()
 
@@ -207,6 +209,8 @@ class ImagePlot3d(ImagePlot):
                       `ImageItem <pyqtgraph.graphicsItems.ImageItem.ImageItem>` 
                       when creating ImageItems from the data.
         ============  ==========================================================
+        
+        Emits: ``sig_image_changed``
         """
         # Test the shape of the input
         if image.ndim is not 3 :

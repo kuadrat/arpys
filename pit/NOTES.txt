@@ -3,6 +3,8 @@ ToDo's
 * don't reset views (z and cursor position) when changing visual properties 
   (cmap, alpha)
 * correct axes limits
+  \- Need to recenter ROI
+     \- ROI setPos and setSize don't work the way one would expect.
 * roll axes (i.e. change X-Y, Y-Z, Z-X representations)
 * colormap powerlaw scaling (*gamma*)
 * compare files -> session management?
