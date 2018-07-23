@@ -87,7 +87,7 @@ class ImagePlot(pg.PlotWidget) :
 
         self.sig_image_changed.emit()
 
-    def set_xscale(self, xscale) :
+    def set_xscale(self, xscale, update=False) :
         """ Set the xscale of the plot. *xscale* is an array of the length 
         ``len(self.image_item.shape[0])``.
         """
@@ -99,9 +99,10 @@ class ImagePlot(pg.PlotWidget) :
         # 'Autoscale' the image to the xscale
         self.xlim = (xscale[0], xscale[-1])
 
-        self._set_axes()
+        if update :
+            self._set_axes()
 
-    def set_yscale(self, yscale) :
+    def set_yscale(self, yscale, update=False) :
         """ Set the yscale of the plot. *yscale* is an array of the length 
         ``len(self.image_item.image.shape[1])``.
         """
@@ -113,7 +114,8 @@ class ImagePlot(pg.PlotWidget) :
         # 'Autoscale' the image to the xscale
         self.ylim = (yscale[0], yscale[-1])
 
-        self._set_axes()
+        if update :
+            self._set_axes()
 
     def _set_axes(self) :
         """ Transform the image such that it matches the desired x and y 
@@ -142,11 +144,27 @@ class ImagePlot(pg.PlotWidget) :
         # Finally, apply the transformation to the imageItem
         self.image_item.setTransform(transform)
 
-        self.sig_axes_changed.emit()
+#        self.sig_axes_changed.emit()
+
+    def get_limits(self) :
+        """ Return ``[[x_min, x_max], [y_min, y_max]]``. """
+         # Default to current viewrange but try to get more accurate values if 
+        # possible
+        [[x_min, x_max], [y_min, y_max]] = self.viewRange()
+        if self.xlim is not None :
+            x_min, x_max = self.xlim
+        if self.ylim is not None :
+            y_min, y_max = self.ylim
+
+        logger.debug(('get_limits(): [[x_min, x_max], [y_min, y_max]] = '
+                    + '[[{}, {}], [{}, {}]]').format(x_min, x_max, y_min, 
+                                                     y_max))
+        return [[x_min, x_max], [y_min, y_max]]
+
 
     def fix_viewrange(self) :
         """ Prevent zooming out by fixing the limits of the ViewBox. """
-        [[x_min, x_max], [y_min, y_max]] = self.viewRange()
+        [[x_min, x_max], [y_min, y_max]] = self.get_limits()
         self.setLimits(xMin=x_min, xMax=x_max, yMin=y_min, yMax=y_max,
                       maxXRange=x_max-x_min, maxYRange=y_max-y_min)
 
@@ -212,13 +230,15 @@ class ImagePlot3d(ImagePlot):
         
         Emits: ``sig_image_changed``
         """
+        logger.debug('ImagePlot3d.set_image() start.')
+
         # Test the shape of the input
         if image.ndim is not 3 :
             m = '`image` must have ndim==3, got {}.'.format(image.ndim)
             raise ValueError(m)
 
         # Get the axis indices
-        self.xaxis, self.yaxis = axes
+        self.x_axis_index, self.y_axis_index = axes
         # z is the remaining out of [0,1,2]
         l = [0,1,2]
         for a in axes :
@@ -227,11 +247,11 @@ class ImagePlot3d(ImagePlot):
             except ValueError :
                 m = '`axis` elements must be one of [0,1,2]. Got {}.'.format(a)
                 raise ValueError(m)
-        self.zaxis = l[0]
+        self.z_axis_index = l[0]
 
         # Determine the new ranges for z
         self.zmin = 0
-        self.zmax = image.shape[self.zaxis] - 1
+        self.zmax = image.shape[self.z_axis_index] - 1
 
         # Update the allowed values for z
         self.z.set_allowed_values(range(self.zmin, self.zmax+1))
@@ -242,6 +262,7 @@ class ImagePlot3d(ImagePlot):
         # Initialize z to 0, taking the first slice of the data
         self.z.set_value(0)
         self.update_image_slice(**image_kwargs)
+        self._set_axes()
 
         # Fix the scales to prevent zooming out
         self.fix_viewrange()
@@ -261,11 +282,11 @@ class ImagePlot3d(ImagePlot):
         # Extract the slice from the image data, depending on how our axes 
         # are defined
         z = self.z.get_value()
-        if self.zaxis == 0 :
+        if self.z_axis_index == 0 :
             image = self.image_data[z,:,:]
-        elif self.zaxis == 1 :
+        elif self.z_axis_index == 1 :
             image = self.image_data[:,z,:]
-        elif self.zaxis == 2 :
+        elif self.z_axis_index == 2 :
             image = self.image_data[:,:,z]
 
         if image_kwargs != {} :
@@ -273,7 +294,7 @@ class ImagePlot3d(ImagePlot):
 
         # Convert to ImageItem and add
         self.image_item = ImageItem(image, **self.image_kwargs)
-#        self._set_axes()
+        self._set_axes()
         self.addItem(self.image_item)
 
     def on_z_change(self, caller=None) :

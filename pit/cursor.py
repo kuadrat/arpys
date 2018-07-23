@@ -94,9 +94,9 @@ class Cursor(qt.QtCore.QObject) :
         corresponding to the  two endpoints.
         """
         # Get the current range of the plot
-        [[xmin, xmax], [ymin, ymax]] = self.plot.viewRange()
-        x = 0.5*(xmax-xmin)
-        y = 0.5*(ymax-ymin)
+        [[xmin, xmax], [ymin, ymax]] = self.plot.get_limits()
+        x = 0.5*(xmax+xmin)
+        y = 0.5*(ymax+ymin)
 
         # Set the start and endpoint depending on the orientation
         if self.orientation is 'horizontal' :

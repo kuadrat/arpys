@@ -25,6 +25,7 @@ from arpys.pit.utilities import TracedVariable
 
 logger = logging.getLogger('pit')
 logger.setLevel(logging.DEBUG)
+#logger.setLevel(logging.INFO)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('[%(levelname)s][%(name)s]%(message)s')
@@ -109,6 +110,14 @@ class MainWindow(QtGui.QMainWindow) :
         if image is None :
             image = self.main_plot.image_data
         self.main_plot.set_image(image, *args, lut=self.lut, **kwargs)
+        self.set_scales()
+
+    def set_scales(self) :
+        """ Set the x- and y-scales of the plots. """
+        self.main_plot.set_xscale(self.D.yscale)
+        self.main_plot.set_yscale(self.D.xscale, update=True)
+        self.main_plot.fix_viewrange()
+        self.cutline.initialize()
 
     def prepare_data(self, filename) :
         """ Load the specified data and prepare some parts of it (caching).
