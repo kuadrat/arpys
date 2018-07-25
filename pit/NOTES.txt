@@ -1,16 +1,13 @@
 ToDo's
 ======
-* don't reset views (z and cursor position) when changing visual properties 
-  (cmap, alpha)
 * correct axes limits
-  \- Need to recenter ROI
-     \- ROI setPos and setSize don't work the way one would expect.
+  \+ done for main_plot
+  \- for cut_plot need to calculate length along pit.cutline.
 * roll axes (i.e. change X-Y, Y-Z, Z-X representations)
 * colormap powerlaw scaling (*gamma*)
 * compare files -> session management?
-* a 3D array slicing ROI
-  \- implement a proper class for that (Cursor) EDIT: this is too time 
-    consuming, just use a draggable LineSegmentROI instead.
+* don't reset views (z and cursor position) when changing visual properties 
+  (cmap, alpha)
 * postprocessing
 * reset to raw data (retain copy of original)
 * colorbar histogram widget
