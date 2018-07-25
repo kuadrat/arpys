@@ -15,4 +15,8 @@ ToDo's
 
 Notes
 =====
-maybe TracedVariable with allowed_values should be subclassed
+* PIT currently requires Qt5, i.e. PyQt5 installed! If there are several 
+versions of PyQt present, the environment variable PYQTGRAPH_QT_LIB has to be 
+set to `PyQt5`.
+
+* maybe TracedVariable with allowed_values should be subclassed
