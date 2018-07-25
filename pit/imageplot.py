@@ -83,7 +83,7 @@ class ImagePlot(pg.PlotWidget) :
         self.image_item = image
         logger.debug('Setting image.')
         self.addItem(image)
-#        self._set_axes()
+#        self._set_axes_scales()
 
         self.sig_image_changed.emit()
 
@@ -100,7 +100,7 @@ class ImagePlot(pg.PlotWidget) :
         self.xlim = (xscale[0], xscale[-1])
 
         if update :
-            self._set_axes()
+            self._set_axes_scales()
 
     def set_yscale(self, yscale, update=False) :
         """ Set the yscale of the plot. *yscale* is an array of the length 
@@ -115,9 +115,9 @@ class ImagePlot(pg.PlotWidget) :
         self.ylim = (yscale[0], yscale[-1])
 
         if update :
-            self._set_axes()
+            self._set_axes_scales()
 
-    def _set_axes(self) :
+    def _set_axes_scales(self) :
         """ Transform the image such that it matches the desired x and y 
         scales.
         """
@@ -160,7 +160,6 @@ class ImagePlot(pg.PlotWidget) :
                     + '[[{}, {}], [{}, {}]]').format(x_min, x_max, y_min, 
                                                      y_max))
         return [[x_min, x_max], [y_min, y_max]]
-
 
     def fix_viewrange(self) :
         """ Prevent zooming out by fixing the limits of the ViewBox. """
@@ -260,9 +259,9 @@ class ImagePlot3d(ImagePlot):
         self.axes = axes
 
         # Initialize z to 0, taking the first slice of the data
-        self.z.set_value(0)
+        self.z.set_value(self.z.allowed_values[0])
         self.update_image_slice(**image_kwargs)
-        self._set_axes()
+        self._set_axes_scales()
 
         # Fix the scales to prevent zooming out
         self.fix_viewrange()
@@ -275,7 +274,8 @@ class ImagePlot3d(ImagePlot):
         <pit.imageplot.ImagePlot3d.addItem>' to set the newly displayed image 
         according to the current value of `self.z`.
         """
-        logger.debug('update_image_slice()')
+        logger.debug(('update_image_slice(): ' + 
+                      'z_axis_index={}').format(self.z_axis_index))
         # Clear plot from the old ImageItem
         self.remove_image()
 
@@ -289,12 +289,14 @@ class ImagePlot3d(ImagePlot):
         elif self.z_axis_index == 2 :
             image = self.image_data[:,:,z]
 
+        logger.debug(image.shape)
+
         if image_kwargs != {} :
             self.image_kwargs = image_kwargs
 
         # Convert to ImageItem and add
         self.image_item = ImageItem(image, **self.image_kwargs)
-        self._set_axes()
+        self._set_axes_scales()
         self.addItem(self.image_item)
 
     def on_z_change(self, caller=None) :

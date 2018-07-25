@@ -231,6 +231,18 @@ class MainWindow(QtGui.QMainWindow) :
         self.lut = self.cmap.getLookupTable()
         self.redraw_plots()
 
+    def roll_axes(self) :
+        """ """
+        data = self.get_data()
+        self.set_data(np.moveaxis(data, [0,1,2], [2,0,1]))
+        #axes = np.array(self.axes)
+        ## Quickly find which axis is *not* in self.axes
+        #mask = np.isin([0,1,2], axes)
+        #z = np.array([0,1,2])[~mask]
+        #axes = np.insert(axes, 0, z)
+        #axes = np.roll(axes, 1)
+        #self.axes = (axes[1], axes[2])
+
     def redraw_plots(self, image=None) :
         """ Redraw plotted data to reflect changes in data or its colors. """
         try :
