@@ -3,9 +3,10 @@
 Contains different tools to post-process (ARPES) data. 
 """
 
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
-import warnings
 from matplotlib.colors import PowerNorm
 from matplotlib.patheffects import withStroke
 from scipy import ndimage

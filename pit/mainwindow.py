@@ -356,10 +356,10 @@ if __name__ == '__main__' :
     app = QtGui.QApplication([])
 #    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00428.fits'
 #    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2018_06_SIS/20180609_0007.h5'
-#    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00398.fits'
+    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00398.fits'
 #    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00399.fits'
 #    filename = '/home/kevin/qmap/experiments/2018_07_CASSIOPEE/CaMnSb/S3_FSM_fine_hv75_T65'
-    filename = '/home/kevin/qmap/materials/Bi2201/2018_06_SIS/0025.h5'
+#    filename = '/home/kevin/qmap/materials/Bi2201/2018_06_SIS/0025.h5'
 
     logger.info(filename)
     main_window = MainWindow()

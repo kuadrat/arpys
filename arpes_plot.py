@@ -29,6 +29,7 @@ KNOWN BUGS:
 """
 
 import argparse
+
 import cmd2 as cmd
 import matplotlib.pyplot as plt
 import numpy as np

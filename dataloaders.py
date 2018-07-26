@@ -49,16 +49,17 @@ programs and routines that receive from a dataloader (which is pretty much
 everything in this module) and previously pickled files.
 """
 
-import h5py
-import numpy as np
 import os
 import pickle
-import pyfits
 import re
 from argparse import Namespace
 from errno import ENOENT
-from igor import binarywave
 from warnings import catch_warnings, simplefilter, warn
+
+import h5py
+import numpy as np
+import pyfits
+from igor import binarywave
 
 # Fcn to build the x, y (, z) ranges (maybe outsource this fcn definition)
 def start_step_n(start, step, n) :

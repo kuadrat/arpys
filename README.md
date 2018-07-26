@@ -1,7 +1,11 @@
 # ARPYS: python module for ARPES (**A**ngle **R**esolved **P**hoto**E**mission **S**pectroscopy) data analysis 
 
 This repository consists of libraries, programs and scripts related to ARPES 
-data analysis. Feel free to use and contribute!
+data analysis.
+The software contained in this repository is distributed under the GNU 
+General Public License v3+. See file 'COPYING' for more information.
+The file 'LICENSE-3RD-PARTY.txt' covers the different licenses of libraries 
+and other programs used by ARPYS.
 
 ## Rough description of files
 
@@ -65,4 +69,7 @@ arpys mostly needs the axes subclasses and some small helper functions from
 there.
 This is actually just a copy of another module that is hosted at 
 `git@github.com:kuadrat/kustom.git`.
+
+================================================================================
+Copyright (c) 2018 Kevin Kramer, Universität Zürich (kevin.kramer@uzh.ch)
 
