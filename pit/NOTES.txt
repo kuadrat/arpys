@@ -11,6 +11,7 @@ ToDo's
 * postprocessing
 * reset to raw data (retain copy of original)
 * colorbar histogram widget
+* visual sliders (cscale, vmax, alpha)
 
 
 Notes
