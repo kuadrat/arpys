@@ -8,7 +8,7 @@ from pyqtgraph.functions import affineSlice
 
 logger = logging.getLogger('pit.'+__name__)
 
-class Cursor(qt.QtCore.QObject) :
+class Cutline(qt.QtCore.QObject) :
     """ Wrapper class allowing easy adding and removing of :class: 
     `LineSegmentROI <pyqtgraph.LineSegmentROI>`s to a :class: `PlotWidget 
     <pyqtgraph.PlotWidget>`.
@@ -28,7 +28,7 @@ class Cursor(qt.QtCore.QObject) :
                         Emitted whenever the ROI is moved or changed.
     sig_initialized     emitted when a new :class: 
                         `LineSegmentROI <pyqtgraph.LineSegmentROI>` has been 
-                        created and assigned as this :class: `Cursor`'s `roi`.
+                        created and assigned as this :class: `Cutline`'s `roi`.
     ==================  ========================================================
     """
 
@@ -42,9 +42,9 @@ class Cursor(qt.QtCore.QObject) :
         self.roi = None
 
     def add_to_plot(self, plot_widget) :
-        """ Add this cursor to a :class: `PlotWidget <pyqtgraph.PlotWidget>`.
-        This is effectively implemented by setting this :class: `Cursor 
-        <arpys.pit.cursor.Cursor>`s plot attribute to the given *plot_widget*.
+        """ Add this cutline to a :class: `PlotWidget <pyqtgraph.PlotWidget>`.
+        This is effectively implemented by setting this :class: `Cutline 
+        <arpys.pit.cutline.Cutline>`s plot attribute to the given *plot_widget*.
         """
         self.plot = plot_widget
         # Signal connection: whenever the viewRange changes , the roi should 
@@ -111,7 +111,7 @@ class Cursor(qt.QtCore.QObject) :
         return lower_left, upper_right
 
     def flip_orientation(self) :
-        """ Change the cursor's orientation from vertical to horitontal or 
+        """ Change the cutline's orientation from vertical to horitontal or 
         vice-versa and re-initialize it in the new orientation.
         """
         # Find out which orientation we're currently in and change 
@@ -169,12 +169,12 @@ class FooCursor(pg.ROI) :
         print()
 
     def onParentImageChange(self) :
-        """ Update the bounds and endpoints of the cursor. """
+        """ Update the bounds and endpoints of the cutline. """
         self.updateBounds()
         self.updateEndpoints()
 
     def updateBounds(self) :
-        """ Set the region where this cursor can be moved around in to its 
+        """ Set the region where this cutline can be moved around in to its 
         parents ViewBox. 
         """
         boundingRect = self.imagePlot.getViewBox().viewRect()
@@ -215,7 +215,7 @@ class FooCursor(pg.ROI) :
 
     def shape(self) :
         """ Function required by one or another superclass. Define the shape 
-        of this cursor. 
+        of this cutline. 
         """
         p = QtGui.QPainterPath()
 

@@ -15,7 +15,7 @@ from qtconsole.inprocess import QtInProcessKernelManager
 import arpys as arp
 from arpys import dl, pp
 from arpys.pit.cmaps import cmaps
-from arpys.pit.cursor import Cursor
+from arpys.pit.cutline import Cutline
 from arpys.pit.imageplot import *
 from arpys.pit.utilities import TracedVariable
 
@@ -68,12 +68,18 @@ class EmbedIPython(RichJupyterWidget):
 # +-----------------------+ #
 
 class MainWindow(QtGui.QMainWindow) :
+    """ (Currently) The main window of PIT. Defines the basic GUI layouts and 
+    acts as the controller, keeping track of the data and handling the 
+    communication between the different GUI elements. 
+    """
     
     title = 'Python Image Tool'
     # width, height
     size = (1200, 800)
     data = None
     axes = (1,2)
+    z = TracedVariable()
+    Z_AXIS_INDEX = 0
 
     def __init__(self, filename=None, background='default') :
         super().__init__()
@@ -81,14 +87,66 @@ class MainWindow(QtGui.QMainWindow) :
         self.setStyleSheet(app_style)
         self.set_cmap(DEFAULT_CMAP)
 
-        self.initUI()
+        self.init_UI()
         
         # Connect signal handling
-        self.main_plot.sig_image_changed.connect(self.on_image_change)
         self.cutline.sig_initialized.connect(self.on_cutline_initialized)
 
         if filename is not None :
             self.prepare_data(filename)
+
+    def init_UI(self) :
+        """ Initialize the elements of the user interface. """
+        # Set the window title
+        self.setWindowTitle(self.title)
+        self.resize(*self.size)
+
+        # Create a "central widget" and its layout
+        self.central_widget = QtGui.QWidget()
+        self.layout = QtGui.QGridLayout()
+        self.central_widget.setLayout(self.layout)
+        self.setCentralWidget(self.central_widget)
+
+        # Create the 3D (main) and cut ImagePlots 
+        self.main_plot = ImagePlot()
+        self.cut_plot = ImagePlot()
+
+        # Set up the python console
+        namespace = dict(pit=self, pg=pg, arp=arp, dl=dl, pp=pp)
+#        self.console = pyqtgraph.console.ConsoleWidget(namespace=namespace)
+        self.console = EmbedIPython(**namespace)
+        self.console.kernel.shell.run_cell('%pylab qt')
+        self.console.setStyleSheet(console_style)
+
+        # Create the scalebar for the z dimension and connect to main_plot's z
+        self.zscale = Scalebar()
+        self.zscale.register_traced_variable(self.z)
+
+        # Add ROI to the main ImageView
+        self.cutline = Cutline(self.main_plot)
+        self.cutline.initialize()
+
+        # Align all the gui elements
+        self.align()
+        self.show()
+
+        #self.define_keys()
+
+    def align(self) :
+        """ Align all the GUI elements in the QLayout. """
+        # Get a short handle
+        l = self.layout
+        # Main (3D) ImageView in bottom left
+        l.addWidget(self.main_plot, 0, 0)
+        # Xcut and Ycut above, to the right of Main
+        l.addWidget(self.cut_plot, 0, 1)
+        # Scalebar
+        l.addWidget(self.zscale, 1, 0)
+        # Console
+        l.addWidget(self.console, 1, 1)
+
+    def define_keys() :
+        pass
 
     def get_data(self) :
         """ Convenience `getter` method. Allows writing `self.get_data()` 
@@ -105,110 +163,122 @@ class MainWindow(QtGui.QMainWindow) :
     def set_image(self, image=None, *args, **kwargs) :
         """ Wraps the underlying ImagePlot3d's set_image method.
         See :func: `<arpys.pit.imageplot.ImagePlot3d.set_image>`. *image* can 
-        be *None* in order to just update the plot with a new colormap.
+        be *None* i.e. in order to just update the plot with a new colormap.
         """
         if image is None :
-            image = self.main_plot.image_data
+            image = self.image_data
         self.main_plot.set_image(image, *args, lut=self.lut, **kwargs)
-        self.set_scales()
 
     def set_scales(self) :
-        """ Set the x- and y-scales of the plots. """
+        """ Set the x- and y-scales of the plots. The :class: `ImagePlot 
+        <arpys.pit.imageplot.ImagePlor>` object takes care of keeping the 
+        scales as they are, once they are set.
+        """
         self.main_plot.set_xscale(self.D.yscale)
         self.main_plot.set_yscale(self.D.xscale, update=True)
         self.main_plot.fix_viewrange()
         self.cutline.initialize()
 
     def prepare_data(self, filename) :
-        """ Load the specified data and prepare some parts of it (caching).
-        @TODO Maybe add a 'loading...' notification.
+        """ Load the specified data and prepare the corresponding z range. 
+        Then display the newly loaded data.
         """
         logger.debug('prepare_data()')
+
         self.D = dl.load_data(filename)
         self.data = TracedVariable(self.D.data)
 
+        # Determine the new ranges for z
+        self.zmin = 0
+        self.zmax = self.get_data().shape[self.Z_AXIS_INDEX] - 1
+
+        self.z.set_value(self.zmin)
+        self.z.set_allowed_values(range(self.zmin, self.zmax+1))
+
         # Connect signal handling so changes in data are immediately reflected
+        self.z.sig_value_changed.connect(self.on_z_change)
         self.data.sig_value_changed.connect(self.redraw_plots)
 
-        self.redraw_plots(image=self.get_data())
+        self.update_main_plot()
+        self.set_scales()
 
-#        self.main_plot.set_xscale(self.D.yscale)
-#        self.main_plot.setYRange(self.D.yscale)
+    def on_z_change(self, caller=None) :
+        """ Callback to the :signal: `sig_z_changed`. Ensure self.z does not go 
+        out of bounds and update the Image slice with a call to :func: 
+        `update_main_plot <arpys.pit.imageplot.ImagePlot.update_main_plot>`.
+        """
+        # Ensure z doesn't go out of bounds
+        z = self.z.get_value()
+        clipped_z = clip(z, self.zmin, self.zmax)
+        if z != clipped_z :
+            # NOTE this leads to unnecessary signal emitting. Should avoid 
+            # emitting the signal from inside a slot (slot: function 
+            # connected to that signal)
+            self.z.set_value(clipped_z)
+        self.update_main_plot()
 
-    def initUI(self) :
-        # Set the window title
-        self.setWindowTitle(self.title)
-        self.resize(*self.size)
+    def update_main_plot(self, **image_kwargs) :
+        """ Change the *self.main_plot*`s currently displayed
+        `image_item <arpys.pit.imageplot.ImagePlot.image_item>` to the slice 
+        of *self.data* corresponding to the current value of *self.z*.
+        """
+        logger.debug(('update_main_plot(): ' + 
+                      'Z_AXIS_INDEX={}').format(self.Z_AXIS_INDEX))
 
-        # Create a "central widget" and its layout
-        self.central_widget = QtGui.QWidget()
-        self.layout = QtGui.QGridLayout()
-        self.central_widget.setLayout(self.layout)
-        self.setCentralWidget(self.central_widget)
+        # Extract the slice from the image data, depending on how our axes 
+        # are defined
+        # TODO Z_AXIS_INDEX is probably going to be a constant, thus this 
+        # if-else becomes redundant
+        z = self.z.get_value()
+        if self.Z_AXIS_INDEX == 0 :
+            image = self.get_data()[z,:,:]
+        elif self.Z_AXIS_INDEX == 1 :
+            image = self.get_data()[:,z,:]
+        elif self.Z_AXIS_INDEX == 2 :
+            image = self.get_data()[:,:,z]
 
-        # Create the 3D (main) and cut ImagePlots 
-        self.main_plot = ImagePlot3d()
-        self.cut_plot = ImagePlot()
-        # The python console
-        namespace = dict(pit=self, pg=pg, arp=arp, dl=dl, pp=pp)
-#        self.console = pyqtgraph.console.ConsoleWidget(namespace=namespace)
-        self.console = EmbedIPython(**namespace)
-        self.console.kernel.shell.run_cell('%pylab qt')
-        self.console.setStyleSheet(console_style)
+        logger.debug('image.shape={}'.format(image.shape))
 
-        # Creat the scalebar for the z dimension and connect to main_plot's z
-        self.zscale = Scalebar()
-        self.zscale.register_traced_variable(self.main_plot.z)
+        if image_kwargs != {} :
+            self.image_kwargs = image_kwargs
 
-        # Add ROI to the main ImageView
-        self.cutline = Cursor(self.main_plot)
-        self.on_image_change()
-
-        # Align all the gui elements
-        self.align()
-        self.show()
-
-        #self.defineKeys()
-
-    def defineKeys() :
-        pass
-
-    def on_image_change(self) :
-        """ Recenter the cutline. :deprecated?:"""
-        self.cutline.initialize()
-
-    def on_cutline_initialized(self) :
-        """ Need to reconnect the signal to the cut_plot. """
-        self.cutline.sig_region_changed.connect(self.update_cut)
-
-    def align(self) :
-        """ Align all the GUI elements in the QLayout. """
-        # Get a short handle
-        l = self.layout
-        # Main (3D) ImageView in bottom left
-        l.addWidget(self.main_plot, 0, 0)
-        # Xcut and Ycut above, to the right of Main
-        l.addWidget(self.cut_plot, 0, 1)
-        # Scalebar
-        l.addWidget(self.zscale, 1, 0)
-        # Console
-        l.addWidget(self.console, 1, 1)
+        # Add image to main_plot
+        self.set_image(image, **image_kwargs)
 
     def update_cut(self) :
-        """ Take cuts of the data along the cutline. """
+        """ Take a cut of *self.data* along *self.cutline*. """
         logger.debug('update_cut')
         try :
             cut = self.cutline.get_array_region(self.get_data(), 
                                             self.main_plot.image_item, 
                                             axes=self.axes)
         except Exception as e :
-            print(e)
+            logger.error(e)
             return
 
-        # Convert np.array `xcut` to an ImageItem and set it as `xcut_plot`'s 
+        # Convert np.array *cut* to an ImageItem and set it as *xcut_plot*'s 
         # Image
         cut_image = pg.ImageItem(cut)
         self.cut_plot.set_image(cut, lut=self.lut)
+
+    def redraw_plots(self, image=None) :
+        """ Redraw plotted data to reflect changes in data or its colors. """
+        try :
+            # Redraw main plot
+            self.set_image(image, axes=self.axes)
+            # Redraw cut plot
+            self.update_cut()
+        except AttributeError :
+            # In some cases (namely initialization) the mainwindow is not 
+            # defined yet
+            pass
+
+    def on_cutline_initialized(self) :
+        """ Need to reconnect the signal to the cut_plot. And directly update 
+        the cut_plot.
+        """
+        self.cutline.sig_region_changed.connect(self.update_cut)
+        self.update_cut()
 
     def set_cmap(self, cmap) :
         """ Set the colormap to *cmap* where *cmap* is one of the names 
@@ -243,23 +313,14 @@ class MainWindow(QtGui.QMainWindow) :
         #axes = np.roll(axes, 1)
         #self.axes = (axes[1], axes[2])
 
-    def redraw_plots(self, image=None) :
-        """ Redraw plotted data to reflect changes in data or its colors. """
-        try :
-            # Redraw main plot
-            self.set_image(image, axes=self.axes)
-            # Redraw cut plot
-            self.update_cut()
-        except AttributeError :
-            # In some cases (namely initialization) the mainwindow is not 
-            # defined yet
-            pass
-
     def keyPressEvent(self, event) :
         """ Define all responses to keyboard presses. """
-        pass
-        #key = event.key()
-        #print(key, type(key))
+        key = event.key()
+        logger.debug('keyPressEvent(): key={}'.format(key))
+        if key == QtCore.Qt.Key_Right :
+            self.z.set_value(self.z.get_value() + 1)
+        elif key == QtCore.Qt.Key_Left :
+            self.z.set_value(self.z.get_value() - 1)
         #if key == QtCore.Qt.Key_R :
         #    print('is R')
         #    self.cutline.flip_orientation()

@@ -9,7 +9,6 @@ from pyqtgraph.graphicsItems.ImageItem import ImageItem
 from pyqtgraph.widgets import PlotWidget, GraphicsView
 
 from arpys.pit.utilities import TracedVariable
-from arpys.pit.cursor import Cursor
 
 logger = logging.getLogger('pit.'+__name__)
 
@@ -83,7 +82,7 @@ class ImagePlot(pg.PlotWidget) :
         self.image_item = image
         logger.debug('Setting image.')
         self.addItem(image)
-#        self._set_axes_scales()
+        self._set_axes_scales()
 
         self.sig_image_changed.emit()
 
@@ -123,6 +122,8 @@ class ImagePlot(pg.PlotWidget) :
         """
         # Get image dimensions and requested origin (x0,y0) and top right 
         # corner (x1, y1)
+        logger.debug(('_set_axes_scales(): self.image_item.image.shape={}' + 
+                     '').format(self.image_item.image.shape))
         nx, ny = self.image_item.image.shape
         if self.xlim is not None :
             x0, x1 = self.xlim
@@ -178,152 +179,6 @@ class ImagePlot(pg.PlotWidget) :
                        maxXRange=inf,
                        maxYRange=inf)
 
-#class ImagePlot3d(ImagePlot, qt.QtGui.QGraphicsWidget):
-class ImagePlot3d(ImagePlot):
-    """
-    Display one slice of a 3D dataset at a time. Allow scrolling through the 
-    data with the keyboard.
-    """
-
-    def __init__(self, image=None, axes=(0,1), parent=None, 
-                 background='default', **kwargs) :
-        """ Call super() and connect signals. See doc of :func: ` __init__() 
-        <arpys.pit.imageplot.ImagePlot.__init__> for explanation of 
-        arguments.  
-        """ 
-        # Initialize self.z before the call to super() because super's 
-        # __init__ will call self.set_image which accesses self.z
-        z = TracedVariable()
-        self.register_traced_variable(z)
-        super().__init__(parent=parent, background=background, **kwargs) 
-        if image is not None :
-            self.set_image(image, axes)
-
-    def register_traced_variable(self, traced_variable) :
-        """ Set self.z to the given TracedVariable instance and connect the 
-        relevant slots to the signals. 
-        """
-        self.z = traced_variable
-        self.z.sig_value_changed.connect(self.on_z_change)
-
-    def sizeHint(self) :
-        # NOTE: Doesn't seem to do much.
-        size = qt.QtCore.QSize(378, 310)
-        return size
-
-    def set_image(self, image, axes=(0,1), **image_kwargs) :
-        """ As opposed to :class: `ImagePlot <pit.imageplot.ImagePlot>` (i.e.
-        the parent), this only accepts 3D np.arrays. Also determines the z 
-        range and resets the `z` value to 0.
-
-        ============  ==========================================================
-        image         3D np.ndarray; the data of which slices are to be 
-                      displayed.
-        axes          tuple of int; axis indices of the x and y axis to be 
-                      used. For example if axis=(0,2) then the shape of 
-                      *image* is assumed to be (x,z,y).
-        image_kwargs  keyword arguments that are passed on to :class:
-                      `ImageItem <pyqtgraph.graphicsItems.ImageItem.ImageItem>` 
-                      when creating ImageItems from the data.
-        ============  ==========================================================
-        
-        Emits: ``sig_image_changed``
-        """
-        logger.debug('ImagePlot3d.set_image() start.')
-
-        # Test the shape of the input
-        if image.ndim is not 3 :
-            m = '`image` must have ndim==3, got {}.'.format(image.ndim)
-            raise ValueError(m)
-
-        # Get the axis indices
-        self.x_axis_index, self.y_axis_index = axes
-        # z is the remaining out of [0,1,2]
-        l = [0,1,2]
-        for a in axes :
-            try :
-                l.remove(a)
-            except ValueError :
-                m = '`axis` elements must be one of [0,1,2]. Got {}.'.format(a)
-                raise ValueError(m)
-        self.z_axis_index = l[0]
-
-        # Determine the new ranges for z
-        self.zmin = 0
-        self.zmax = image.shape[self.z_axis_index] - 1
-
-        # Update the allowed values for z
-        self.z.set_allowed_values(range(self.zmin, self.zmax+1))
-
-        self.image_data = image
-        self.axes = axes
-
-        # Initialize z to 0, taking the first slice of the data
-        self.z.set_value(self.z.allowed_values[0])
-        self.update_image_slice(**image_kwargs)
-        self._set_axes_scales()
-
-        # Fix the scales to prevent zooming out
-        self.fix_viewrange()
-      
-        self.sig_image_changed.emit()
-
-    def update_image_slice(self, **image_kwargs) :
-        """ Update the currently displayed image slice by deleting the old 
-        `self.image_item` and using :func: `addItem 
-        <pit.imageplot.ImagePlot3d.addItem>' to set the newly displayed image 
-        according to the current value of `self.z`.
-        """
-        logger.debug(('update_image_slice(): ' + 
-                      'z_axis_index={}').format(self.z_axis_index))
-        # Clear plot from the old ImageItem
-        self.remove_image()
-
-        # Extract the slice from the image data, depending on how our axes 
-        # are defined
-        z = self.z.get_value()
-        if self.z_axis_index == 0 :
-            image = self.image_data[z,:,:]
-        elif self.z_axis_index == 1 :
-            image = self.image_data[:,z,:]
-        elif self.z_axis_index == 2 :
-            image = self.image_data[:,:,z]
-
-        logger.debug(image.shape)
-
-        if image_kwargs != {} :
-            self.image_kwargs = image_kwargs
-
-        # Convert to ImageItem and add
-        self.image_item = ImageItem(image, **self.image_kwargs)
-        self._set_axes_scales()
-        self.addItem(self.image_item)
-
-    def on_z_change(self, caller=None) :
-        """ Callback to the :signal: `sig_z_changed`. Ensure self.z does not go 
-        out of bounds and update the Image slice with a call to :func: 
-        `update_image_slice <arpys.pit.imageplot.ImagePlot3d.update_image_slice>`.
-        """
-        # Ensure z doesn't go out of bounds
-        z = self.z.get_value()
-        clipped_z = clip(z, self.zmin, self.zmax)
-        if z != clipped_z :
-            # NOTE this leads to unnecessary signal emitting. Should avoid 
-            # emitting the signal from inside a slot (slot: function 
-            # connected to that signal)
-            self.z.set_value(clipped_z)
-        self.update_image_slice()
-
-    def keyPressEvent(self, event) :
-        """ Handle keyboard input. """
-        key = event.key()
-        z = self.z.get_value()
-        if key == qt.QtCore.Qt.Key_Right :
-            z += 1
-        elif key == qt.QtCore.Qt.Key_Left :
-            z -= 1
-        self.z.set_value(z)
-
 class Scalebar(pg.PlotWidget) :
     """ Implements a simple, draggable scalebar represented by a line 
     (:class: `InfiniteLine <pyqtgraph.InfiniteLine>) on an axis (:class: 
@@ -342,6 +197,9 @@ class Scalebar(pg.PlotWidget) :
         ==========  ============================================================
         """
         super().__init__(parent=parent, background=background, **kwargs) 
+
+        # Hide the pyqtgraph auto-rescale button
+        self.getPlotItem().buttonsHidden = True
 
         # The position of the slider is stored with a TracedVariable
         initial_pos = 0
