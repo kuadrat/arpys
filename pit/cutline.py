@@ -121,7 +121,7 @@ class Cutline(qt.QtCore.QObject) :
         i = (orientations.index(self.orientation) + 1) % 2
         self.orientation = orientations[i]
         logger.info('New orientation: {}'.format(self.orientation))
-        #self.updateEndpoints()
+        self.initialize()
 
     def get_array_region(self, *args, **kwargs) :
         """ Wrapper for :attr: `self.roi.getArrayRegion`. """

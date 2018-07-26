@@ -368,14 +368,15 @@ class MainWindow(QtGui.QMainWindow) :
             self.z.set_value(self.z.get_value() + 1)
         elif key == QtCore.Qt.Key_Left :
             self.z.set_value(self.z.get_value() - 1)
-        #if key == QtCore.Qt.Key_R :
+        elif key == QtCore.Qt.Key_R :
         #    print('is R')
-        #    self.cutline.flip_orientation()
-        #else :
+            self.cutline.flip_orientation()
+        else :
         #    print('not R')
-        #    event.ignore()
-        #    return
-        #event.accept()
+            event.ignore()
+            return
+        # If any if-statement matched, we accepted the event
+        event.accept()
 
 if __name__ == '__main__' :
     app = QtGui.QApplication([])
