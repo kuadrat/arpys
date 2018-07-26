@@ -266,11 +266,20 @@ class Dataloader_ALS(Dataloader) :
         # match the actual shape of the data...
         self.print_m(*data.shape)
         self.print_m(nx, ny, nz)
-        for scale in [xscale, yscale, zscale] :
+        scales = [zscale, yscale, xscale]
+        for i,scale in enumerate(scales) :
             try :
-                self.print_m(len(scale))
+                length = len(scale)
             except Exception :
                 self.print_m('length problem')
+                continue
+            self.print_m(length)
+            n = data.shape[i]
+            if length != n :
+                self.print_m(('Shape mismatch in dim {}: {} != {}. Setting ' +
+                              'scale to arange.').format(i, length, n))
+                scales[i] = np.arange(n)
+        zscale, yscale, xscale = scales
 
         # NOTE angles==xscale and E_b can be extracted from yscale, thus it 
         # is not really necessary to pass them on here.
@@ -732,8 +741,11 @@ class Dataloader_CASSIOPEE(Dataloader) :
         return res
 
     def load_from_txt(self, filename) :
+        print('[CASSIPEE]Loading from txt')
         i, energy, angles = self.get_metadata(filename)
+        print(i)
         data0 = np.loadtxt(filename, skiprows=i+1)
+        print(data0.shape)
         # The first column in the datafile contains the angles
         angles_from_data = data0[:,0]
         data = np.array([data0[:,1:]])
@@ -776,7 +788,7 @@ class Dataloader_CASSIOPEE(Dataloader) :
                     # NOTE this hv does not reflect the actually used hv
 #                    hv = float(line.split('=')[-1])
                     pass
-                elif line.startswith('inputA') :
+                elif line.startswith('inputA') or line.startswith('[Data') :
                     # this seems to be the last line before the data
                     break
         return i, energy, angles
