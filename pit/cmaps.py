@@ -11,7 +11,27 @@ from pyqtgraph import ColorMap
 from arpys.utilities import plotting as kplot
 
 class pit_cmap(ColorMap) :
-    """ Simple subclass of :class: `<pyqtgraph.ColorMap>`. """
+    """ Simple subclass of :class: `<pyqtgraph.ColorMap>`. Adds 
+    powerlaw normalization.
+    """
+
+    def __init__(self, pos, color, gamma=1, **kwargs) :
+        super().__init__(pos, color, **kwargs)
+        # Retain a copy of the originally given positions
+        self.unnormalized_pos = self.pos.copy()
+        # Apply the powerlaw-norm
+        self.set_gamma(gamma)
+
+    def set_gamma(self, gamma=1) :
+        """ Set the exponent for the power-law norm that maps the colors to 
+        values. I.e. the values where the colours are defined are mapped like 
+        ``y=x**gamma``.
+        """
+        self.gamma = gamma
+        # Reset the cache in pyqtgraph.Colormap
+        self.stopsCache = dict()
+        # Update the positions
+        self.pos = self.unnormalized_pos**gamma
 
     def set_alpha(self, alpha) :
         """ Set the value of alpha for the whole colormap to *alpha* where 

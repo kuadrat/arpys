@@ -76,12 +76,19 @@ class MainWindow(QtGui.QMainWindow) :
     """
     
     title = 'Python Image Tool'
-    # width, height
+    # width, height in pixels
     size = (1200, 800)
+    # np.array that contains the 3D data
     data = None
+    # Indices of *data* that are displayed in the main plot 
     axes = (1,2)
+    # Index along the z axis at which to produce a slice
     z = TracedVariable()
     Z_AXIS_INDEX = 0
+    # Plot transparency alpha
+    alpha = 0.5
+    # Plot powerlaw normalization exponent gamma
+    gamma = 1
 
     def __init__(self, filename=None, background='default') :
         super().__init__()
@@ -315,14 +322,32 @@ class MainWindow(QtGui.QMainWindow) :
         except KeyError :
             print('Invalid colormap name. Use one of: ')
             print(cmaps.keys())
-        self.lut = self.cmap.getLookupTable()
-        self.redraw_plots()
+        # Since the cmap changed it forgot our settings for alpha and gamma
+        self.cmap.set_alpha(self.alpha)
+        self.cmap.set_gamma(self.gamma)
+        self.cmap_changed()
 
     def set_alpha(self, alpha) :
         """ Set the alpha value of the currently used cmap. *alpha* can be a 
         single float or an array of length ``len(self.cmap.color)``.
         """
+        self.alpha = alpha
         self.cmap.set_alpha(alpha)
+        self.cmap_changed()
+
+    def set_gamma(self, gamma=1) :
+        """ Set the exponent for the power-law norm that maps the colors to 
+        values. I.e. the values where the colours are defined are mapped like 
+        ``y=x**gamma``.
+        """
+        self.gamma = gamma
+        self.cmap.set_gamma(gamma)
+        self.cmap_changed()
+    
+    def cmap_changed(self) :
+        """ Recalculate the lookup table and redraw the plots such that the 
+        changes are immediately reflected.
+        """
         self.lut = self.cmap.getLookupTable()
         self.redraw_plots()
 
