@@ -237,6 +237,7 @@ class CursorPlot(pg.PlotWidget) :
         """
         # Get the relevant coordinate of the mouseWheel scroll
         delta = event.pixelDelta().y()
+        logger.debug('wheelEvent(); delta = {}'.format(delta))
         if delta > 0 :
             sign = -1
         elif delta < 0 :
@@ -244,8 +245,9 @@ class CursorPlot(pg.PlotWidget) :
         else :
             # It seems that in some cases delta==0
             sign = 0
-        self.pos.set_value(self.pos.get_value() + sign * 
-                           self.wheel_frames) 
+        new_pos = self.pos.get_value() + sign*self.wheel_frames
+        logger.debug('wheelEvent(); new_pos = {}'.format(new_pos))
+        self.pos.set_value(new_pos)
 
     def register_traced_variable(self, traced_variable) :
         """ Set self.pos to the given TracedVariable instance and connect the 
@@ -299,7 +301,10 @@ class CursorPlot(pg.PlotWidget) :
         self.slider.setBounds([lower, upper])
 
         # When the bounds update, the mousewheelspeed should change accordingly
-        self.wheel_frames = 0.01 * self.wheel_sensitivity * (upper-lower)
+        self.wheel_frames = 0.01 * self.wheel_sensitivity * abs(upper-lower)
+        # Ensure wheel_frames is at least 1 (technically >0.5 should suffice)
+        if self.wheel_frames < 1 :
+            self.wheel_frames = 1
 
 class Scalebar(CursorPlot) :
     """ Simple subclass of :class: `CursorPlot 
