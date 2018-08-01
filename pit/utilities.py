@@ -12,19 +12,19 @@ class TracedVariable(qt.QtCore.QObject) :
     `QObject <pyqtgraph.Qt.QtCore.QObject>`.
     
     =================  =========================================================
-    __value            the python object represented by this TracedVariable 
+    _value             the python object represented by this TracedVariable 
                        instance. Should never be accessed directly but only 
                        through the getter and setter methods.
     sig_value_changed  :class: `Signal <pyqtgraph.Qt.QtCore.Signal>`; the signal 
-                       that is emitted whenever :attr: self.__value is changed.
+                       that is emitted whenever :attr: self._value is changed.
     sig_value_read     :class: `Signal <pyqtgraph.Qt.QtCore.Signal>`; the signal 
-                       that is emitted whenever :attr: self.__value is read.
+                       that is emitted whenever :attr: self._value is read.
     sig_allowed_values_changed
                        :class: `Signal <pyqtgraph.Qt.QtCore.Signal>`; the signal 
                        that is emitted whenever :attr: self.allowed_values 
                        are set or unset.
     allowed_values     :class: `array <numpy.ndarray>`; a sorted list of all 
-                       values that self.__value can assume. If set, all tries 
+                       values that self._value can assume. If set, all tries 
                        to set the value will automatically set it to the 
                        closest allowed one.
     =================  =========================================================
@@ -37,25 +37,25 @@ class TracedVariable(qt.QtCore.QObject) :
     def __init__(self, value=None) :
         # Have to call superclass init for signals to work
         super().__init__()
-        self.__value = value
+        self._value = value
 
     def __repr__(self) :
-        return '<TracedVariable({})>'.format(self.__value)
+        return '<TracedVariable({})>'.format(self._value)
 
     def set_value(self, value=None) :
-        """ Emit sig_value_changed and set the internal self.__value. """
+        """ Emit sig_value_changed and set the internal self._value. """
         # Choose the closest allowed value
         if self.allowed_values is not None :
             value = self.find_closest_allowed(value)
-        self.__value = value
+        self._value = value
         self.sig_value_changed.emit()
 
     def get_value(self) :
-        """ Emit sig_value_changed and return the internal self.__value. 
+        """ Emit sig_value_changed and return the internal self._value. 
         NOTE: the signal is emitted here before the caller actually receives 
         the return value. This could lead to unexpected behaviour. """
         self.sig_value_read.emit()
-        return self.__value
+        return self._value
 
     def on_change(self, callback) :
         """ Convenience wrapper for :class: `Signal 

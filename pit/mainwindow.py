@@ -80,6 +80,7 @@ class MainWindow(QtGui.QMainWindow) :
     size = (1200, 800)
     # np.array that contains the 3D data
     data = None
+    scales = np.array([[0, 1], [0, 1], [0, 1]])
     # Indices of *data* that are displayed in the main plot 
     axes = (1,2)
     # Index along the z axis at which to produce a slice
@@ -178,8 +179,8 @@ class MainWindow(QtGui.QMainWindow) :
         self.D = dl.load_data(filename)
         self.data = TracedVariable(self.D.data)
 
-        self.on_z_dim_change()
         self.prepare_scales()
+        self.on_z_dim_change()
         
         # Connect signal handling so changes in data are immediately reflected
         self.z.sig_value_changed.connect(self.on_z_change)
@@ -262,6 +263,12 @@ class MainWindow(QtGui.QMainWindow) :
         # Calculate the integrated intensity and plot it
         self.calculate_integrated_intensity()
         ip.plot(self.integrated)
+
+        # Also display the actual data values in the top axis
+        zscale = self.scales[0]
+        zmin = zscale[0]
+        zmax = zscale[-1]
+        ip.set_top_axis(zmin, zmax)
 
     def calculate_integrated_intensity(self) :
         self.integrated = self.get_data().sum(1).sum(1)

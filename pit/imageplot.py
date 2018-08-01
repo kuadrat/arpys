@@ -302,9 +302,28 @@ class CursorPlot(pg.PlotWidget) :
 
         # When the bounds update, the mousewheelspeed should change accordingly
         self.wheel_frames = 0.01 * self.wheel_sensitivity * abs(upper-lower)
-        # Ensure wheel_frames is at least 1 (technically >0.5 should suffice)
-        if self.wheel_frames < 1 :
-            self.wheel_frames = 1
+        # Ensure wheel_frames is at least as big as a step in the allowed 
+        # values. NOTE This assumes allowed_values to be evenly spaced.
+        av = self.pos.allowed_values
+        if av is not None and self.wheel_frames < 1 :
+            self.wheel_frames = av[1] - av[0]
+    
+    def set_top_axis(self, min_val, max_val) :
+        """ Create (or replace) a second x-axis on the top which ranges from 
+        :param: `min_val` to :param: `max_val`.
+        """
+        # Get a handle on the underlying plotItem
+        plotItem = self.plotItem
+
+        # Remove the old top-axis
+        plotItem.layout.removeItem(plotItem.getAxis('top'))
+        # Create the new axis and set its range
+        new_axis = pg.AxisItem(orientation='top')
+        new_axis.setRange(min_val, max_val)
+        # Attach it internally to the plotItem and its layout (The arguments 
+        # `1, 1` refer to the axis' position in the GridLayout)
+        plotItem.axes['top']['item'] = new_axis
+        plotItem.layout.addItem(new_axis, 1, 1)
 
 class Scalebar(CursorPlot) :
     """ Simple subclass of :class: `CursorPlot 
@@ -312,6 +331,8 @@ class Scalebar(CursorPlot) :
     scalebar. This is achieved by providing simply a long, flat plot without 
     any data and no y axis, but the same draggable slider as in CursorPlot.
     """
+    # TODO Disable y axis ticks but add a axes all around, creating a 
+    # surrounding box
     def __init__(self, *args, **kwargs) :
         super().__init__(*args, **kwargs)
 
