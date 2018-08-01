@@ -127,9 +127,9 @@ class MainWindow(QtGui.QMainWindow) :
         self.console.kernel.shell.run_cell('%pylab qt')
         self.console.setStyleSheet(console_style)
 
-        # Create the scalebar for the z dimension and connect to main_plot's z
-        self.zscale = Scalebar()
-        self.zscale.register_traced_variable(self.z)
+        # Create the integrated intensity plot
+        self.integrated_plot = CursorPlot()
+        self.integrated_plot.register_traced_variable(self.z)
 
         # Add ROI to the main ImageView
         self.cutline = Cutline(self.main_plot)
@@ -149,8 +149,8 @@ class MainWindow(QtGui.QMainWindow) :
         l.addWidget(self.main_plot, 0, 0)
         # Xcut and Ycut above, to the right of Main
         l.addWidget(self.cut_plot, 0, 1)
-        # Scalebar
-        l.addWidget(self.zscale, 1, 0)
+        # Integrated z-intensity plot
+        l.addWidget(self.integrated_plot, 1, 0)
         # Console
         l.addWidget(self.console, 1, 1)
 
@@ -178,7 +178,7 @@ class MainWindow(QtGui.QMainWindow) :
         self.D = dl.load_data(filename)
         self.data = TracedVariable(self.D.data)
 
-        self.update_z_range()
+        self.on_z_dim_change()
         self.prepare_scales()
         
         # Connect signal handling so changes in data are immediately reflected
@@ -240,6 +240,31 @@ class MainWindow(QtGui.QMainWindow) :
             # connected to that signal)
             self.z.set_value(clipped_z)
         self.update_main_plot()
+
+    def on_z_dim_change(self) :
+        """ Called when either completely new data is loaded or the dimension 
+        from which we look at the data changed (e.g. through :func: `roll_axes 
+        <arpys.pit.mainwindow.roll_axes>`).
+        Update the z range and the integrated intensity plot.
+        """
+        logger.debug('on_z_dim_change()')
+        self.update_z_range()
+
+        # Get a shorthand for the integrated intensity plot
+        ip = self.integrated_plot
+        # Remove the old integrated intensity curve
+        try :
+            old = ip.listDataItems()[0]
+            ip.removeItem(old)
+        except IndexError :
+            pass
+
+        # Calculate the integrated intensity and plot it
+        self.calculate_integrated_intensity()
+        ip.plot(self.integrated)
+
+    def calculate_integrated_intensity(self) :
+        self.integrated = self.get_data().sum(1).sum(1)
 
     def set_image_data(self) :
         """ Get the right (possibly integrated) slice out of *self.data*, 
@@ -355,8 +380,9 @@ class MainWindow(QtGui.QMainWindow) :
         """ """
         data = self.get_data()
         self.set_data(np.moveaxis(data, [0,1,2], [2,0,1]))
+        # Setting the data triggers a call to self.redraw_plots()
         self.scales = np.roll(self.scales, 1)
-        self.update_z_range()
+        self.on_z_dim_change()
 #        self.redraw_plots()
         self.set_scales()
 

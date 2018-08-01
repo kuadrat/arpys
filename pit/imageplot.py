@@ -179,13 +179,16 @@ class ImagePlot(pg.PlotWidget) :
                        maxXRange=inf,
                        maxYRange=inf)
 
-class Scalebar(pg.PlotWidget) :
+class CursorPlot(pg.PlotWidget) :
     """ Implements a simple, draggable scalebar represented by a line 
     (:class: `InfiniteLine <pyqtgraph.InfiniteLine>) on an axis (:class: 
     `PlotWidget <pyqtgraph.PlotWidget>).
     The current position of the slider is tracked with the :class: 
     `TracedVariable <arpys.pit.utilities.TracedVariable>` self.pos.
     """
+    # The speed at which the slider moves on mousewheel scroll in units of 
+    # % of total range
+    wheel_sensitivity = 0.5
 
     def __init__(self, parent=None, background='default', **kwargs) :
         """ Initialize the slider and set up the visual tweaks to make a 
@@ -214,18 +217,11 @@ class Scalebar(pg.PlotWidget) :
         #self.slider.addMarker('o', 0.5, 10)
         self.addItem(self.slider)
 
-        # Aesthetics and other widget configs
-        self.hideAxis('left')
-        self.setSize(300, 50)
         # Disable mouse scrolling, panning and zooming for both axes
         self.setMouseEnabled(False, False)
 
         # Initialize range to [0, 1]
         self.set_bounds(initial_pos, initial_pos + 1)
-
-        # Set the speed at which the slider moves on mousewheel scroll
-        # in units of % of total range
-        self.wheel_sensitivity = 0.5
 
         # Connect a slot (callback) to dragging and clicking events
         self.slider.sigDragged.connect(self.on_position_change)
@@ -262,11 +258,6 @@ class Scalebar(pg.PlotWidget) :
         # Set the bounds to the current values of this TracedVar, if existent
         #self.on_allowed_values_changed()
 
-    def onClick(self, *args) :
-        """ For testing. """
-        print(args)
-        print('Clicked')
-
     def on_position_change(self) :
         """ Callback for the :signal: `sigDragged 
         <pyqtgraph.InfiniteLine.sigDragged>`. Set the value of the 
@@ -290,9 +281,6 @@ class Scalebar(pg.PlotWidget) :
         upper = self.pos.max_allowed
         self.set_bounds(lower, upper)
 
-        # When the bounds update, the mousewheelspeed should change accordingly
-        self.wheel_frames = 0.01 * self.wheel_sensitivity * (upper-lower)
-
     def set_position(self) :
         """ Callback for the :signal: `sig_value_changed 
         <arpys.pit.utilities.TracedVariable.sig_value_changed>`. Whenever the 
@@ -302,13 +290,6 @@ class Scalebar(pg.PlotWidget) :
         new_pos = self.pos.get_value()
         self.slider.setValue(new_pos)
 
-    def setSize(self, width, height) :
-        """ Set this widgets size by setting minimum and maximum sizes 
-        simultaneously to the same value. 
-        """
-        self.setMinimumSize(width, height)
-        self.setMaximumSize(width, height)
-
     def set_bounds(self, lower, upper) :
         """ Set both, the displayed area of the axis as well as the the range 
         in which the slider (InfiniteLine) can be dragged to the interval 
@@ -316,6 +297,29 @@ class Scalebar(pg.PlotWidget) :
         """
         self.setXRange(lower, upper, padding=0.01)
         self.slider.setBounds([lower, upper])
+
+        # When the bounds update, the mousewheelspeed should change accordingly
+        self.wheel_frames = 0.01 * self.wheel_sensitivity * (upper-lower)
+
+class Scalebar(CursorPlot) :
+    """ Simple subclass of :class: `CursorPlot 
+    <arpys.pit.imageview.CursorPlot>` that is intended to simulate a 
+    scalebar. This is achieved by providing simply a long, flat plot without 
+    any data and no y axis, but the same draggable slider as in CursorPlot.
+    """
+    def __init__(self, *args, **kwargs) :
+        super().__init__(*args, **kwargs)
+
+        # Aesthetics and other widget configs
+        self.hideAxis('left')
+        self.set_size(300, 50)
+
+    def set_size(self, width, height) :
+        """ Set this widgets size by setting minimum and maximum sizes 
+        simultaneously to the same value. 
+        """
+        self.setMinimumSize(width, height)
+        self.setMaximumSize(width, height)
 
 # Deprecated
 class ImagePlotWidget(qt.QtGui.QWidget) :

@@ -3,8 +3,9 @@ ToDo's
 * correct axes limits
   \+ done for main_plot
   \- for cut_plot need to calculate length along pit.cutline.
-* roll axes (i.e. change X-Y, Y-Z, Z-X representations)
-* colormap powerlaw scaling (*gamma*)
+* intensity distribution with selectable z
+* integrate along z
+* (integrate along cutline)
 * compare files -> session management?
 * don't reset views (z and cursor position) when changing visual properties 
   (cmap, alpha)
@@ -21,3 +22,4 @@ versions of PyQt present, the environment variable PYQTGRAPH_QT_LIB has to be
 set to `PyQt5`.
 
 * maybe TracedVariable with allowed_values should be subclassed
+
