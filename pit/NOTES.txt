@@ -1,5 +1,6 @@
 ToDo's
 ======
+* Show EDCs/MDCs
 * correct axes limits
   \+ done for main_plot
   \- for cut_plot need to calculate length along pit.cutline.
@@ -10,11 +11,13 @@ ToDo's
 * don't reset views (z and cursor position) when changing visual properties 
   (cmap, alpha)
 * add abbreviations of often-used functions to ipython namespace
+* make (data and) cut-data available from console
 * postprocessing
 * save and export images and data
 * reset to raw data (retain copy of original)
 * colorbar histogram widget
 * visual sliders (cscale, vmax, alpha)
+* configure console syntax colours
 
 
 Notes

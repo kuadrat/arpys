@@ -43,6 +43,13 @@ class ImagePlot(pg.PlotWidget) :
         ==========  ============================================================
         """
         super().__init__(parent=parent, background=background, **kwargs) 
+
+        # Show top and tight axes by default, but without ticklabels
+        self.showAxis('top')
+        self.showAxis('right')
+        self.getAxis('top').setStyle(showValues=False)
+        self.getAxis('right').setStyle(showValues=False)
+
         if image is not None :
             self.set_image(image)
 
@@ -203,6 +210,10 @@ class CursorPlot(pg.PlotWidget) :
 
         # Hide the pyqtgraph auto-rescale button
         self.getPlotItem().buttonsHidden = True
+
+        # Display the right axis without ticklabels
+        self.showAxis('right')
+        self.getAxis('right').setStyle(showValues=False)
 
         # The position of the slider is stored with a TracedVariable
         initial_pos = 0
