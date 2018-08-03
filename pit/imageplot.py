@@ -32,7 +32,7 @@ class ImagePlot(pg.PlotWidget) :
     sig_axes_changed = qt.QtCore.Signal()
 
     def __init__(self, image=None, parent=None, background='default', 
-                 **kwargs) :
+                 name=None, **kwargs) :
         """ Allows setting of the image upon initialization. 
         
         ==========  ============================================================
@@ -40,9 +40,11 @@ class ImagePlot(pg.PlotWidget) :
                     displayed.
         parent      QtWidget instance; parent widget of this widget.
         background  str; confer PyQt documentation
+        name        str; allows giving a name for debug purposes
         ==========  ============================================================
         """
         super().__init__(parent=parent, background=background, **kwargs) 
+        self.name = name
 
         # Show top and tight axes by default, but without ticklabels
         self.showAxis('top')
@@ -87,7 +89,7 @@ class ImagePlot(pg.PlotWidget) :
         # Replace the image
         self.remove_image()
         self.image_item = image
-        logger.debug('Setting image.')
+        logger.debug('<{}>Setting image.'.format(self.name))
         self.addItem(image)
         self._set_axes_scales()
 
@@ -129,17 +131,18 @@ class ImagePlot(pg.PlotWidget) :
         """
         # Get image dimensions and requested origin (x0,y0) and top right 
         # corner (x1, y1)
-        logger.debug(('_set_axes_scales(): self.image_item.image.shape={}' + 
-                     '').format(self.image_item.image.shape))
         nx, ny = self.image_item.image.shape
-        if self.xlim is not None :
-            x0, x1 = self.xlim
-        else :
-            x0, x1 = 0, nx-1
-        if self.ylim is not None :
-            y0, y1 = self.ylim
-        else :
-            y0, y1 = 0, ny-1
+        logger.debug(('<{}>_set_axes_scales(): self.image_item.image.shape={}' + 
+                     ' x {}').format(self.name, nx, ny))
+        [[x0, x1], [y0, y1]] = self.get_limits()
+        #if self.xlim is not None :
+        #    x0, x1 = self.xlim
+        #else :
+        #    x0, x1 = 0, nx-1
+        #if self.ylim is not None :
+        #    y0, y1 = self.ylim
+        #else :
+        #    y0, y1 = 0, ny-1
         # Calculate the scaling factors
         sx = (x1-x0)/nx
         sy = (y1-y0)/ny
@@ -152,25 +155,41 @@ class ImagePlot(pg.PlotWidget) :
         # Finally, apply the transformation to the imageItem
         self.image_item.setTransform(transform)
 
-#        self.sig_axes_changed.emit()
+        # Leads to infinite recursion?
+        logger.info('<{}>Emitting sig_axes_changed.'.format(self.name))
+        self.sig_axes_changed.emit()
 
     def get_limits(self) :
         """ Return ``[[x_min, x_max], [y_min, y_max]]``. """
-         # Default to current viewrange but try to get more accurate values if 
+        # Default to current viewrange but try to get more accurate values if 
         # possible
-        [[x_min, x_max], [y_min, y_max]] = self.viewRange()
+        #[[x_min, x_max], [y_min, y_max]] = self.viewRange()
+        #if self.xlim is not None :
+        #    x_min, x_max = self.xlim
+        #if self.ylim is not None :
+        #    y_min, y_max = self.ylim
+        if self.image_item is not None :
+            x, y = self.image_item.image.shape
+        else :
+            x, y = 1, 1
+
         if self.xlim is not None :
             x_min, x_max = self.xlim
+        else :
+            x_min, x_max = 0, x
         if self.ylim is not None :
             y_min, y_max = self.ylim
+        else :
+            y_min, y_max = 0, y
 
-        logger.debug(('get_limits(): [[x_min, x_max], [y_min, y_max]] = '
-                    + '[[{}, {}], [{}, {}]]').format(x_min, x_max, y_min, 
-                                                     y_max))
+        logger.debug(('<{}>get_limits(): [[x_min, x_max], [y_min, y_max]] = '
+                    + '[[{}, {}], [{}, {}]]').format(self.name, x_min, x_max, 
+                                                     y_min, y_max))
         return [[x_min, x_max], [y_min, y_max]]
 
     def fix_viewrange(self) :
         """ Prevent zooming out by fixing the limits of the ViewBox. """
+        logger.debug('<{}>fix_viewrange().'.format(self.name))
         [[x_min, x_max], [y_min, y_max]] = self.get_limits()
         self.setLimits(xMin=x_min, xMax=x_max, yMin=y_min, yMax=y_max,
                       maxXRange=x_max-x_min, maxYRange=y_max-y_min)
@@ -179,6 +198,7 @@ class ImagePlot(pg.PlotWidget) :
         """ Undo the effects of :func: `fix_viewrange 
         <pit.imageplot.ImagePlot.fix_viewrange>`
         """
+        logger.debug('<{}>release_viewrange().'.format(self.name))
         self.setLimits(xMin=-inf,
                        xMax=inf,
                        yMin=-inf,

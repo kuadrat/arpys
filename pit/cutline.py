@@ -47,13 +47,18 @@ class Cutline(qt.QtCore.QObject) :
         <arpys.pit.cutline.Cutline>`s plot attribute to the given *plot_widget*.
         """
         self.plot = plot_widget
-        # Signal connection: whenever the viewRange changes , the roi should 
-        # be updated
-#        self.plot.sigRangeChanged.connect(self.initialize)
-#        self.plot.sig_axes_changed.connect(self.initialize)
+        # Signal connection: whenever the viewRange changes, the cutline should 
+        # be updated. Make sure to not accumulate connections by trying to 
+        # disconnect first.
+        try :
+            self.plot.sigRangeChanged.disconnect(self.initialize)
+        except TypeError :
+            pass
+        self.plot.sig_axes_changed.connect(self.initialize)
 
     def initialize(self, orientation=None) :
         """ Emits :signal: `sig_initialized`. """
+        logger.debug('initialize()')
         # Change the orientation if one is given
         if orientation :
             self.orientation = orientation
@@ -72,8 +77,9 @@ class Cutline(qt.QtCore.QObject) :
         # Reconnect signal handling
         # Wrap the LineSegmentROI's sigRegionChanged
         self.sig_region_changed = self.roi.sigRegionChanged
-        self.plot.sig_axes_changed.connect(self.initialize)
+#        self.plot.sig_axes_changed.connect(self.initialize)
 
+        logger.info('Emitting sig_initialized.')
         self.sig_initialized.emit()
 
     def recenter(self) :

@@ -118,8 +118,8 @@ class MainWindow(QtGui.QMainWindow) :
         self.setCentralWidget(self.central_widget)
 
         # Create the 3D (main) and cut ImagePlots 
-        self.main_plot = ImagePlot()
-        self.cut_plot = ImagePlot()
+        self.main_plot = ImagePlot(name='main_plot')
+        self.cut_plot = ImagePlot(name='cut_plot')
 
         # Set up the python console
         namespace = dict(pit=self, pg=pg, arp=arp, dl=dl, pp=pp)
@@ -204,7 +204,7 @@ class MainWindow(QtGui.QMainWindow) :
 
     def set_scales(self) :
         """ Set the x- and y-scales of the plots. The :class: `ImagePlot 
-        <arpys.pit.imageplot.ImagePlor>` object takes care of keeping the 
+        <arpys.pit.imageplot.ImagePlot>` object takes care of keeping the 
         scales as they are, once they are set.
         """
         xscale = self.scales[2]
@@ -214,6 +214,7 @@ class MainWindow(QtGui.QMainWindow) :
         self.main_plot.set_xscale(xscale)
         self.main_plot.set_yscale(yscale, update=True)
         self.main_plot.fix_viewrange()
+        self.cut_plot.fix_viewrange()
         self.cutline.initialize()
 
     def update_z_range(self) :
@@ -311,7 +312,7 @@ class MainWindow(QtGui.QMainWindow) :
         """ Take a cut of *self.data* along *self.cutline*. This is used to 
         update only the cut plot without affecting the main plot.
         """
-        logger.debug('update_cut')
+        logger.debug('update_cut()')
         try :
             cut = self.cutline.get_array_region(self.get_data(), 
                                             self.main_plot.image_item, 
