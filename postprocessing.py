@@ -338,7 +338,7 @@ def normalize_per_integrated_segment(data, dim=0, profile=False,
 def norm_int_edc(data, profile=False) :
     """ 
     Shorthand for :func: `normalize_per_integrated_segment 
-    <kustom.arpys.postprocessing.normalize_per_integrated_segment>` with 
+    <arpys.postprocessing.normalize_per_integrated_segment>` with 
     arguments
     `dim=1, profile=False, in_place=True`.
     Returns the normalized array.
@@ -1228,8 +1228,7 @@ def rotation_matrix(theta) :
     return R
 
 def rotate_xy(xscale, yscale, theta=45) :
-    """
-    Rotate the x and y cooridnates of rectangular 2D data by angle theta.
+    """ Rotate the x and y cooridnates of rectangular 2D data by angle theta.
 
     Parameters
     ----------
@@ -1351,6 +1350,86 @@ def symmetrize_around(data, p0, p1) :
 #    transformed = ndimage.map_coordinates(data, [xt, yt]).reshape(ny, nx)
     return transformed[::-1,::-1]
 #    return transformed
+
+def symmetrize_rectangular(data, i) :
+    """ Symmetrize a piece of rectangular *data* around column *i* by simply 
+    mirroring the data at column *i* and overlaying it in the correct position. 
+    
+    *Parameters*
+    ====  ======================================================================
+    data  np.array of shape (ny, nx); data to be symmetrized.
+    i     int; index along x (0 <= i < nx) around which to symmetrize.
+    ====  ======================================================================
+
+    *Returns*
+    ======  ====================================================================
+    result  np.array of shape (ny, nx1); the x dimension has expanded.
+    nx1     int; the new length of the x dimension.
+    ======  ====================================================================
+
+    Here's a graphical explanation for the coordinates used in the code for 
+    the case i < nx0/2. If i > nx0/2 we flip the data first such that we can 
+    apply the same procedure and coordinates.
+    ```
+    Original image:
+
+            +----------+
+            |   |      |
+            |          |
+            |   |      |
+            |          |
+            |   |      |
+            +----------+
+
+    Mirrored image:
+
+         x----------x
+         |      |   |
+         |          |
+         |      |   |
+         |          |
+         |      |   |
+         x----------x
+
+    Overlay both images:
+        
+         x--+-------x--+
+         |  |   |   |  |
+         |  |       |  |
+         |  |   |   |  |
+         |  |       |  |
+         |  |   |   |  |
+         x--+-------x--+
+         ^  ^   ^   ^  ^
+         0  |   i  nx0 |
+            |          |
+         nx0-2*i      nx1 = 2*(nx0-i)
+    ```
+    """
+    # Flip the image if i>nx0/2
+    ny, nx0 = data.shape
+    if i > nx0/2 :
+        data = data[:,::-1]
+        i = nx0-i
+
+    # Define relevant coordinates
+    i0 = nx0 - 2*i
+
+    # Determine the new data dimensions and prepare the new data container
+    nx1 = 2*(nx0 - i)
+    result = np.zeros([ny, nx1])
+
+    # Fill the mirrored data into the new container
+    print(result[:,:nx0].shape, data[:,::-1].shape)
+    result[:,:nx0] += data[:,::-1]
+
+    # Overlay the original data
+    result[:,i0:] += data
+
+    # "Normalize" the overlap region
+    result[:,i0:nx0] /= 2
+
+    return result, nx1
 
 def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4, 
                    debug=False) :
@@ -1503,9 +1582,10 @@ def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4,
         return kx, ky, symmetrized
 
 def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=4, **kwargs) :
-    """
-    Plot all (or only the ones specified by `zs`) cuts along dimension `dim` 
+    """ Plot all (or only the ones specified by `zs`) cuts along dimension `dim` 
     on separate subplots onto matplotlib figures.
+
+    *Parameters*
     =========  =================================================================
     data       3D np.array with shape (z,y,x); the data cube.
     dim        int; one of (0,1,2). Dimension along which to take the cuts.

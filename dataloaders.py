@@ -937,8 +937,7 @@ def load_data(filename, exclude=None, suppress_warnings=False) :
 
 # Function to create a python pickle file from a data namespace
 def dump(D, filename, force=False) :
-    """ 
-    Wrapper for :func: `pickle.dump()`. Does not overwrite if a file of 
+    """ Wrapper for :func: `pickle.dump()`. Does not overwrite if a file of 
     the given name already exists, unless :param: `force` is True.
 
     ========  ==================================================================
@@ -964,8 +963,7 @@ def dump(D, filename, force=False) :
     print(message)
 
 def update_namespace(D, *attributes) :
-    """ 
-    Add arbitrary attributes to a :class: `Namespace <argparse.Namespace>`.
+    """ Add arbitrary attributes to a :class: `Namespace <argparse.Namespace>`.
 
     ==========  ================================================================
     D           argparse.Namespace; the namespace holding the data and 
