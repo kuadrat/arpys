@@ -1,6 +1,10 @@
 
+import logging
+
 import numpy as np
 from pyqtgraph import Qt as qt
+
+logger = logging.getLogger('pit.'+__name__)
 
 class TracedVariable(qt.QtCore.QObject) :
     """ A pyqt implementaion of tkinter's/Tcl's traced variables using Qt's 
@@ -48,12 +52,14 @@ class TracedVariable(qt.QtCore.QObject) :
         if self.allowed_values is not None :
             value = self.find_closest_allowed(value)
         self._value = value
+        logger.info('Emitting sig_value_changed.')
         self.sig_value_changed.emit()
 
     def get_value(self) :
         """ Emit sig_value_changed and return the internal self._value. 
         NOTE: the signal is emitted here before the caller actually receives 
         the return value. This could lead to unexpected behaviour. """
+        logger.info('Emitting sig_value_read.')
         self.sig_value_read.emit()
         return self._value
 
@@ -73,7 +79,7 @@ class TracedVariable(qt.QtCore.QObject) :
         """ Define a set/range/list of values that are allowed for this 
         Variable. Once set, all future calls to set_value will automatically 
         try to pick the most reasonable of the allowed values to assign. 
-        Emits :signal: `sigAllowedValueChanged`
+        Emits :signal: `sig_allowed_value_changed`
 
         ====== =================================================================
         values iterable; The complete list of allowed (numerical) values. This
@@ -103,6 +109,7 @@ class TracedVariable(qt.QtCore.QObject) :
             self.min_allowed = values[0]
             self.max_allowed = values[-1]
 
+        logger.info('Emitting sig_allowed_values_changed.')
         self.sig_allowed_values_changed.emit()
 
     def find_closest_allowed(self, value) :

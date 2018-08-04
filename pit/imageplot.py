@@ -91,8 +91,13 @@ class ImagePlot(pg.PlotWidget) :
         self.image_item = image
         logger.debug('<{}>Setting image.'.format(self.name))
         self.addItem(image)
-        self._set_axes_scales()
+        self._set_axes_scales(emit=False)
+        # We suppressed emittance of sig_axes_changed to avoid external 
+        # listeners thinking the axes are different now. Thus, have to call 
+        # self.fix_viewrange manually.
+        self.fix_viewrange()
 
+        logger.info('<{}>Emitting sig_image_changed.'.format(self.name))
         self.sig_image_changed.emit()
 
     def set_xscale(self, xscale, update=False) :
@@ -108,7 +113,7 @@ class ImagePlot(pg.PlotWidget) :
         self.xlim = (xscale[0], xscale[-1])
 
         if update :
-            self._set_axes_scales()
+            self._set_axes_scales(emit=True)
 
     def set_yscale(self, yscale, update=False) :
         """ Set the yscale of the plot. *yscale* is an array of the length 
@@ -123,9 +128,9 @@ class ImagePlot(pg.PlotWidget) :
         self.ylim = (yscale[0], yscale[-1])
 
         if update :
-            self._set_axes_scales()
+            self._set_axes_scales(emit=True)
 
-    def _set_axes_scales(self) :
+    def _set_axes_scales(self, emit=False) :
         """ Transform the image such that it matches the desired x and y 
         scales.
         """
@@ -135,14 +140,6 @@ class ImagePlot(pg.PlotWidget) :
         logger.debug(('<{}>_set_axes_scales(): self.image_item.image.shape={}' + 
                      ' x {}').format(self.name, nx, ny))
         [[x0, x1], [y0, y1]] = self.get_limits()
-        #if self.xlim is not None :
-        #    x0, x1 = self.xlim
-        #else :
-        #    x0, x1 = 0, nx-1
-        #if self.ylim is not None :
-        #    y0, y1 = self.ylim
-        #else :
-        #    y0, y1 = 0, ny-1
         # Calculate the scaling factors
         sx = (x1-x0)/nx
         sy = (y1-y0)/ny
@@ -155,19 +152,14 @@ class ImagePlot(pg.PlotWidget) :
         # Finally, apply the transformation to the imageItem
         self.image_item.setTransform(transform)
 
-        # Leads to infinite recursion?
-        logger.info('<{}>Emitting sig_axes_changed.'.format(self.name))
-        self.sig_axes_changed.emit()
+        if emit :
+            logger.info('<{}>Emitting sig_axes_changed.'.format(self.name))
+            self.sig_axes_changed.emit()
 
     def get_limits(self) :
         """ Return ``[[x_min, x_max], [y_min, y_max]]``. """
         # Default to current viewrange but try to get more accurate values if 
         # possible
-        #[[x_min, x_max], [y_min, y_max]] = self.viewRange()
-        #if self.xlim is not None :
-        #    x_min, x_max = self.xlim
-        #if self.ylim is not None :
-        #    y_min, y_max = self.ylim
         if self.image_item is not None :
             x, y = self.image_item.image.shape
         else :

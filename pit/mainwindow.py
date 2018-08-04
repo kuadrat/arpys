@@ -328,6 +328,7 @@ class MainWindow(QtGui.QMainWindow) :
 
     def redraw_plots(self, image=None) :
         """ Redraw plotted data to reflect changes in data or its colors. """
+        logger.debug('redraw_plots()')
         try :
             # Redraw main plot
             self.set_image(image, axes=self.axes)
@@ -385,7 +386,12 @@ class MainWindow(QtGui.QMainWindow) :
         self.redraw_plots()
 
     def roll_axes(self) :
-        """ """
+        """ Change the way we look at the data cube. While initially we see 
+        an Y vs. X slice in the main plot, roll it to Z vs. Y. A second call 
+        would roll it to X vs. Z and, finally, a third call brings us back to 
+        the original situation.
+        """
+        logger.debug('roll_axes()')
         data = self.get_data()
         self.set_data(np.moveaxis(data, [0,1,2], [2,0,1]))
         # Setting the data triggers a call to self.redraw_plots()
