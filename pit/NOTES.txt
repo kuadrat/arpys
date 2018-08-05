@@ -13,7 +13,6 @@ ToDo's
 * make (data and) cut-data available from console
 * postprocessing
 * save and export images and data
-* reset to raw data (retain copy of original)
 * colorbar histogram widget
 * visual sliders (cscale, vmax, alpha)
 * configure console syntax colours

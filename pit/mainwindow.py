@@ -6,6 +6,7 @@ elements.
 """
 
 import logging
+from copy import copy
 
 import numpy as np
 import pyqtgraph as pg
@@ -83,9 +84,11 @@ class MainWindow(QtGui.QMainWindow) :
     scales = np.array([[0, 1], [0, 1], [0, 1]])
     # Indices of *data* that are displayed in the main plot 
     axes = (1,2)
+    # How often we have rolled the axes from their initial positions
+    n_rolls = 0 #unused
     # Index along the z axis at which to produce a slice
     z = TracedVariable()
-    Z_AXIS_INDEX = 0
+    Z_AXIS_INDEX = 0 #unused
     # Plot transparency alpha
     alpha = 0.5
     # Plot powerlaw normalization exponent gamma
@@ -179,15 +182,30 @@ class MainWindow(QtGui.QMainWindow) :
         self.D = dl.load_data(filename)
         self.data = TracedVariable(self.D.data)
 
+        # Retain a copy of the original datadict so that we can reset later
+        self.original_D = copy(self.D)
+
         self.prepare_scales()
         self.on_z_dim_change()
         
         # Connect signal handling so changes in data are immediately reflected
         self.z.sig_value_changed.connect(self.on_z_change)
-        self.data.sig_value_changed.connect(self.redraw_plots)
+        self.data.sig_value_changed.connect(self.on_data_change)
 
         self.update_main_plot()
         self.set_scales()
+
+    def reset_data(self) :
+        """ Put all data and metadata into its original state, as if it was 
+        just loaded from file.
+        """
+        logger.debug('reset_data()')
+        self.D = copy(self.original_D)
+        self.set_data(self.D.data)
+        self.prepare_scales()
+        self.set_scales()
+        # Redraw the integrated intensity plot
+        self.on_z_dim_change()
 
     def prepare_scales(self) :
         """ Create a list containing the three original x-, y- and z-scales. """
@@ -227,6 +245,11 @@ class MainWindow(QtGui.QMainWindow) :
 
         self.z.set_allowed_values(range(self.zmin, self.zmax+1))
         self.z.set_value(self.zmin)
+
+    def on_data_change(self) :
+        """ Update self.image_data and replot. """
+        self.update_image_data()
+        self.redraw_plots()
 
     def on_z_change(self, caller=None) :
         """ Callback to the :signal: `sig_z_changed`. Ensure self.z does not go 
@@ -274,7 +297,7 @@ class MainWindow(QtGui.QMainWindow) :
     def calculate_integrated_intensity(self) :
         self.integrated = self.get_data().sum(1).sum(1)
 
-    def set_image_data(self) :
+    def update_image_data(self) :
         """ Get the right (possibly integrated) slice out of *self.data*, 
         apply postprocessings and store it in *self.image_data*. 
         """
@@ -298,7 +321,7 @@ class MainWindow(QtGui.QMainWindow) :
         logger.debug(('update_main_plot(): ' + 
                       'Z_AXIS_INDEX={}').format(self.Z_AXIS_INDEX))
 
-        self.set_image_data()
+        self.update_image_data()
 
         logger.debug('self.image_data.shape={}'.format(self.image_data.shape))
 
@@ -385,19 +408,24 @@ class MainWindow(QtGui.QMainWindow) :
         self.lut = self.cmap.getLookupTable()
         self.redraw_plots()
 
-    def roll_axes(self) :
+    def roll_axes(self, i=1) :
         """ Change the way we look at the data cube. While initially we see 
         an Y vs. X slice in the main plot, roll it to Z vs. Y. A second call 
         would roll it to X vs. Z and, finally, a third call brings us back to 
         the original situation.
+        ..: *i* : int; either 1 or 2. Number of dimensions to roll.
         """
         logger.debug('roll_axes()')
         data = self.get_data()
-        self.set_data(np.moveaxis(data, [0,1,2], [2,0,1]))
+        if i==1 :
+            res = [2,0,1]
+        elif i==2 :
+            res = [1,2,0]
+        self.n_rolls = (self.n_rolls + 1) % 3
+        self.set_data(np.moveaxis(data, [0,1,2], res))
         # Setting the data triggers a call to self.redraw_plots()
-        self.scales = np.roll(self.scales, 1)
+        self.scales = np.roll(self.scales, i)
         self.on_z_dim_change()
-#        self.redraw_plots()
         self.set_scales()
 
     def keyPressEvent(self, event) :
@@ -409,10 +437,8 @@ class MainWindow(QtGui.QMainWindow) :
         elif key == QtCore.Qt.Key_Left :
             self.z.set_value(self.z.get_value() - 1)
         elif key == QtCore.Qt.Key_R :
-        #    print('is R')
             self.cutline.flip_orientation()
         else :
-        #    print('not R')
             event.ignore()
             return
         # If any if-statement matched, we accepted the event
