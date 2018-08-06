@@ -31,11 +31,13 @@ KNOWN BUGS:
 import argparse
 
 import cmd2 as cmd
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import cm, rcParams
+from matplotlib import cm, rcParams, use
 from matplotlib.path import Path
 from matplotlib.colors import PowerNorm
+# Switch backend before importing pyplot
+use('TKAgg')
+from matplotlib import pyplot as plt
 from scipy.ndimage import filters
 from screeninfo import get_monitors
 
