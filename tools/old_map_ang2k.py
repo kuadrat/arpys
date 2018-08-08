@@ -19,10 +19,10 @@ parser.add_argument('filename', type=str,
                     conversion')
 
 parser.add_argument('-x', '--xshift', type=float, default=0,
-                   help='How much to shift the x angular scale (in its units).')
+                   help='How much to shift the angular scale (in its units).')
 
 parser.add_argument('-y', '--yshift', type=float, default=0,
-                   help='How much to shift the y angular scale (in its units).')
+                   help='How much to shift the angular scale (in its units).')
 
 parser.add_argument('-l', '--lattice_constant', type=float, default=1,
                    help='Lattice constant in Angstrom.')
@@ -63,30 +63,50 @@ phi = ns.phi
 hv = ns.hv
 E_b = ns.E_b
 
-X, Y = np.meshgrid(xscale, yscale)
-KX, KY = pp.new_a2k(X, Y, hv=hv, lattice_constant=args.lattice_constant, 
-                    dtheta=args.xshift, dtilt=args.yshift)
+kx, foo = pp.angle_to_k(xscale, theta, phi, hv, E_b, 
+                       lattice_constant=args.lattice_constant, 
+                       shift=args.xshift, degrees=True)
+
+ky, foo = pp.angle_to_k(yscale, theta=phi, phi=theta, hv=hv, E_b=E_b, 
+                       lattice_constant=args.lattice_constant, 
+                       shift=args.yshift, degrees=True)
 
 mp = pp.make_slice(data, d=0, i=args.index, integrate=args.integrate)
 
+KX, KY, sym_mp = pp.symmetrize_map(kx, ky, mp, clean=args.clean, 
+                                   debug=args.debug)
+
+if 0 in sym_mp.shape :
+    print('Symmetrization failed.')
+    KX, KY, sym_mp = kx, ky, mp
+
 if args.theta :
-    KX, KY = pp.rotate_XY(KX, KY, args.theta)
+    kx, ky = pp.rotate_xy(kx, ky, args.theta)
+    KX, KY = pp.rotate_xy(KX, KY, args.theta)
 
 # Plotting
 # ==============================================================================
 figtitle = 'x: {}, y: {} - {}'.format(args.xshift, args.yshift, args.filename)
-fig, (ax0, ax1) = plt.subplots(nrows=1, ncols=2, num=figtitle, figsize=(10,5))
+fig, (ax0, ax1, ax2) = plt.subplots(nrows=1, ncols=3, num=figtitle, 
+                                    figsize=(15,5))
 
 try :
     cmap = plt.get_cmap(args.cmap)
 except Exception :
     cmap = 'bone_r'
 
-vmax = args.vmax*mp.max()
-kwargs = dict(vmin=0, vmax=vmax, cmap=cmap)
+vmax1 = args.vmax*mp.max()
+#vmax2 = args.vmax*sym_mp.max()
+vmax2 = sym_mp.max()
+kwargs1 = dict(vmin=0, vmax=vmax1)
+kwargs2 = dict(vmin=sym_mp.min(), vmax=vmax2)
+for kwargs in [kwargs1, kwargs2] :
+    kwargs.update(dict(cmap=cmap))
 
-ax0.pcolormesh(xscale, yscale, mp, **kwargs)
-ax1.pcolormesh(KX, KY, mp, **kwargs)
+ax0.pcolormesh(mp, **kwargs1)
+ax1.pcolormesh(kx, ky, mp, **kwargs1)
+ax2.pcolormesh(KX, KY, sym_mp, **kwargs2)
+
 
 # Define cornerpoints for diagonals 
 c = 1
@@ -97,7 +117,7 @@ rt2 = np.sqrt(2)/2
 ax1.plot([-rt2, -rt2], [-1, 1], **diag_kwargs)
 ax1.plot([rt2, rt2], [-1, 1], **diag_kwargs)
 
-for ax in [ax1] :
+for ax in ax1, ax2 :
     # Plot some diagonals
     ax.plot([-c, c], [-c, c], **diag_kwargs)
     ax.plot([-c, c], [c, -c], **diag_kwargs)
@@ -105,4 +125,3 @@ for ax in [ax1] :
     ax.grid()
 
 plt.show()
-

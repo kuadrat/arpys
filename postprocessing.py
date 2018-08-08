@@ -1037,6 +1037,56 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
 
     return kx, ky
 
+def new_a2k(thetas, tilts, hv, work_func=4, E_b=0, dtheta=0, dtilt=0, 
+            lattice_constant=1, orientation='horizontal', 
+            photon_momentum=True, alpha=20) :
+    """ Cleaner implementation of angle to k conversion, particularly more 
+    suitable for maps. 
+    Confer docstring of :func: `angle_to_k
+    <arpys.postprocessing.angle_to_k>` for now.
+    """
+    # c0 = sqrt(2*&m_e)/hbar
+    c0 = 0.5124
+    # c1 is the angle to radian conversion
+    c1 = np.pi/180
+    
+    prefactor = c0 * np.sqrt(hv - E_b - work_func)
+    # Convert to units of pi/a
+    prefactor *= lattice_constant/np.pi
+
+    kx = prefactor * np.sin(c1*(thetas+dtheta))
+    ky = prefactor * np.cos(c1*(tilts+dtilt))
+
+    if photon_momentum :
+        # TODO Change this in other slit orientation
+        # TODO Use actual manipulator values instead of dtheta and dtilt
+        # c2 is the eV to Angstrom conversion
+        c2 = 2*lattice_constant/12400
+        kx -= c2*np.cos(c1*(alpha+dtheta))
+        ky += c2*np.sin(c1*(alpha+dtheta))*np.sin(c1*(dtilt))
+
+    o = orientation.lower()[0]
+    if o == 'h' :
+        return kx, ky
+    elif o == 'v' :
+        return ky, kx
+    else :
+        raise ValueError('Orientation not understood: {}.'.format(orientation))
+
+def a2k(angle, dtilt, dtheta, dphi, hv, work_func, orientation='horizontal') :
+    """ Alternative angle-to-k conversion approach using rotation matrices. 
+    Determine the norm of the k vector from the kinetic energy using the 
+    relation:
+               sqrt( 2*m_e*hv )
+        k_F = ------------------
+                     hbar
+    Then initiate a k vector in the direction measured and rotate it with the 
+    given tilt, theta and phi angles.
+    
+    """
+    pass
+
+
 # +---------+ #
 # | Fitting | # ================================================================
 # +---------+ #
@@ -1227,44 +1277,57 @@ def rotation_matrix(theta) :
                   [np.sin(t),  np.cos(t)]])
     return R
 
-def rotate_xy(xscale, yscale, theta=45) :
-    """ Rotate the x and y cooridnates of rectangular 2D data by angle theta.
+def rotate_XY(X, Y, theta=45) :
+    """ Rotate a coordinate mesh of (n by m) points by angle *theta*. *X* and 
+    *Y* hold the x and y components of the coordinates respectively, as if 
+    generated through :func: `np.meshgrid()`.
 
-    Parameters
-    ----------
-    xscale, yscale  : 1D arrays; the x (length m) and y (length n)  
-                      coordinates of the (rectangular) 2D data
-    theta           : float; rotation angle in degrees
+    *Parameters*
+    =====  =====================================================================
+    X      n by m array; x components of coordinates.
+    Y      n by m array; y components of coordinates.
+    theta  float; rotation angle in degrees
+    =====  =====================================================================
 
-    Returns
-    -------
-    xr, yr          : 2D arrays; rotated coordinate meshes (shape n x m) that 
-                      can be used as arguments to matplotlib's pcolormesh
+    *Returns*
+    ===  =======================================================================
+    U,V  n by m arrays; U (V) contains the x (y) components of the rotated 
+    coordinates. These can be used as arguments to :func: pcolormesh()
+    ===  =======================================================================
+
+    ..:see also: `<arpes.postprocessing.rotate_xy>`
     """
-    # Get dimensions
-    n = len(xscale)
-    m = len(yscale)
-
-    # Create a coordinate mesh
-    X, Y = np.meshgrid(xscale, yscale)
-
-    # Initialize the output arrays
-    xr = np.zeros([m, n])
-    yr = xr.copy()
-
-    # Build the rotation matrix (convert angle to radians first)
+    # Create the rotation matrix
     R = rotation_matrix(theta)
 
-    # Rotate each coordinate vector and write it to the output arrays
-    # NOTE there must be a more pythonic way to do this
-    for i in range(m) :
-        for j in range(n) :
-            v = np.array([X[i,j], Y[i,j]])
-            vr = v.dot(R)
-            xr[i,j] = vr[0]
-            yr[i,j] = vr[1]
+    # In order to take the dot product we need to flatten the meshgrids and 
+    # organize them correctly
+    U, V = np.dot(R, [X.ravel(), Y.ravel()])
 
-    return xr, yr
+    return U, V
+
+def rotate_xy(x, y, theta=45) :
+    """ Rotate the x and y cooridnates of rectangular 2D data by angle theta.
+
+    *Parameters*
+    =====  =====================================================================
+    x      1D array of length n; x values of the rectangular grid
+    y      1D array of length m; y values of the rectangular grid
+    theta  float; rotation angle in degrees
+    =====  =====================================================================
+
+    *Returns*
+    ===  =======================================================================
+    U,V  n by m arrays; U (V) contains the x (y) components of the rotated 
+         coordinates. These can be used as arguments to :func: pcolormesh() 
+    ===  =======================================================================
+
+    ..:see also: `<arpes.postprocessing.rotate_XY>`
+    """
+    # Create a coordinate mesh
+    X, Y = np.meshgrid(x, y)
+    # rotate_XY does the rest of the work
+    return rotate_XY(X, Y, theta)
 
 def symmetrize_around(data, p0, p1) :
     """ TODO p0, p1: indices of points """
@@ -1351,20 +1414,24 @@ def symmetrize_around(data, p0, p1) :
     return transformed[::-1,::-1]
 #    return transformed
 
-def symmetrize_rectangular(data, i) :
+def symmetrize_rectangular(data, i, k=None) :
     """ Symmetrize a piece of rectangular *data* around column *i* by simply 
     mirroring the data at column *i* and overlaying it in the correct position. 
     
     *Parameters*
     ====  ======================================================================
-    data  np.array of shape (ny, nx); data to be symmetrized.
-    i     int; index along x (0 <= i < nx) around which to symmetrize.
+    data  array of shape (ny, nx0); data to be symmetrized.
+    i     int; index along x (0 <= i < nx0) around which to symmetrize.
+    k     array of length nx0; the original k values (x scale of the data). 
+          If this is given, the new, expanded k values will be calculated and 
+          returned.
     ====  ======================================================================
 
     *Returns*
     ======  ====================================================================
-    result  np.array of shape (ny, nx1); the x dimension has expanded.
-    nx1     int; the new length of the x dimension.
+    result  array of shape (ny, nx1); the x dimension has expanded.
+    sym_k   array of length nx1; the expanded k values (x scale to the 
+            resulting data). If *k* is None, *sym_k* will also be None.
     ======  ====================================================================
 
     Here's a graphical explanation for the coordinates used in the code for 
@@ -1409,6 +1476,7 @@ def symmetrize_rectangular(data, i) :
     # Flip the image if i>nx0/2
     ny, nx0 = data.shape
     if i > nx0/2 :
+        flipped = True
         data = data[:,::-1]
         i = nx0-i
 
@@ -1420,7 +1488,6 @@ def symmetrize_rectangular(data, i) :
     result = np.zeros([ny, nx1])
 
     # Fill the mirrored data into the new container
-    print(result[:,:nx0].shape, data[:,::-1].shape)
     result[:,:nx0] += data[:,::-1]
 
     # Overlay the original data
@@ -1429,7 +1496,27 @@ def symmetrize_rectangular(data, i) :
     # "Normalize" the overlap region
     result[:,i0:nx0] /= 2
 
-    return result, nx1
+    # Create the new k values
+    if k is not None :
+        sym_k = np.arange(nx1, dtype=float)
+        dn = nx1 - nx0
+        dk = k[1] - k[0]
+        if flipped :
+            # Extend to the right
+            sym_k[:nx0] = k
+            start = k[-1]
+            stop = start + dn*dk
+            sym_k[nx0:] = np.arange(start, stop, dk)
+        else :
+            # Extend to the left
+            sym_k[dn:] = k
+            start = k[0]
+            stop = start - dn*dk
+            sym_k[:dn] = np.arange(start, stop, -dk)
+    else :
+        sym_k = None
+
+    return result, sym_k
 
 def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4, 
                    debug=False) :
