@@ -1479,6 +1479,8 @@ def symmetrize_rectangular(data, i, k=None) :
         flipped = True
         data = data[:,::-1]
         i = nx0-i
+    else :
+        flipped = False
 
     # Define relevant coordinates
     i0 = nx0 - 2*i
@@ -1512,7 +1514,7 @@ def symmetrize_rectangular(data, i, k=None) :
             sym_k[dn:] = k
             start = k[0]
             stop = start - dn*dk
-            sym_k[:dn] = np.arange(start, stop, -dk)
+            sym_k[:dn] = np.arange(start, stop, -dk)[::-1]
     else :
         sym_k = None
 
