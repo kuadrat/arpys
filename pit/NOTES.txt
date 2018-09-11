@@ -17,6 +17,10 @@ ToDo's
 * visual sliders (cscale, vmax, alpha)
 * configure console syntax colours
 
+Bugs
+====
+* Intensity plot does not update on data.sigValueChanged
+
 
 Notes
 =====
