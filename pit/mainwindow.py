@@ -84,7 +84,7 @@ class PITDataHandler() :
     # How often we have rolled the axes from their initial positions
     n_rolls = 0 #unused
     # Index along the z axis at which to produce a slice
-    z = TracedVariable()
+    z = TracedVariable(name='z')
 
     def __init__(self, main_window) :
         self.main_window = main_window
@@ -108,7 +108,7 @@ class PITDataHandler() :
         logger.debug('prepare_data()')
 
         self.D = dl.load_data(filename)
-        self.data = TracedVariable(self.D.data)
+        self.data = TracedVariable(self.D.data, name='data')
 
         # Retain a copy of the original datadict so that we can reset later
         self.original_D = copy(self.D)
@@ -161,6 +161,7 @@ class PITDataHandler() :
 
     def on_data_change(self) :
         """ Update self.main_window.image_data and replot. """
+        logger.debug('on_data_change()')
         self.main_window.update_image_data()
         self.main_window.redraw_plots()
         # Also need to recalculate the intensity plot
@@ -380,16 +381,24 @@ class MainWindow(QtGui.QMainWindow) :
     def update_image_data(self) :
         """ Get the right (possibly integrated) slice out of *self.data*, 
         apply postprocessings and store it in *self.image_data*. 
+        Skip this if the z value should be out of range, which can happen if 
+        the image data changes and the z scale hasn't been updated yet.
         """
+        logger.debug('update_image_data()')
         z = self.data_handler.z.get_value()
-        self.image_data = self.data_handler.get_data()[z,:,:]
+        try :
+            self.image_data = self.data_handler.get_data()[z,:,:]
+        except IndexError :
+            logger.debug(('update_image_data(): z index {} out of range for '
+                          'data of length {}.').format(
+                             z, self.image_data.shape[0]))
 
     def redraw_plots(self, image=None) :
         """ Redraw plotted data to reflect changes in data or its colors. """
         logger.debug('redraw_plots()')
         try :
             # Redraw main plot
-            self.set_image(image, axes=self.axes)
+            self.set_image(image, axes=self.data_handler.axes)
             # Redraw cut plot
             self.update_cut()
         except AttributeError as e :

@@ -229,7 +229,7 @@ class CursorPlot(pg.PlotWidget) :
 
         # The position of the slider is stored with a TracedVariable
         initial_pos = 0
-        pos = TracedVariable(initial_pos)
+        pos = TracedVariable(initial_pos, name='pos')
         self.register_traced_variable(pos)
 
         # Set up the slider
