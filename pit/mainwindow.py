@@ -182,6 +182,37 @@ class PITDataHandler() :
             self.z.set_value(clipped_z)
         self.main_window.update_main_plot()
 
+    def update_edc_mdc(self) :
+        """ Update the EDC and MDC plots. """
+        logger.debug('on_crosshair_move()')
+
+        # Get shorthands for plots
+        ep = self.main_window.edc_plot
+        mp = self.main_window.mdc_plot
+        for plot in [ep, mp] :
+            # Remove the old integrated intensity curve
+            try :
+                old = plot.listDataItems()[0]
+                plot.removeItem(old)
+            except IndexError :
+                pass
+
+        # EDC
+        i_edc = int( min(mp.pos.get_value(), mp.pos.allowed_values.max()-1))
+        edc = self.cut_data[i_edc]
+        y = np.arange(len(edc))
+        ep.plot(edc, y)
+
+        # MDC
+        i_mdc = int( min(ep.pos.get_value(), ep.pos.allowed_values.max()-1)) 
+        mdc = self.cut_data[:,i_mdc]
+        x = np.arange(len(mdc))
+        mp.plot(x, mdc)
+
+        # This update is only necessary for the EDC plot as its range is 
+        # variable. NOTE Leads to infinite recursion
+#        ep.pos.set_value(i_mdc)
+
     def on_z_dim_change(self) :
         """ Called when either completely new data is loaded or the dimension 
         from which we look at the data changed (e.g. through :func: `roll_axes 
@@ -208,7 +239,7 @@ class PITDataHandler() :
         zscale = self.scales[0]
         zmin = zscale[0]
         zmax = zscale[-1]
-        ip.set_top_axis(zmin, zmax)
+        ip.set_secondary_axis(zmin, zmax)
 
     def calculate_integrated_intensity(self) :
         self.integrated = self.get_data().sum(1).sum(1)
@@ -278,7 +309,20 @@ class MainWindow(QtGui.QMainWindow) :
 
         # Create the 3D (main) and cut ImagePlots 
         self.main_plot = ImagePlot(name='main_plot')
-        self.cut_plot = ImagePlot(name='cut_plot')
+        self.cut_plot = CrosshairImagePlot(name='cut_plot')
+
+        # Create the EDC and MDC plots (though, technically, they only 
+        # display MDCs or EDCs und certain circumstances, and just 
+        # intensities along a line in the general case)
+        self.edc_plot = CursorPlot(name='edc_plot', orientation='horizontal')
+        self.mdc_plot = CursorPlot(name='mdc_plot')
+        self.edc_plot.register_traced_variable(self.cut_plot.pos[0])
+        self.mdc_plot.register_traced_variable(self.cut_plot.pos[1])
+        for traced_variable in self.cut_plot.pos :
+            traced_variable.sig_value_changed.connect(
+                self.data_handler.update_edc_mdc)
+
+        self.cut_plot.sig_image_changed.connect(self.data_handler.update_edc_mdc)
 
         # Set up the python console
         namespace = dict(pit=self.data_handler, mw=self, pg=pg, arp=arp, 
@@ -289,7 +333,7 @@ class MainWindow(QtGui.QMainWindow) :
         self.console.setStyleSheet(console_style)
 
         # Create the integrated intensity plot
-        self.integrated_plot = CursorPlot()
+        self.integrated_plot = CursorPlot(name='z selector')
         self.integrated_plot.register_traced_variable(self.data_handler.z)
 
         # Add ROI to the main ImageView
@@ -303,17 +347,45 @@ class MainWindow(QtGui.QMainWindow) :
         #self.define_keys()
 
     def align(self) :
-        """ Align all the GUI elements in the QLayout. """
+        """ Align all the GUI elements in the QLayout. 
+        
+          0   1   2   3   4
+        +---+---+---+---+---+
+        |       |       | e | 0
+        + main  |  cut  | d +
+        |       |       | c | 1
+        +-------+-------+---+
+        |       |  mdc  |   | 2
+        +   z   +-------+---+
+        |       |  console  | 4
+        +---+---+---+---+---+
+        
+        
+        """
         # Get a short handle
         l = self.layout
-        # Main (3D) ImageView in bottom left
-        l.addWidget(self.main_plot, 0, 0)
-        # Xcut and Ycut above, to the right of Main
-        l.addWidget(self.cut_plot, 0, 1)
+        # addWIdget(row, column, rowSpan, columnSpan)
+        # Main (3D) ImageView in top left
+        l.addWidget(self.main_plot, 0, 0, 2, 2)
+        # Cut to the right of Main
+        l.addWidget(self.cut_plot, 0, 2, 2, 2)
+        # EDC and MDC plots
+        l.addWidget(self.edc_plot, 0, 4, 2, 1)
+        l.addWidget(self.mdc_plot, 2, 2, 1, 2)
         # Integrated z-intensity plot
-        l.addWidget(self.integrated_plot, 1, 0)
+        l.addWidget(self.integrated_plot, 2, 0, 2, 2)
         # Console
-        l.addWidget(self.console, 1, 1)
+        l.addWidget(self.console, 3, 2, 1, 3)
+
+        nrows = 4
+        ncols = 5
+        # Need to manually set all row- and columnspans as well as min-sizes
+        for i in range(nrows) :
+            l.setRowMinimumHeight(i, 50)
+            l.setRowStretch(i, 1)
+        for i in range(ncols) :
+            l.setColumnMinimumWidth(i, 50)
+            l.setColumnStretch(i, 1)
 
     def define_keys() :
         pass
@@ -325,11 +397,15 @@ class MainWindow(QtGui.QMainWindow) :
         """
         xscale = self.data_handler.scales[2]
         yscale = self.data_handler.scales[1]
+        zscale = self.data_handler.scales[0]
         logger.debug(('set_scales(): len(xscale), len(yscale)={}, ' +
                       '{}').format(len(xscale), len(yscale)))
         self.main_plot.set_xscale(xscale)
         self.main_plot.set_yscale(yscale, update=True)
         self.main_plot.fix_viewrange()
+        self.cut_plot.set_xscale(zscale, update=True)
+        # yscale depends on our cutline
+        #self.cut_plot.set_yscale(yscale, update=True)
         self.cut_plot.fix_viewrange()
         self.cutline.initialize()
 
@@ -373,6 +449,7 @@ class MainWindow(QtGui.QMainWindow) :
             logger.error(e)
             return
 
+        self.data_handler.cut_data = cut
         # Convert np.array *cut* to an ImageItem and set it as *cut_plot*'s 
         # Image
         cut_image = pg.ImageItem(cut)

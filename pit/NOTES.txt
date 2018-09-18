@@ -19,7 +19,7 @@ ToDo's
 
 Bugs
 ====
-* Intensity plot does not update on data.sigValueChanged
+* Intensity plot does not update on data.sig_value_changed. EDIT: seems fixed...
 
 
 Notes
