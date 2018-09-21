@@ -325,7 +325,7 @@ class CursorPlot(pg.PlotWidget) :
     wheel_sensitivity = 0.7
 
     def __init__(self, parent=None, background='default', name=None, 
-                 orientation='vertical', **kwargs) : 
+                 orientation='vertical', cursor_width=1, **kwargs) : 
         """ Initialize the slider and set up the visual tweaks to make a 
         PlotWidget look more like a scalebar.
 
@@ -361,7 +361,7 @@ class CursorPlot(pg.PlotWidget) :
 
         # Set up the slider
         self.slider = pg.InfiniteLine(initial_pos, movable=True, angle=self.angle)
-        self.slider.setPen((255,255,0,255))
+        self.slider.setPen(color=(255,255,0,255), width=cursor_width)
         # Add a marker. Args are (style, position (from 0-1), size #NOTE 
         # seems broken
         #self.slider.addMarker('o', 0.5, 10)
@@ -496,14 +496,25 @@ class Scalebar(CursorPlot) :
     scalebar. This is achieved by providing simply a long, flat plot without 
     any data and no y axis, but the same draggable slider as in CursorPlot.
     """
-    # TODO Disable y axis ticks but add a axes all around, creating a 
-    # surrounding box
     def __init__(self, *args, **kwargs) :
         super().__init__(*args, **kwargs)
 
+        self.disableAutoRange()
+
         # Aesthetics and other widget configs
-        self.hideAxis('left')
+        for axis in ['top', 'right', 'left', 'bottom'] :
+            self.showAxis(axis)
+            ax = self.getAxis(axis)
+            #ax.setTicks([[], []])
+            ax.setStyle(showValues=False, tickLength=0)
+
         self.set_size(300, 50)
+        self.pos.set_allowed_values(linspace(0, 1, 100))
+
+        # Slider appearance
+        slider_width = 20
+        self.slider.setPen(color=(100, 100, 100), width=slider_width)
+        self.slider.setHoverPen(color=(120, 120, 120), width=slider_width)
 
     def set_size(self, width, height) :
         """ Set this widgets size by setting minimum and maximum sizes 

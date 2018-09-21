@@ -20,7 +20,7 @@ from arpys import dl, pp
 from arpys.pit.cmaps import cmaps
 from arpys.pit.cutline import Cutline
 from arpys.pit.imageplot import *
-from arpys.pit.utilities import TracedVariable
+from arpys.pit.utilities import TracedVariable, indexof
 
 # +----------------+ #
 # | Set up logging | # =========================================================
@@ -340,6 +340,18 @@ class MainWindow(QtGui.QMainWindow) :
         self.cutline = Cutline(self.main_plot)
         self.cutline.initialize()
 
+        # Scalebars. Scalebar1 is for the `gamma` value
+        scalebar1 = Scalebar()
+        self.gamma_values = np.concatenate((np.linspace(0.1, 1, 50), 
+                                            np.linspace(1.1, 10, 50)))
+        scalebar1.pos.set_value(0.5)
+        scalebar1.pos.sig_value_changed.connect(self.on_gamma_slider_move)
+        # Label the scalebar
+        gamma_label = pg.TextItem('γ', anchor=(0.5, 0.5))
+        gamma_label.setPos(0.5, 0.5)
+        scalebar1.addItem(gamma_label)
+        self.scalebar1 = scalebar1
+
         # Align all the gui elements
         self.align()
         self.show()
@@ -360,25 +372,31 @@ class MainWindow(QtGui.QMainWindow) :
         |       |  console  | 4
         +---+---+---+---+---+
         
-        
+        (Units of subdivision [sd])
         """
+        # subdivision 
+        sd = 3
         # Get a short handle
         l = self.layout
         # addWIdget(row, column, rowSpan, columnSpan)
         # Main (3D) ImageView in top left
-        l.addWidget(self.main_plot, 0, 0, 2, 2)
+        l.addWidget(self.main_plot, 0, 0, 2*sd, 2*sd)
         # Cut to the right of Main
-        l.addWidget(self.cut_plot, 0, 2, 2, 2)
+        l.addWidget(self.cut_plot, 0, 2*sd, 2*sd, 2*sd)
         # EDC and MDC plots
-        l.addWidget(self.edc_plot, 0, 4, 2, 1)
-        l.addWidget(self.mdc_plot, 2, 2, 1, 2)
+#        l.addWidget(self.edc_plot, 0, 4*sd, 2*sd, 1*sd)
+        l.addWidget(self.edc_plot, 0, 4*sd, 2*sd, 2)
+        l.addWidget(self.mdc_plot, 2*sd, 2*sd, 1*sd, 2*sd)
         # Integrated z-intensity plot
-        l.addWidget(self.integrated_plot, 2, 0, 2, 2)
+        l.addWidget(self.integrated_plot, 2*sd, 0, 2*sd, 2*sd)
         # Console
-        l.addWidget(self.console, 3, 2, 1, 3)
+        l.addWidget(self.console, 3*sd, 2*sd, 1*sd, 3*sd)
 
-        nrows = 4
-        ncols = 5
+        # Scalebars
+        l.addWidget(self.scalebar1, 2*sd, 4*sd, 1, 1*sd)
+
+        nrows = 4*sd
+        ncols = 5*sd
         # Need to manually set all row- and columnspans as well as min-sizes
         for i in range(nrows) :
             l.setRowMinimumHeight(i, 50)
@@ -490,6 +508,12 @@ class MainWindow(QtGui.QMainWindow) :
         self.cutline.sig_region_changed.connect(self.update_cut)
         self.update_cut()
 
+    def on_gamma_slider_move(self) :
+        """ When the user moves the gamma slider, update gamma. """
+        ind = min(int(100*self.scalebar1.pos.get_value()), len(self.gamma_values)-1)
+        gamma = self.gamma_values[ind]
+        self.set_gamma(gamma)
+
     def set_cmap(self, cmap) :
         """ Set the colormap to *cmap* where *cmap* is one of the names 
         registered in `<arpys.pit.cmaps>` which includes all matplotlib and 
@@ -521,6 +545,12 @@ class MainWindow(QtGui.QMainWindow) :
         self.gamma = gamma
         self.cmap.set_gamma(gamma)
         self.cmap_changed()
+        # Additionally, we need to update the slider position. We need to 
+        # hack a bit to avoid infinite signal loops: avoid emitting of the 
+        # signal and update the slider position by hand with a call to 
+        # scalebar1.set_position().
+        self.scalebar1.pos._value = indexof(gamma, self.gamma_values)/100
+        self.scalebar1.set_position()
     
     def cmap_changed(self) :
         """ Recalculate the lookup table and redraw the plots such that the 

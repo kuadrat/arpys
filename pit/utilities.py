@@ -128,4 +128,21 @@ class TracedVariable(qt.QtCore.QObject) :
             ind = np.abs( self.allowed_values-value ).argmin()
             return self.allowed_values[ind]
 
+#_Functions_____________________________________________________________________
+
+def indexof(value, array) :
+    """ 
+    Return the first index of the value in the array closest to the given 
+    :param: `value`.
+
+    Example
+    -------
+    >>> a = np.array([1, 0, 0, 2, 1])
+    >>> indexof(0, a)
+    1
+    >>> indexof(0.9, a)
+    0
+    """
+    return np.argmin(np.abs(array - value))
+
 

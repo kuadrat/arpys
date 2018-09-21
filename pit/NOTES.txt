@@ -1,16 +1,12 @@
 ToDo's
 ======
-* Show EDCs/MDCs
 * correct axes limits
   \+ done for main_plot
   \- for cut_plot need to calculate length along pit.cutline.
 * integrate along z
 * (integrate along cutline)
 * compare files -> session management?
-* don't reset views (z and cursor position) when changing visual properties 
-  (cmap, alpha)
 * add abbreviations of often-used functions to ipython namespace
-* make (data and) cut-data available from console
 * postprocessing
 * save and export images and data
 * colorbar histogram widget
@@ -20,6 +16,8 @@ ToDo's
 Bugs
 ====
 * Intensity plot does not update on data.sig_value_changed. EDIT: seems fixed...
+* gamma slider doesn't moueswheel beyond the center position at 0.5 (it's a 
+feature?)
 
 
 Notes
@@ -28,5 +26,8 @@ Notes
 versions of PyQt present, the environment variable PYQTGRAPH_QT_LIB has to be 
 set to `PyQt5`.
 
-* maybe TracedVariable with allowed_values should be subclassed
+* In the version of PyQtGraph that was used in development (0.10.0) the 
+saving of plots from the context menu had a small bug (got a float for the 
+size of the rectangle, where an int was expected). This was, in development, 
+crudely fixed in the pyqtgraph source.
 
