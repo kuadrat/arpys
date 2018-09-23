@@ -7,6 +7,17 @@ General Public License v3+. See file 'COPYING' for more information.
 The file 'LICENSE-3RD-PARTY.txt' covers the different licenses of libraries 
 and other programs used by ARPYS.
 
+## Installation
+
+`arpys` requires `PyQt5` which requires `SIP` version 4.19.1 or higher, which 
+as of this writing cannot be installed using `pip` (at least not with 
+python3.4 or older).  Therefore, you'll have to download and install those 
+from source.  The source packages can be found 
+[here](https://www.riverbankcomputing.com/software/sip/download "SIP") and 
+[here](https://riverbankcomputing.com/software/pyqt/download5 "PyQt5").
+Once these are installed a simple
+`pip install arpys` _should_ do the trick.
+
 ## Rough description of files
 
 postprocessing.py
