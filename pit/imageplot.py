@@ -18,11 +18,11 @@ class ImagePlot(pg.PlotWidget) :
     distribution) or a 3D array (distribution of RGB values) as well as all 
     the nice pyqtgraph axes panning/rescaling/zooming functionality.
 
-    ============================================================================
+    =================  =========================================================
     *Signals*
     sig_image_changed  emitted whenever the image is updated
     sig_axes_changed   emitted when the axes are updated
-    ============================================================================
+    =================  =========================================================
     """
     image_item = None
     image_kwargs = {}
@@ -293,6 +293,7 @@ class CrosshairImagePlot(ImagePlot) :
         of the edc and mdc plots) are in line with the data represented in 
         cut_plot.
         """
+        logger.debug('{}.update_allowed_values()'.format(self.name))
         [[xmin, xmax], [ymin, ymax]] = self.get_limits()
         self.pos[0].set_allowed_values(linspace(ymin, ymax, 100))
         self.pos[1].set_allowed_values(linspace(xmin, xmax, 100))
@@ -302,7 +303,7 @@ class CrosshairImagePlot(ImagePlot) :
         in which the crosshair can be dragged to the intervals [xmin, xmax] 
         and [ymin, ymax]. 
         """
-        logger.debug('<{}>set_bounds()'.format(self.name))
+        logger.debug('{}.set_bounds()'.format(self.name))
         self.setXRange(xmin, xmax, padding=0.01)
         self.setYRange(ymin, ymax, padding=0.01)
 

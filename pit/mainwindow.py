@@ -199,12 +199,16 @@ class PITDataHandler() :
 
         # EDC
         i_edc = int( min(mp.pos.get_value(), mp.pos.allowed_values.max()-1))
+#        i_edc = indexof(mp.pos.get_value(), self.scales[1])
+        logger.debug('mp.pos.get_value()={}; i_edc: {}'.format(mp.pos.get_value(), i_edc))
         edc = self.cut_data[i_edc]
         y = np.arange(len(edc))
         ep.plot(edc, y)
 
         # MDC
         i_mdc = int( min(ep.pos.get_value(), ep.pos.allowed_values.max()-1)) 
+#        i_mdc = indexof(ep.pos.get_value(), self.scales[0])
+        logger.debug('ep.pos.get_value()={}; i_mdc: {}'.format(ep.pos.get_value(), i_mdc))
         mdc = self.cut_data[:,i_mdc]
         x = np.arange(len(mdc))
         mp.plot(x, mdc)
@@ -312,7 +316,7 @@ class MainWindow(QtGui.QMainWindow) :
         self.cut_plot = CrosshairImagePlot(name='cut_plot')
 
         # Create the EDC and MDC plots (though, technically, they only 
-        # display MDCs or EDCs und certain circumstances, and just 
+        # display MDCs or EDCs under certain circumstances, and just 
         # intensities along a line in the general case)
         self.edc_plot = CursorPlot(name='edc_plot', orientation='horizontal')
         self.mdc_plot = CursorPlot(name='mdc_plot')
@@ -421,10 +425,13 @@ class MainWindow(QtGui.QMainWindow) :
         self.main_plot.set_xscale(xscale)
         self.main_plot.set_yscale(yscale, update=True)
         self.main_plot.fix_viewrange()
-        self.cut_plot.set_xscale(zscale, update=True)
+
+        # Kind of a hack to get the crosshair to the right position...
+        self.cut_plot.sig_axes_changed.emit()
+#        self.cut_plot.set_xscale(zscale, update=True)
         # yscale depends on our cutline
         #self.cut_plot.set_yscale(yscale, update=True)
-        self.cut_plot.fix_viewrange()
+#        self.cut_plot.fix_viewrange()
         self.cutline.initialize()
 
     def set_image(self, image=None, *args, **kwargs) :

@@ -14,6 +14,6 @@ args = parser.parse_args()
 app = QtGui.QApplication([])
 
 main_window = mw.MainWindow()
-main_window.prepare_data(args.filename)
+main_window.data_handler.prepare_data(args.filename)
 app.exec_()
 
