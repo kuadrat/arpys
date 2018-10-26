@@ -1,5 +1,7 @@
 # ARPYS: python module for ARPES (**A**ngle **R**esolved **P**hoto**E**mission **S**pectroscopy) data analysis 
 
+![PIT in action](https://raw.githubusercontent.com/kuadrat/arpys/master/screenshots/pit_demo.gif)
+
 This repository consists of libraries, programs and scripts related to ARPES 
 data analysis.
 The software contained in this repository is distributed under the GNU 
@@ -15,8 +17,10 @@ python3.4 or older).  Therefore, you'll have to download and install those
 from source.  The source packages can be found 
 [here](https://www.riverbankcomputing.com/software/sip/download "SIP") and 
 [here](https://riverbankcomputing.com/software/pyqt/download5 "PyQt5").
-Once these are installed a simple
-`pip install arpys` _should_ do the trick.
+Follow the installation instructions that are found in the respective README 
+files.
+
+Once these are installed a simple `pip install arpys` _should_ do the trick.
 
 ## Rough description of files
 
@@ -79,7 +83,7 @@ used on his system and got incorporated into arpys.
 arpys mostly needs the axes subclasses and some small helper functions from 
 there.
 This is actually just a copy of another module that is hosted at 
-`git@github.com:kuadrat/kustom.git`.
+[git@github.com:kuadrat/kustom.git].
 
 ================================================================================
 Copyright (c) 2018 Kevin Kramer, Universität Zürich (kevin.kramer@uzh.ch)
