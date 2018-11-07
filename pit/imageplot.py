@@ -470,7 +470,7 @@ class CursorPlot(pg.PlotWidget) :
         # Ensure wheel_frames is at least as big as a step in the allowed 
         # values. NOTE This assumes allowed_values to be evenly spaced.
         av = self.pos.allowed_values
-        if av is not None and self.wheel_frames < 1 :
+        if av is not None and len(av) > 1 and self.wheel_frames < 1 :
             self.wheel_frames = av[1] - av[0]
     
     def set_secondary_axis(self, min_val, max_val) :
