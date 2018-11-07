@@ -21,6 +21,7 @@ feature?)
 * EDC & MDC plots don't work properly if axes aren't indices! EDIT: maybe 
 fixed by not having proper scales on cut_plot?
 * Can't seem to load cuts (xscale dimension error) EDIT: maybe fixed?
+* CursorPlot sliders buggy when repeatedly increasing width with keyboard.
 
 Notes
 =====

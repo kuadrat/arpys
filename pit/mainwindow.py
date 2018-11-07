@@ -570,11 +570,11 @@ class MainWindow(QtGui.QMainWindow) :
         """ Define all responses to keyboard presses. """
         key = event.key()
         logger.debug('keyPressEvent(): key={}'.format(key))
-        if key == QtCore.Qt.Key_Right :
-            self.data_handler.z.set_value(self.data_handler.z.get_value() + 1)
-        elif key == QtCore.Qt.Key_Left :
-            self.data_handler.z.set_value(self.data_handler.z.get_value() - 1)
-        elif key == QtCore.Qt.Key_R :
+#        if key == QtCore.Qt.Key_Right :
+#            self.data_handler.z.set_value(self.data_handler.z.get_value() + 1)
+#        elif key == QtCore.Qt.Key_Left :
+#            self.data_handler.z.set_value(self.data_handler.z.get_value() - 1)
+        if key == QtCore.Qt.Key_R :
             self.cutline.flip_orientation()
         else :
             event.ignore()

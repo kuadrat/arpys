@@ -8,9 +8,11 @@ from pyqtgraph import Qt as qt #import QtCore
 from pyqtgraph.graphicsItems.ImageItem import ImageItem
 from pyqtgraph.widgets import PlotWidget, GraphicsView
 
-from arpys.pit.utilities import TracedVariable
+from arpys.pit.utilities import TracedVariable, indexof
 
 logger = logging.getLogger('pit.'+__name__)
+
+HOVER_COLOR = (195,155,0)
 
 class ImagePlot(pg.PlotWidget) :
     """
@@ -215,6 +217,7 @@ class Crosshair() :
         # Set the color
         for line in [self.hline, self.vline] :
             line.setPen((255,255,0,255))
+            line.setHoverPen(HOVER_COLOR)
 
         # Register some callbacks
         self.hpos.sig_value_changed.connect(self.update_position_h)
@@ -318,15 +321,18 @@ class CursorPlot(pg.PlotWidget) :
     (:class: `InfiniteLine <pyqtgraph.InfiniteLine>) on an axis (:class: 
     `PlotWidget <pyqtgraph.PlotWidget>).
     The current position of the slider is tracked with the :class: 
-    `TracedVariable <arpys.pit.utilities.TracedVariable>` self.pos.
+    `TracedVariable <arpys.pit.utilities.TracedVariable>` self.pos and its 
+    width with the `TracedVariable` self.slider_width.
+
     """
     name = 'Unnamed'
+    hover_color = HOVER_COLOR
     # The speed at which the slider moves on mousewheel scroll in units of 
     # % of total range
     wheel_sensitivity = 0.7
 
     def __init__(self, parent=None, background='default', name=None, 
-                 orientation='vertical', cursor_width=1, **kwargs) : 
+                 orientation='vertical', slider_width=1, **kwargs) : 
         """ Initialize the slider and set up the visual tweaks to make a 
         PlotWidget look more like a scalebar.
 
@@ -361,8 +367,11 @@ class CursorPlot(pg.PlotWidget) :
         self.register_traced_variable(pos)
 
         # Set up the slider
+        self.slider_width = TracedVariable(1, name='{}.slider_width'.format(
+                                           self.name))
         self.slider = pg.InfiniteLine(initial_pos, movable=True, angle=self.angle)
-        self.slider.setPen(color=(255,255,0,255), width=cursor_width)
+        self.set_slider_pen(color=(255,255,0,255), width=slider_width)
+
         # Add a marker. Args are (style, position (from 0-1), size #NOTE 
         # seems broken
         #self.slider.addMarker('o', 0.5, 10)
@@ -490,6 +499,72 @@ class CursorPlot(pg.PlotWidget) :
         # `*(1, 1)` or `*(2, 2)` refers to the axis' position in the GridLayout)
         plotItem.axes[self.secondary_axis]['item'] = new_axis
         plotItem.layout.addItem(new_axis, *self.secondary_axis_grid)
+
+    def set_slider_pen(self, color=None, width=None, hover_color=None) :
+        """ Define the color and thickness of the slider (`InfiniteLine 
+        object <pyqtgraph.InfiniteLine>`) and store these attribute in :attr: 
+        `self.slider_width` and :attr: `self.cursor_color`).
+        """
+        # Default to the current values if none are given
+        if color is None :
+            color = self.cursor_color
+        else :
+            self.cursor_color = color
+
+        if width is None :
+            width = self.slider_width.get_value()
+        else :
+            self.slider_width.set_value(width)
+
+        if hover_color is None :
+            hover_color = self.hover_color
+        else :
+            self.hover_color = hover_color
+
+        self.slider.setPen(color=color, width=width)
+        # Keep the hoverPen-size consistent
+        self.slider.setHoverPen(color=hover_color, width=width)
+            
+    def increase_width(self, step=1) :
+        """ Increase (or decrease) `self.slider_width` by `step` units of odd 
+        numbers (such that the line always has a well defined center at the 
+        value it is positioned at).
+        """
+        old_width = self.slider_width.get_value()
+        new_width = old_width + 2*step
+        if new_width < 0 :
+            new_width = 1
+        self.set_slider_pen(width=new_width)
+
+    def increase_pos(self, step=1) :
+        """ Increase (or decrease) `self.pos` by a reasonable amount. 
+        I.e. move `step` steps along the list of allowed values.
+        """
+        allowed_values = self.pos.allowed_values
+        old_index = indexof(self.pos.get_value(), allowed_values)
+        new_index = old_index + step
+        new_value = allowed_values[new_index]
+        self.pos.set_value(new_value)
+
+    def keyPressEvent(self, event) :
+        """ Define responses to keyboard interactions. """
+        key = event.key()
+        logger.debug('{}.keyPressEvent(): key={}'.format(self.name, key))
+        if key == qt.QtCore.Qt.Key_Right :
+            self.increase_pos(1)
+        elif key == qt.QtCore.Qt.Key_Left :
+            self.increase_pos(-1)
+        elif key == qt.QtCore.Qt.Key_Up :
+#            self.set_slider_pen(width=self.slider_width+1)
+            self.increase_width(1)
+        elif key == qt.QtCore.Qt.Key_Down :
+#            self.set_slider_pen(width=self.slider_width-1)
+            self.increase_width(-1)
+        else :
+            event.ignore()
+            return
+        # If any if-statement matched, we accept the event
+        event.accept()
 
 class Scalebar(CursorPlot) :
     """ Simple subclass of :class: `CursorPlot 
