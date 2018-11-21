@@ -646,7 +646,7 @@ class Dataloader_CASSIOPEE(Dataloader) :
 
         # Properly rearrange the cuts
         data = []
-        for i in range(i_min, i_max) :
+        for i in range(i_min, i_max+1) :
             data.append(unordered[i])
         data = np.array(data)
 

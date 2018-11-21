@@ -257,6 +257,7 @@ def normalize_per_integrated_segment(data, dim=0, profile=False,
                   computation time with actually changing the data (as might 
                   be the case when processing FSMs). If this is False `data` 
                   will not be in the output.
+                  TODO This doesn't make sense.
 
     Returns
     -------
