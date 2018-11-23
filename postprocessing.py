@@ -56,19 +56,21 @@ def make_slice(data, d, i, integrate=0) :
     """ Create a slice out of the 3d data (l x m x n) along dimension d 
     (0,1,2) at index i. Optionally integrate around i.
 
-    Parameters
-    ----------
-    data        : array-like; map data of the shape (l x m x n) where l 
-                  corresponds to the number of energy values
-    d           : int, d in (0, 1, 2); dimension along which to slice
-    i           : int, 0 <= i < data.size[d]; The index at which to create the slice
-    integrate   : int, 0 <= integrate < |i - n|; the number of slices above 
-                  and below slice i over which to integrate
+    *Parameters*
+    ============================================================================
+    data       array-like; map data of the shape (l x m x n) where l 
+               corresponds to the number of energy values
+    d          int, d in (0, 1, 2); dimension along which to slice
+    i          int, 0 <= i < data.size[d]; The index at which to create the slice
+    integrate  int, 0 <= integrate < |i - n|; the number of slices above 
+               and below slice i over which to integrate
+    ============================================================================
 
-    Returns
-    -------
-    res         : np.array; Slice at index with dimensions shape[:d] + shape[d+1:]
-                  where shape = (l, m, n).
+    *Returns*
+    ============================================================================
+    res        np.array; Slice at index with dimensions shape[:d] + shape[d+1:]
+               where shape = (l, m, n).
+    ============================================================================
     """
     # Get the relevant dimensions
     shape = data.shape
@@ -112,18 +114,24 @@ def make_map(data, i, integrate=0) :
     If the values of i or integrate are bigger than what is possible, they 
     are automatically reduced to the maximum possible.
 
-    Parameters
-    ----------
-    data        : array-like; map data of the shape (l x m x n) where l 
-                  corresponds to the number of energy values
+    *Parameters*
+    ============================================================================
+    data       array-like; map data of the shape (l x m x n) where l 
+               corresponds to the number of energy values
                 
-    i           : int, 0 <= i < n; The index at which to create the slice
-    integrate   : int, 0 <= integrate < |i - n|; the number of slices above 
-                  and below slice i over which to integrate
+    i          int, 0 <= i < n; The index at which to create the slice
+    integrate  int, 0 <= integrate < |i - n|; the number of slices above 
+               and below slice i over which to integrate
+    ============================================================================
 
-    Returns
-    -------
-    res         : np.array; Map at given energy with dimensions (m x n)
+    *Returns*
+    ============================================================================
+    res        np.array; Map at given energy with dimensions (m x n)
+    ============================================================================
+
+    .. :see also:
+        `make_slice <arpys.postprocessing.make_slice>`. `make_map` is 
+        basically a special case of `make_slice`.
     """
     # Prepare the start and stop indices for slicing of the map data
     l, m, n = data.shape
@@ -157,14 +165,16 @@ def normalize_globally(data, minimum=True) :
     """ The simplest approach: normalize the whole dataset by the global min- 
     or maximum.
 
-    Parameters
-    ----------
-    data        : array-like; the input data of arbitrary dimensionality
-    minimum     : boolean; if True, use the min, otherwise the max function
+    *Parameters*
+    ============================================================================
+    data     array-like; the input data of arbitrary dimensionality
+    minimum  boolean; if True, use the min, otherwise the max function
+    ============================================================================
 
-    Returns
-    -------
-    res         : np.array; normalized version of input data
+    *Returns*
+    ============================================================================
+    res      np.array; normalized version of input data
+    ============================================================================
     """
     # Select whether to use the minimum or the maximum for normalization
     min_or_max = 'min' if minimum else 'max'
@@ -177,50 +187,52 @@ def normalize_globally(data, minimum=True) :
 
 def convert_data(data) :
     """ Helper function to convert data to the right shape. """
-    # Find out whether we have a (l x m) (d=2) or a (1 x l x m) (d=3) array
+    # Find out whether we have a (m x n) (d=2) or a (1 x m x n) (d=3) array
     shape = data.shape
     d = len(shape)
 
-    # Convert to shape (1 x l x m) 
+    # Convert to shape (1 x m x n) 
     if d == 2 :
-        l = shape[0]
-        m = shape[1]
-        data = data.reshape(1, l, m)
+        m = shape[0]
+        n = shape[1]
+        data = data.reshape(1, m, n)
     elif d == 3 :
-        l = shape[1]
-        m = shape[2]
+        m = shape[1]
+        n = shape[2]
     else :
         raise ValueError('Could not bring data with shape {} into right \
                          form.'.format(shape))
-    return data, d, l, m
+    return data, d, m, n
 
-def convert_data_back(data, d, l, m) :
+def convert_data_back(data, d, m, n) :
     """ Helper function to convert data back to the original shape which is 
-    determined by the values of d, l and m (outputs of :func: convert_data).
+    determined by the values of d, m and n (outputs of :func: convert_data).
     """
     if d == 2 :
-        data = data.reshape(l, m)
+        data = data.reshape(m, n)
     return data
 
 def normalize_per_segment(data, dim=0, minimum=False) :
     """ Normalize each column/row by its respective max value.
 
-    Parameters
-    ----------
-    data        : array-like; the input data with shape (l x m) or 
-                  (1 x l x m)
-    dim         : int; along which dimension to normalize (0 or 1)
-    minimum     : boolean; if True, use the min, otherwise the max function
+    *Parameters*
+    ============================================================================
+    data     array-like; the input data with shape (m x n) or 
+             (1 x m x n)
+    dim      int; along which dimension to normalize (0 or 1)
+    minimum  boolean; if True, use the min, otherwise the max function
+    ============================================================================
 
-    Returns
-    -------
-    res         : np.array; normalized version of input data in same shape
+    *Returns*
+    ============================================================================
+    res      np.array; normalized version of input data in same shape
+    ============================================================================
     """
     # Select whether to use the minimum or the maximum for normalization
     min_or_max = 'min' if minimum else 'max'
 
     # Convert data if necessary
-    data, d, l, m = convert_data(data)
+    data, d, m, n = convert_data(data)
 
     # Determine the length of the dimension along which to normalize
     length = data.shape[dim+1]
@@ -236,7 +248,7 @@ def normalize_per_segment(data, dim=0, minimum=False) :
         row /= row.__getattribute__(min_or_max)()
 
     # Convert back to original shape, if necessary
-    convert_data_back(data, d, l, m)
+    convert_data_back(data, d, m, n)
 
     return data
 
@@ -244,31 +256,33 @@ def normalize_per_integrated_segment(data, dim=0, profile=False,
                                      in_place=True) :
     """ Normalize each MDC/EDC by its integral.
 
-    Parameters
-    ----------
-    data        : array-like; the input data with shape (l x m) or 
-                  (1 x l x m).
-    dim         : int; along which dimension to normalize (0 or 1)
-    profile     : boolean; if True return a tuple (res, norm) instead of just 
+    *Parameters*
+    ============================================================================
+    data      array-like; the input data with shape (m x n) or 
+              (1 x m x n).
+    dim       int; along which dimension to normalize (0 or 1)
+    profile   boolean; if True return a tuple (res, norm) instead of just 
                   res.
-    in_place    : boolean; whether or not to update the input data in place. 
-                  This can be used if one is only interested in the 
-                  normalization profile and does not want to spend 
-                  computation time with actually changing the data (as might 
-                  be the case when processing FSMs). If this is False `data` 
-                  will not be in the output.
-                  TODO This doesn't make sense.
+    in_place  boolean; whether or not to update the input data in place. 
+              This can be used if one is only interested in the 
+              normalization profile and does not want to spend 
+              computation time with actually changing the data (as might 
+              be the case when processing FSMs). If this is False `data` 
+              will not be in the output.
+              TODO This doesn't make sense.
+    ============================================================================
 
-    Returns
-    -------
-    res         : np.array; normalized version of input data in same shape. 
-                  Only given if `in_place` is True.
-    norms       : np.array; 1D array of length X for dim=0 and Y for dim=1 of 
-                  normalization factors for each channel. Only given if 
-                  `profile` is True.
+    *Returns*
+    ============================================================================
+    res       np.array; normalized version of input data in same shape. 
+              Only given if `in_place` is True.
+    norms     np.array; 1D array of length X for dim=0 and Y for dim=1 of 
+              normalization factors for each channel. Only given if 
+              `profile` is True.
+    ============================================================================
     """
     # Convert data if necessary
-    data, d, l, m = convert_data(data)
+    data, d, m, n = convert_data(data)
 
     # Determine the length of the dimension along which to normalize
     length = data.shape[dim+1]
@@ -319,7 +333,7 @@ def normalize_per_integrated_segment(data, dim=0, profile=False,
             data[:,:,i] = row
 
     # Convert back to original shape, if necessary
-    data = convert_data_back(data, d, l, m)
+    data = convert_data_back(data, d, m, n)
 
     # Prepare the output
     return_value = []
@@ -346,47 +360,49 @@ def norm_int_edc(data, profile=False) :
     """
     return normalize_per_integrated_segment(data, dim=1, profile=profile)
 
-def normalize_above_fermi(data, ef_index, n=10, dist=0, inverted=False, 
+def normalize_above_fermi(data, ef_index, n_pts=10, dist=0, inverted=False, 
                           dim=1, profile=False, in_place=True) : 
-    """ Normalize data to the mean of the n smallest values above the Fermi 
+    """ Normalize data to the mean of the n_pts smallest values above the Fermi 
     level.
 
-    Parameters
-    ----------
-    data     : array-like; data of shape (lxm) or (1xlxm)
-    ef_index : int; index of the Fermi level in the EDCs
-    n        : int; number of points above the Fermi level to average over
-    dist     : int; distance from Fermi level before starting to take points 
-               for the normalization. The points taken correspond to 
-               EDC[ef_index+d:ef_index+d+n] (in the non-inverted case)
-    dim      : either 1 or 2; 1 if EDCs have length m, 2 if EDCs have length l
-    inverted : boolean; this should be set to True if higher energy values 
-               come first in the EDCs
-    profile  : boolean; if True, the list of normalization factors is returned
-               additionally
+    *Parameters*
+    ============================================================================
+    data      array-like; data of shape (m x n) or (1 x m x n)
+    ef_index  int; index of the Fermi level in the EDCs
+    n         int; number of points above the Fermi level to average over
+    dist      int; distance from Fermi level before starting to take points 
+              for the normalization. The points taken correspond to 
+              EDC[ef_index+d:ef_index+d+n] (in the non-inverted case)
+    dim       either 1 or 2; 1 if EDCs have length n, 2 if EDCs have length m
+    inverted  boolean; this should be set to True if higher energy values 
+              come first in the EDCs
+    profile   boolean; if True, the list of normalization factors is returned
+              additionally
+    ============================================================================
 
-    Returns
-    -------
-    data     : array-like; normalized data of same shape as input data
-    profile  : 1D-array; only returned as a tuple with data (`data, profile`) 
-               if argument `profile` was set to True. Contains the 
-               normalization profile, i.e. the normalization factor for each 
-               channel. Its length is m if dim==2 and l if dim==1.
+    *Returns*
+    ============================================================================
+    data      array-like; normalized data of same shape as input data
+    profile   1D-array; only returned as a tuple with data (`data, profile`) 
+              if argument `profile` was set to True. Contains the 
+              normalization profile, i.e. the normalization factor for each 
+              channel. Its length is m if dim==2 and l if dim==1.
+    ============================================================================
     """
     # Prevent input data from being overwritten by creating a copy and 
     # convert data shape if necessary
     if not in_place :
         data = data.copy()
-    data, d, l, m = convert_data(data)
+    data, d, m, n = convert_data(data)
 
     # Create a mini-function (with lambda) which extracts the right part of 
     # the data, depending on the user input
     if dim==1 :
         get_edc = lambda k : data[0,k]
-        n_edcs = l
+        n_edcs = m
     elif dim==2 :
         get_edc = lambda k : data[0,:,k]
-        n_edcs = m
+        n_edcs = n
     else :
         message = '[arpys.pp.normalize_above_fermi]`dim` should be 1 or 2, \
         got {}'.format(dim)
@@ -407,7 +423,7 @@ def normalize_above_fermi(data, ef_index, n=10, dist=0, inverted=False,
         edc = get_edc(k)
         above_ef = get_above_fermi(edc)
 
-        norm = np.mean(above_ef[:n])
+        norm = np.mean(above_ef[:n_pts])
         if profile :
             norms.append(norm)
 
@@ -420,47 +436,96 @@ def normalize_above_fermi(data, ef_index, n=10, dist=0, inverted=False,
 #        except FloatingPointError as e :
 #            print('Passing...')
 #            pass
-    data = convert_data_back(data, d, l, m)
+    data = convert_data_back(data, d, m, n)
 
     if profile :
         return data, np.array(norms)
     else :
         return data
 
+def norm_to_smooth_mdc(data, mdc_index, integrate, dim=1, n_box=15, 
+                       recursion_level=1) :
+    """
+    Normalize a cut to a smoothened average MDC of the intensity above the 
+    Fermi level.
+
+    *Parameters*
+    ============================================================================
+    data       array of shape (1 x m x n) or (m x n);
+    mdc_index  int; index in data at which to take the mdc
+    integrate  int; number of MDCs above and below `mdc_index` over which to 
+               integrate
+    dim        either 1 or 2; 1 if EDCs have length n, 2 if EDCs have length m
+    n_box      int; box size of linear smoother. Confer :func: 
+               `<arpys.postprocessing.smooth>`
+    recursion_level
+               int; number of times to iteratively apply the smoother. Confer
+               :func: `<arpys.postprocessing.smooth>`
+    ============================================================================
+
+    *Returns*
+    ============================================================================
+    result     normalized data in same shape
+    ============================================================================
+    """
+    data, d, m, n = convert_data(data)
+    i0 = mdc_index - integrate
+    i1 = mdc_index + integrate + 1
+    if dim==1 :
+        mdc = np.sum(data[0,i0:i1], 0)
+    elif dim==2 :
+        mdc = np.sum(data[0,:,i0:i1], 1)
+    
+    # Smoothen MDC with a linear box smoother
+    smoothened = smooth(mdc, n_box, recursion_level)
+
+    # Build an array of the same shape as the original data to allow fast 
+    # array-division
+    if dim==1 :
+        divisor = [smoothened for i in range(m)]
+    if dim==2 :
+        divisor = [smoothened for i in range(n)]
+        divisor = np.array(divisor).T
+
+    # Add empty dimension to be in right shape (1xlxm)
+    divisor = np.array([divisor])
+    data /= divisor
+
+    return convert_data_back(data, d, m, n)
 
 # +----------------+ #
 # | BG subtraction | # ========================================================
 # +----------------+ #
 
-def subtract_bg_fermi(data, n=10, ef=None, ef_index=None) :
+def subtract_bg_fermi(data, n_pts=10, ef=None, ef_index=None) :
     """ Use the mean of the counts above the Fermi level as a background and 
     subtract it from every channel/k. If no fermi level or index of the fermi
     level is specified, do the same as <func> subtract_bg_matt() but along EDCs
     instead of MDCs.
 
-    Parameters
-    ----------
-    data        : array-like; the input data with shape (l x m) or 
-                  (1 x l x m) containing momentum in y (m momentum points (?)) 
-                  and energy along x (l energy points) (plotting amazingly 
-                  inverts x and y)
-    n           : int; number of smallest points to take in order to determine
-                  bg
+    *Parameters*
+    ============================================================================
+    data   array-like; the input data with shape (m x n) or (1 x m x n) 
+           containing momentum in y (n momentum points (?)) and energy along x 
+           (m energy points) (plotting amazingly inverts x and y)
+    n_pts  int; number of smallest points to take in order to determine bg
+    ============================================================================
 
-    Returns
-    -------
-    res         : np.array; bg-subtracted  version of input data in same shape
+    *Returns*
+    ============================================================================
+    res    np.array; bg-subtracted  version of input data in same shape
+    ============================================================================
     """
     # Reshape input
     shape = data.shape
     d = len(shape)
     if d == 3 :
-        l = shape[1] 
-        m = shape[2]
-        data = data.reshape([l, m])
+        m = shape[1] 
+        n = shape[2]
+        data = data.reshape([m, n])
     else :
-        l = shape[0]
-        m = shape[1]
+        m = shape[0]
+        n = shape[1]
 
     if ef_index == None :
     # TODO elif ef:
@@ -468,46 +533,48 @@ def subtract_bg_fermi(data, n=10, ef=None, ef_index=None) :
             ef_index = 0
 
     # Loop over every k
-    for k in range(l) :
+    for k in range(m) :
         edc = data[k]
         above_ef = edc[ef_index:]
 
         # Order the values in the edc by magnitude
         ordered = sorted(above_ef)
 
-        # Average over the first (smallest) n points to get the bg
-        bg = np.mean(ordered[:n])
+        # Average over the first (smallest) n_pts points to get the bg
+        bg = np.mean(ordered[:n_pts])
 
         # Subtract the background (this updates the data array in place)
         edc -= bg
 
     if d==3 :
-        data = data.reshape([1, l, m])
+        data = data.reshape([1, m, n])
          
     return data
 
-def subtract_bg_matt(data, n=5, profile=False) :
+def subtract_bg_matt(data, n_pts=5, profile=False) :
     """ Subtract background following the method in C.E.Matt's 
     "High-temperature Superconductivity Restrained by Orbital Hybridisation".
-    Use the mean of the n smallest points in the spectrum for each energy 
+    Use the mean of the n_pts smallest points in the spectrum for each energy 
     (i.e. each MDC).
 
-    Parameters
-    ----------
-    data    : array-like; the input data with shape (l x m) or (1 x l x m) 
-              containing momentum in y (m momentum points) and energy along x 
-              (l energy points) (plotting amazingly inverts x and y)
-    n       : int; number of smallest points to take in each MDC in order to 
-              determine bg
-    profile : boolean; if True, a list of the background values for each MDC 
-              is returned additionally.
+    *Parameters*
+    ============================================================================
+    data     array-like; the input data with shape (m x n) or (1 x m x n) 
+             containing momentum in y (n momentum points) and energy along x 
+             (m energy points) (plotting amazingly inverts x and y)
+    n_pts    int; number of smallest points to take in each MDC in order to 
+             determine bg
+    profile  boolean; if True, a list of the background values for each MDC 
+             is returned additionally.
+    ============================================================================
 
-    Returns
-    -------
-    res     : np.array; bg-subtracted version of input data in same shape
-    profile : 1D-array; only returned as a tuple with data (`data, profile`) 
-              if argument `profile` was set to True. Contains the 
-              background profile, i.e. the background value for each MDC.
+    *Returns*
+    ============================================================================
+    res      np.array; bg-subtracted version of input data in same shape
+    profile  1D-array; only returned as a tuple with data (`data, profile`) 
+             if argument `profile` was set to True. Contains the 
+             background profile, i.e. the background value for each MDC.
+    ============================================================================
     """
     # Prevent original data from being overwritten by retaining a copy
     data = data.copy()
@@ -516,12 +583,12 @@ def subtract_bg_matt(data, n=5, profile=False) :
     shape = data.shape
     d = len(shape)
     if d == 3 :
-        l = shape[1] 
-        m = shape[2]
-        data = data.reshape([l,m])
+        m = shape[1] 
+        n = shape[2]
+        data = data.reshape([m,n])
     else :
-        l = shape[0]
-        m = shape[1]
+        m = shape[0]
+        n = shape[1]
 
     # Determine the number of energies l
     #    shape = data.shape
@@ -530,14 +597,14 @@ def subtract_bg_matt(data, n=5, profile=False) :
         bgs = []
 
     # Loop over every energy
-    for e in range(l) :
+    for e in range(m) :
         mdc = data[e, :]
 
         # Order the values in the mdc by magnitude
         ordered = sorted(mdc)
 
-        # Average over the first (smallest) n points to get the bg
-        bg = np.mean(ordered[:n])
+        # Average over the first (smallest) n_pts points to get the bg
+        bg = np.mean(ordered[:n_pts])
         if profile :
             bgs.append(bg)
 
@@ -545,7 +612,7 @@ def subtract_bg_matt(data, n=5, profile=False) :
         mdc -= bg
      
     if d == 3 :
-        data = data.reshape([1, l, m])
+        data = data.reshape([1, m, n])
 
     if profile :
         return data, np.array(bgs)
@@ -574,35 +641,37 @@ def subtract_bg_shirley(data, dim=0, profile=False, normindex=0) :
     practice this convergence is reached in 4-5 iterations at most and even a 
     single iteration may suffice.
 
-    Parameters
-    ----------
-    data : np.array; input data with shape (l x m) or (1 x l x m) containing 
-           an E(k) cut
-    dim  : int; either 0 or 1. Determines whether the input is aranged as 
-           E(k) (m EDCs of length l, dim=0) or k(E) (l EDCs of length m, dim=1) 
-    profile : boolean; if True, a list of the background values for each MDC 
-              is returned additionally.
-    normindex : TESTING
+    *Parameters*
+    ============================================================================
+    data     np.array; input data with shape (m x n) or (1 x m x n) containing 
+             an E(k) cut
+    dim      int; either 0 or 1. Determines whether the input is aranged as 
+             E(k) (n EDCs of length m, dim=0) or k(E) (m EDCs of length n, dim=1) 
+    profile  boolean; if True, a list of the background values for each MDC 
+             is returned additionally.
+    normindex  TESTING
+    ============================================================================
 
-    Returns
-    -------
-    data : np.array; has the same dimensions as the input array.
-    profile : 1D-array; only returned as a tuple with data (`data, profile`) 
-              if argument `profile` was set to True. Contains the 
-              background profile, i.e. the background value for each MDC.
+    *Returns*
+    ============================================================================
+    data     np.array; has the same dimensions as the input array.
+    profile  1D-array; only returned as a tuple with data (`data, profile`) 
+             if argument `profile` was set to True. Contains the 
+             background profile, i.e. the background value for each MDC.
+    ============================================================================
     """
     # Prevent original data from being overwritten by retaining a copy
     data = data.copy()
 
-    data, d, l, m = convert_data(data)
+    data, d, m, n = convert_data(data)
     
     if dim == 0 :
-        nk = m
-        ne = l
+        nk = n
+        ne = m
         get_edc = lambda k : data[0,:,k]
     elif dim == 1 :
-        nk = l
-        ne = m
+        nk = m
+        ne = n
         get_edc = lambda k : data[0,k]
 
     # Take shirley bg from the angle-averaged EDC
@@ -622,7 +691,7 @@ def subtract_bg_shirley(data, dim=0, profile=False, normindex=0) :
         # Update data in-place
         edc -= bg
 
-    data = convert_data_back(data, d, l, m)
+    data = convert_data_back(data, d, m, n)
     if profile :
         return data, bg
     else :
@@ -650,17 +719,19 @@ def subtract_bg_shirley_old(data, dim=0, normindex=0) :
     practice this convergence is reached in 4-5 iterations at most and even a 
     single iteration may suffice.
 
-    Parameters
-    ----------
+    *Parameters*
+    ============================================================================
     data : np.array; input data with shape (l x m) or (1 x l x m) containing 
            an E(k) cut
     dim  : int; either 0 or 1. Determines whether the input is aranged as 
            E(k) (m EDCs of length l, dim=0) or k(E) (l EDCs of length m, dim=1) 
     normindex : TESTING
+    ============================================================================
 
-    Returns
-    -------
+    *Returns*
+    ============================================================================
     data : np.array; has the same dimensions as the input array.
+    ============================================================================
     """
     # Prevent original data from being overwritten by retaining a copy
     data = data.copy()
@@ -693,21 +764,23 @@ def subtract_bg_shirley_old(data, dim=0, normindex=0) :
     return data
 
 def subtract_bg_kaminski(data) :
-    """ Use the method of Kaminski et al. (DOI: 10.1103/PhysRevB.69.212509) 
+    """ 
+    *Unfinished*
+    Use the method of Kaminski et al. (DOI: 10.1103/PhysRevB.69.212509) 
     to subtract background. The principle is as follows:
     A lorentzian + a linear background y(x) = ax + b is fitted to momentum
     distribution curves. One then uses the magnitude of the linear component 
     at every energy as the background at that energy for a given k point. 
 
-    Parameters
-    ----------
-    data        : array-like; the input data with shape (l x m) or 
-                  (l x m x 1) containing momentum in y (m momentum points) 
-                  and energy along x (l energy points) (plotting amazingly 
-                  inverts x and y)
+    *Parameters*
+    ============================================================================
+    data     array-like; the input data with shape (l x m) or 
+             (l x m x 1) containing momentum in y (m momentum points) 
+             and energy along x (l energy points) (plotting amazingly 
+             inverts x and y)
+    ============================================================================
 
-    Returns
-    -------
+    *Returns*
     """
     pass
     ## Get the number of energies
@@ -721,16 +794,32 @@ def subtract_bg_kaminski(data) :
     #    mdc = data[e]
     #    ax.plot(mdc, lw=1, color='k')
 
-def apply_to_map(data, func, dim=2, output=False, fargs=[], fkwargs={}) :
-# NOTE unfinished, untested
-    """ Apply a postprocessing function `func` which is designed to be 
+def apply_to_map(data, func, dim=1, output=True, fargs=(), fkwargs={}) :
+    """ 
+    **Untested**
+    Apply a postprocessing function `func` which is designed to be 
     applied to an `energy vs k` cut to each cut of a map. 
 
-    Parameters
-    ----------
-    data        : array; 3D array of shape (l x m x n) representing the data.
-                  For SIS data the dimensions are (energy x k x tilt)
-    func        : function; a function that can be applied to 2D data
+    *Parameters*
+    =======  ===================================================================
+    data     array; 3D array of shape (l x m x n) representing the data.
+    func     function; a function that can be applied to 2D data
+    dim      int; dimension along which to apply the function `func`:
+             0 - l cuts
+             1 - m cuts
+             2 - n cuts
+    output   boolean; if *True*, collect the output of every application of 
+             `func` on each slice in a list `results` and return it. Can be 
+             set to *False* if no return is needed in order to save some memory.
+    fargs    tuple; positional arguments to be passed on to `func`.
+    fkwargs  dict; keyword arguments to be passed on to `func`.
+    =======  ===================================================================
+
+    *Returns*
+    =======  ===================================================================
+    returns  list; contains the return value of every call to `func` that was 
+             made in the order they were made.
+    =======  ===================================================================
     """
     n_cuts = data.shape[dim]
     if dim == 0 :
@@ -760,18 +849,19 @@ def _derivatives(data, dx, dy) :
     """ Helper function to caluclate first and second partial derivatives of 
     2D data.
 
-    Parameters
-    ----------
-    data        : array-like; the input data with shape (l x m) or 
-                  (1 x l x m)
-    dx          : float; distance at x axis
-    dy          : float; distance at y axis
+    *Parameters*
+    ============================================================================
+    data  array-like; the input data with shape (m x n) or (1 x m x n)
+    dx    float; distance at x axis
+    dy    float; distance at y axis
+    ============================================================================
 
-    Returns
-    -------
+    *Returns*
+    ============================================================================
     grad_x, grad_y, grad2_x, grad2_y
-                : np.arrays; first and second derivatives of data along x/y
-                  in the same shape as the input array
+          np.arrays; first and second derivatives of data along x/y
+          in the same shape as the input array
+    ============================================================================
     """
     # The `axis` arguments change depending on the shape of the input data
     d = len(data.shape)
@@ -790,18 +880,19 @@ def _derivatives(data, dx, dy) :
 def laplacian(data, dx=1, dy=1, a=None) :
     """ Apply the second derivative (Laplacian) to the data.
 
-    Parameters
-    ----------
-    data        : array-like; the input data with shape (l x m) or 
-                  (1 x l x m)
-    dx          : float; distance at x axis
-    dy          : float; distance at y axis
-    a           : float; scaling factor for between x and y derivatives.  
-                  Should be close to dx/dy. 
+    *Parameters*
+    ============================================================================
+    data  array-like; the input data with shape (m x n) or (1 x m x n)
+    dx    float; distance at x axis
+    dy    float; distance at y axis
+    a     float; scaling factor for between x and y derivatives.  
+          Should be close to dx/dy. 
+    ============================================================================
 
-    Returns
-    -------
-    res         : np.array; second derivative of input array in same dimensions
+    *Returns*
+    ============================================================================
+    res   np.array; second derivative of input array in same dimensions
+    ============================================================================
  
     """
     # Get the partial derivatives
@@ -816,16 +907,17 @@ def laplacian(data, dx=1, dy=1, a=None) :
 def curvature(data, dx=1, dy=1, cx=1, cy=1) :
     """ Apply the curvature method (DOI: 10.1063/1.3585113) to the data.
  
-    Parameters
-    ----------
-    data        : array-like; the input data with shape (l x m) or 
-                  (1 x l x m)
-    dx          : float; distance at x axis
-    dy          : float; distance at y axis
+    *Parameters*
+    ============================================================================
+    data  array-like; the input data with shape (m x n) or (1 x m x n)
+    dx    float; distance at x axis
+    dy    float; distance at y axis
+    ============================================================================
 
-    Returns
-    -------
-    res         : np.array; curvature of input array in same dimensions
+    *Returns*
+    ============================================================================
+    res   np.array; curvature of input array in same dimensions
+    ============================================================================
     """
     # Get the partial derivatives
     grad_x, grad_y, grad2_x, grad2_y = _derivatives(data, dx, dy)
@@ -865,19 +957,25 @@ def smooth(x, n_box, recursion_level=1) :
     [1,1,2,3,5,8,13] becomes [1,1,1,1,2,3,5,8,13,13,13] for a box with 
     n_box=5.  
 
-    Parameters
-    ----------
-    x           : 1D array-like; the data to smooth
-    n_box       : int; size of the smoothing box (i.e. number of points 
-                  around the central point over which to take the mean). 
-                  Should be an odd number.
+    *Parameters*
+    ============================================================================
+    x      1D array-like; the data to smooth
+    n_box  int; size of the smoothing box (i.e. number of points around the 
+           central point over which to take the mean).  Should be an odd 
+           number - otherwise the next lower odd number is taken.
     recursion_level
-                : int; equals the number of times the smoothing is applied.
+           int; equals the number of times the smoothing is applied.
+    ============================================================================
 
-    Returns
-    -------
-    res         : np.array; smoothed data points of same shape as input.
+    *Returns*
+    ============================================================================
+    res    np.array; smoothed data points of same shape as input.
+    ============================================================================
     """
+    # Ensure odd n_box
+    if n_box%2 == 0 :
+        n_box -= 1
+
     # Make the box. Sum(box) should equal 1 to keep the normalization (?)
     box = np.ones(n_box) / n_box
 
@@ -902,10 +1000,11 @@ def smooth_derivative(x, n_box=15, n_smooth=3) :
     smoothed curve, smooth that derivative and take the derivative again. 
     Finally, apply a last round of smoothing.
     
-    Parameters
-    ----------
+    *Parameters*
+    ============================================================================
     Same as in `func:arpys.postprocessing.smooth`.
     `n_smooth` corresponds to `recursion_level`.
+    ============================================================================
     """
     # Smoothing 1
     res = smooth(x, n_box, n_smooth)
@@ -925,15 +1024,16 @@ def zero_crossings(x, direction=0) :
     (direction=1) or both (direction=0). This is detected simply by a change 
     of sign between two subsequent points.
 
-    Parameters
-    ----------
-    x           : 1D array-like; data in which to find zero crossings
-    direction   : int, one of (-1, 0, 1); see above for explanation
+    *Parameters*
+    ============================================================================
+    x          1D array-like; data in which to find zero crossings
+    direction  int, one of (-1, 0, 1); see above for explanation
+    ============================================================================
 
-    Returns
-    -------
-    crossings   : list; list of indices of the elements just before the 
-                  crossings
+    *Returns*
+    ============================================================================
+    crossings  list; list of indices of the elements just before the crossings
+    ============================================================================
     """
     # Initiate the container
     crossings = []
@@ -993,26 +1093,28 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
     Confer the sheet 'Electron momentum calculations' from ADDRESS beamline 
     for more information on the used notation.
         
-    Parameters
-    ----------
-    angles      : 1D array; angles (in degree) to be converted into k space
-                  (currently equal theta_a)
-    theta       : float; corresponds to theta_m 
-    phi         : float; corresponds to phi_m
-    hv          : float; photon energy in eV
-    E_B         : float; binding energy of electrons in eV
-    work_func   : float; corresponds to e*phi (eV)
-    c1          : float; numeric constant. Shouldn't really be changed 
-    shift       : float; shift in units of `angle` to get zero at right 
-                  position 
+    *Parameters*
+    ============================================================================
+    angles     1D array; angles (in degree) to be converted into k space
+               (currently equal theta_a)
+    theta      float; corresponds to theta_m 
+    phi        float; corresponds to phi_m
+    hv         float; photon energy in eV
+    E_B        float; binding energy of electrons in eV
+    work_func  float; corresponds to e*phi (eV)
+    c1         float; numeric constant. Shouldn't really be changed 
+    shift      float; shift in units of `angle` to get zero at right 
+               position 
     lattice_constant    
-                : float; lattice constant a in Angstrom used to convert to 
-                  units of pi/a
-    degrees     : bool; allows giving the angles in either degrees or radians
+               float; lattice constant a in Angstrom used to convert to 
+               units of pi/a
+    degrees    bool; allows giving the angles in either degrees or radians
+    ============================================================================
 
-    Returns
-    -------
-    kx, ky      : tuple of floats; kx and ky coordinates in units of pi/a
+    *Returns*
+    ============================================================================
+    kx, ky     tuple of floats; kx and ky coordinates in units of pi/a
+    ============================================================================
 
     """
     # Precalculate the prefactor (*lattice_constant to get lattice constant 
@@ -1075,7 +1177,9 @@ def new_a2k(thetas, tilts, hv, work_func=4, E_b=0, dtheta=0, dtilt=0,
         raise ValueError('Orientation not understood: {}.'.format(orientation))
 
 def a2k(angle, dtilt, dtheta, dphi, hv, work_func, orientation='horizontal') :
-    """ Alternative angle-to-k conversion approach using rotation matrices. 
+    """ 
+    *Unfinished*
+    Alternative angle-to-k conversion approach using rotation matrices. 
     Determine the norm of the k vector from the kinetic energy using the 
     relation:
                sqrt( 2*m_e*hv )
@@ -1101,11 +1205,12 @@ def step_function_core(x, step_x=0, flip=False) :
             |
             \ 1   if x > step_x
 
-    Parameters
-    ----------
-    x      array; x domain of function
-    step_x float; position of the step
-    flip   boolean; Flip the > and < signs in the definition
+    *Parameters*
+    ============================================================================
+    x       array; x domain of function
+    step_x  float; position of the step
+    flip    boolean; Flip the > and < signs in the definition
+    ============================================================================
     """
     sign = -1 if flip else 1
     if sign*x < sign*step_x :
@@ -1160,17 +1265,19 @@ def lorentzian(x, a=1, mu=0, gamma=1) :
                       \   \ gamma /  /
 
 
-    Parameters
-    ----------
-    x     : array; variable at which to evaluate f(x)
-    a     : float; amplitude (maximum value of curve)
-    mu    : float; mean of curve (location of maximum)
-    gamma : float; half-width at half-maximum (HWHM) of the curve
+    *Parameters*
+    ============================================================================
+    x      array; variable at which to evaluate f(x)
+    a      float; amplitude (maximum value of curve)
+    mu     float; mean of curve (location of maximum)
+    gamma  float; half-width at half-maximum (HWHM) of the curve
+    ============================================================================
 
-    Returns
-    -------
-    res   : array containing the value of the Lorentzian at every point of 
-            input x 
+    *Returns*
+    ============================================================================
+    res    array containing the value of the Lorentzian at every point of 
+           input x 
+    ============================================================================
     """
     return a/( np.pi*gamma*( 1 + ((x-mu)/gamma)**2 ) )
 
@@ -1182,17 +1289,19 @@ def gaussian(x, a=1, mu=0, sigma=1) :
     f(x) = a * exp( - - * ( -------  ) )
                       2    \ sigma  /
 
-    Parameters
-    ----------
-    x     : array; variable at which to evaluate f(x)
-    a     : float; amplitude (maximum value of curve)
-    mu    : float; mean of curve (location of maximum)
-    sigma : float; standard deviation (`width` of the curve)
+    *Parameters*
+    ============================================================================
+    x      array; variable at which to evaluate f(x)
+    a      float; amplitude (maximum value of curve)
+    mu     float; mean of curve (location of maximum)
+    sigma  float; standard deviation (`width` of the curve)
+    ============================================================================
 
-    Returns
-    -------
-    res   : array containing the value of the Gaussian at every point of 
-            input x 
+    *Returns*
+    ============================================================================
+    res    array containing the value of the Gaussian at every point of 
+           input x 
+    ============================================================================
     """
     return a * np.exp(-0.5 * (x-mu)**2 / sigma**2)
 
@@ -1224,16 +1333,17 @@ def gaussian_step(x, step_x=0, a=1, mu=0, sigma=1, flip=False, after_step=None) 
 
     where g(x) is the :func: `gaussian`.
 
-    Parameters
-    ----------
-    x          array; x domain of function
-    step_x     float; position of the step
-    a          float; prefactor of the Gaussian
-    mu         float; mean of the Gaussian
-    sigma      float; standard deviation of the Gaussian
-    flip       boolean; Flip the > and < signs in the definition
-    after_step float; if not None, set a constant value that is assumed after 
-               the step. Else assume the value of the Gaussian at the step_x.   
+    *Parameters*
+    ============================================================================
+    x           array; x domain of function
+    step_x      float; position of the step
+    a           float; prefactor of the Gaussian
+    mu          float; mean of the Gaussian
+    sigma       float; standard deviation of the Gaussian
+    flip        boolean; Flip the > and < signs in the definition
+    after_step  float; if not None, set a constant value that is assumed after 
+                the step. Else assume the value of the Gaussian at the step_x.   
+    ============================================================================
     """
     # If no specific step height is given, use the value of the Gaussian at 
     # x=step_x
@@ -1296,7 +1406,7 @@ def rotate_XY(X, Y, theta=45) :
     coordinates. These can be used as arguments to :func: pcolormesh()
     ===  =======================================================================
 
-    ..:see also: `<arpes.postprocessing.rotate_xy>`
+    .. :see also: `<arpes.postprocessing.rotate_xy>`
     """
     # Create the rotation matrix
     R = rotation_matrix(theta)
@@ -1323,7 +1433,7 @@ def rotate_xy(x, y, theta=45) :
          coordinates. These can be used as arguments to :func: pcolormesh() 
     ===  =======================================================================
 
-    ..:see also: `<arpes.postprocessing.rotate_XY>`
+    .. :see also: `<arpes.postprocessing.rotate_XY>`
     """
     # Create a coordinate mesh
     X, Y = np.meshgrid(x, y)
@@ -1533,21 +1643,23 @@ def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4,
     This functions implements a couple of optimizations, leading to slightly 
     more complicated but faster running code.
 
-    Parameters
-    ----------
-    kx          : n length array
-    ky          : m length array
-    mapdata     : (m x n) array (counterintuitive to kx and ky but consistent 
-                  with pcolormesh)
-    clean       : boolean; toggle whether or not to cut off unsymmetrized parts
+    *Parameters*
+    ===========  ===============================================================
+    kx           n length array
+    ky           m length array
+    mapdata      (m x n) array (counterintuitive to kx and ky but consistent 
+                 with pcolormesh)
+    clean        boolean; toggle whether or not to cut off unsymmetrized parts
+    ===========  ===============================================================
 
-    Returns
-    -------
-    kx, ky      : if `clean` is False, these are the same as the input kx and 
-                  ky. If `clean` is True the arrays are cut to the right size
-    symmetrized : 2D array; the symmetrized map. Either it has shape (m x n) 
-                  `clean` is False) or smaller, depending on how much could 
-                  be symmetrized.
+    *Returns*
+    ===========  ===============================================================
+    kx, ky       if `clean` is False, these are the same as the input kx and 
+                 ky. If `clean` is True the arrays are cut to the right size
+    symmetrized  2D array; the symmetrized map. Either it has shape (m x n) 
+                 `clean` is False) or smaller, depending on how much could 
+                 be symmetrized.
+    ===========  ===============================================================
     """
     # Create data index ranges
     M, N = mapdata.shape
@@ -1671,7 +1783,8 @@ def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4,
     else :
         return kx, ky, symmetrized
 
-def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=4, **kwargs) :
+def plot_cuts(data, dim=0, zs=None, labels=None, max_ppf=16, max_nfigs=4, 
+              **kwargs) :
     """ Plot all (or only the ones specified by `zs`) cuts along dimension `dim` 
     on separate subplots onto matplotlib figures.
 
@@ -1681,6 +1794,8 @@ def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=4, **kwargs) :
     dim        int; one of (0,1,2). Dimension along which to take the cuts.
     zs         1D np.array; selection of indices along dimension `dim`. Only 
                the given indices will be plotted.
+    labels     1D array/list of length z. Optional labels to assign to the 
+               different cuts
     max_ppf    int; maximum number of *p*lots *p*er *f*igure.
     max_nfigs  int; maximum number of figures that are created. If more would 
                be necessary to display all plots, a warning is issued and 
@@ -1752,9 +1867,13 @@ def plot_cuts(data, dim=0, zs=None, max_ppf=16, max_nfigs=4, **kwargs) :
                 continue
             ax = fig.add_subplot(ppr, ppr, j+1)
             ax.pcolormesh(cut, norm=PowerNorm(gamma=gamma), **kwargs)
-            ax.set_xticklabels([])
-            ax.set_yticklabels([])
-            label = ax.text(0, 0, str(cut_index), size=10)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            if labels is not None :
+                labeltext = str(labels[cut_index])
+            else :
+                labeltext = str(cut_index)
+            label = ax.text(0, 0, labeltext, size=10)
             label.set_path_effects([withStroke(linewidth=2, foreground='w', 
                                                alpha=0.5)])
 

@@ -367,7 +367,8 @@ class CursorPlot(pg.PlotWidget) :
         self.register_traced_variable(pos)
 
         # Set up the slider
-        self.slider_width = TracedVariable(1, name='{}.slider_width'.format(
+        self.slider_width = TracedVariable(slider_width, 
+                                           name='{}.slider_width'.format( 
                                            self.name))
         self.slider = pg.InfiniteLine(initial_pos, movable=True, angle=self.angle)
         self.set_slider_pen(color=(255,255,0,255), width=slider_width)
