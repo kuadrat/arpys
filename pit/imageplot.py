@@ -600,6 +600,14 @@ class Scalebar(CursorPlot) :
         self.setMinimumSize(width, height)
         self.setMaximumSize(width, height)
 
+    def keyPressEvent(self, event) :
+        """ Override some behaviour of the superclass. """
+        key = event.key()
+        if key in [qt.QtCore.Qt.Key_Up, qt.QtCore.Qt.Key_Down] :
+            event.ignore()
+        else :
+            super().keyPressEvent(event)
+
 # Deprecated
 class ImagePlotWidget(qt.QtGui.QWidget) :
     """ A widget that contains an :class: `ImagePlot3d 

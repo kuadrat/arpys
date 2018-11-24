@@ -123,6 +123,11 @@ class PITDataHandler() :
         self.main_window.update_main_plot()
         self.main_window.set_scales()
 
+    def load(self, filename) :
+        """ Convenient alias for :func: `prepare_data 
+        <arpys.pit.mainwindow.PITDataHandler.prepare_data>`. """
+        self.prepare_data(filename)
+
     def update_z_range(self) :
         """ When new data is loaded or the axes are rolled, the limits and 
         allowed values along the z dimension change.
@@ -282,6 +287,8 @@ class MainWindow(QtGui.QMainWindow) :
     alpha = 0.5
     # Plot powerlaw normalization exponent gamma
     gamma = 1
+    # Relative colormap maximum
+    vmax = 1
 
     def __init__(self, filename=None, background='default') :
         super().__init__()
@@ -344,7 +351,7 @@ class MainWindow(QtGui.QMainWindow) :
         self.cutline = Cutline(self.main_plot)
         self.cutline.initialize()
 
-        # Scalebars. Scalebar1 is for the `gamma` value
+        # Scalebars. scalebar1 is for the `gamma` value
         scalebar1 = Scalebar()
         self.gamma_values = np.concatenate((np.linspace(0.1, 1, 50), 
                                             np.linspace(1.1, 10, 50)))
@@ -355,6 +362,16 @@ class MainWindow(QtGui.QMainWindow) :
         gamma_label.setPos(0.5, 0.5)
         scalebar1.addItem(gamma_label)
         self.scalebar1 = scalebar1
+        
+        # scalebar2 is for  vmax (relative colorscale maximum)
+        scalebar2 = Scalebar()
+        scalebar2.pos.set_value(self.vmax)
+        scalebar2.pos.sig_value_changed.connect(self.on_vmax_slider_move)
+        # Label the scalebar
+        vmax_label = pg.TextItem('Colorscale', anchor=(0.5, 0.5))
+        vmax_label.setPos(0.5, 0.5)
+        scalebar2.addItem(vmax_label)
+        self.scalebar2 = scalebar2
 
         # Align all the gui elements
         self.align()
@@ -373,7 +390,7 @@ class MainWindow(QtGui.QMainWindow) :
         +-------+-------+---+
         |       |  mdc  |   | 2
         +   z   +-------+---+
-        |       |  console  | 4
+        |       |  console  | 3
         +---+---+---+---+---+
         
         (Units of subdivision [sd])
@@ -398,6 +415,7 @@ class MainWindow(QtGui.QMainWindow) :
 
         # Scalebars
         l.addWidget(self.scalebar1, 2*sd, 4*sd, 1, 1*sd)
+        l.addWidget(self.scalebar2, 2*sd+1, 4*sd, 1, 1*sd)
 
         nrows = 4*sd
         ncols = 5*sd
@@ -521,6 +539,11 @@ class MainWindow(QtGui.QMainWindow) :
         gamma = self.gamma_values[ind]
         self.set_gamma(gamma)
 
+    def on_vmax_slider_move(self) :
+        """ When the user moves the vmax slider, update vmax. """
+        vmax = int(np.round(100*self.scalebar2.pos.get_value()))/100
+        self.set_vmax(vmax)
+
     def set_cmap(self, cmap) :
         """ Set the colormap to *cmap* where *cmap* is one of the names 
         registered in `<arpys.pit.cmaps>` which includes all matplotlib and 
@@ -558,6 +581,20 @@ class MainWindow(QtGui.QMainWindow) :
         # scalebar1.set_position().
         self.scalebar1.pos._value = indexof(gamma, self.gamma_values)/100
         self.scalebar1.set_position()
+
+    def set_vmax(self, vmax=1) :
+        """ Set the relative maximum of the colormap. I.e. the colors are 
+        mapped to the range `min(data)` - `vmax*max(data)`.
+        """
+        self.vmax = vmax
+        self.cmap.set_vmax(vmax)
+        self.cmap_changed()
+        # Additionally, we need to update the slider position. We need to 
+        # hack a bit to avoid infinite signal loops: avoid emitting of the 
+        # signal and update the slider position by hand with a call to 
+        # scalebar1.set_position().
+        self.scalebar2.pos._value = vmax
+        self.scalebar2.set_position()
     
     def cmap_changed(self) :
         """ Recalculate the lookup table and redraw the plots such that the 
@@ -586,10 +623,10 @@ if __name__ == '__main__' :
     app = QtGui.QApplication([])
 #    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00428.fits'
 #    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2018_06_SIS/20180609_0007.h5'
-    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00398.fits'
+#    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00398.fits'
 #    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00399.fits'
 #    filename = '/home/kevin/qmap/experiments/2018_07_CASSIOPEE/CaMnSb/S3_FSM_fine_hv75_T65'
-#    filename = '/home/kevin/qmap/materials/Bi2201/2018_06_SIS/0025.h5'
+    filename = '/home/kevin/qmap/experiments/2018_11_CASSIOPEE/CRO_s3/02_FSM/'
 
     logger.info(filename)
     main_window = MainWindow()
