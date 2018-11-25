@@ -327,9 +327,8 @@ class CursorPlot(pg.PlotWidget) :
     """
     name = 'Unnamed'
     hover_color = HOVER_COLOR
-    # The speed at which the slider moves on mousewheel scroll in units of 
-    # % of total range
-    wheel_sensitivity = 0.7
+    # Whether to allow changing the slider width with arrow keys
+    change_width_enabled = False
 
     def __init__(self, parent=None, background='default', name=None, 
                  orientation='vertical', slider_width=1, **kwargs) : 
@@ -399,29 +398,13 @@ class CursorPlot(pg.PlotWidget) :
             self.secondary_axis = 'top'
             self.secondary_axis_grid = (1,1)
             self.angle = 90
+            self.slider_axis_index = 0
         else :
             self.right_axis = 'top'
             self.secondary_axis = 'right'
             self.secondary_axis_grid = (2,2)
             self.angle = 0
-
-    def wheelEvent(self, event) :
-        """ Override of the Qt wheelEvent method. Fired on mousewheel 
-        scrolling inside the widget. Change the position of the 
-        """
-        # Get the relevant coordinate of the mouseWheel scroll
-        delta = event.pixelDelta().y()
-        logger.debug('<{}>wheelEvent(); delta = {}'.format(self.name, delta))
-        if delta > 0 :
-            sign = 1
-        elif delta < 0 :
-            sign = -1
-        else :
-            # It seems that in some cases delta==0
-            sign = 0
-        new_pos = self.pos.get_value() + sign*self.wheel_frames
-        logger.debug('<{}>wheelEvent(); new_pos = {}'.format(self.name, new_pos))
-        self.pos.set_value(new_pos)
+            self.slider_axis_index = 1
 
     def register_traced_variable(self, traced_variable) :
         """ Set self.pos to the given TracedVariable instance and connect the 
@@ -447,6 +430,8 @@ class CursorPlot(pg.PlotWidget) :
         <pyqtgraph.utilities.TracedVariable.sig_allowed_values_changed>`. 
         With a change of the allowed values in the TracedVariable, we should 
         update our bounds accordingly.
+        The number of allowed values can also give us a hint for a reasonable 
+        maximal width for the slider.
         """
         # If the allowed values were reset, just exit
         if self.pos.allowed_values is None : return
@@ -454,6 +439,12 @@ class CursorPlot(pg.PlotWidget) :
         lower = self.pos.min_allowed
         upper = self.pos.max_allowed
         self.set_bounds(lower, upper)
+
+        # Define a max width of the slider and the resulting set of allowed 
+        # widths
+        max_width = int(len(self.pos.allowed_values)/2)
+        allowed_widths = [2*i + 1 for i in range(max_width+1)]
+        self.slider_width.set_allowed_values(allowed_widths)
 
     def set_position(self) :
         """ Callback for the :signal: `sig_value_changed 
@@ -467,7 +458,7 @@ class CursorPlot(pg.PlotWidget) :
     def set_bounds(self, lower, upper) :
         """ Set both, the displayed area of the axis as well as the the range 
         in which the slider (InfiniteLine) can be dragged to the interval 
-        [lower, upper]. 
+        [lower, upper].
         """
         if self.orientation == 'vertical' :
             self.setXRange(lower, upper, padding=0.01)
@@ -476,11 +467,12 @@ class CursorPlot(pg.PlotWidget) :
         self.slider.setBounds([lower, upper])
 
         # When the bounds update, the mousewheelspeed should change accordingly
-        self.wheel_frames = 0.01 * self.wheel_sensitivity * abs(upper-lower)
+        # TODO This should be in a slot to self.pos.sig_value_changed now
+        self.wheel_frames = 1 
         # Ensure wheel_frames is at least as big as a step in the allowed 
         # values. NOTE This assumes allowed_values to be evenly spaced.
         av = self.pos.allowed_values
-        if av is not None and self.wheel_frames < 1 :
+        if av is not None and self.wheel_frames <= 1 :
             self.wheel_frames = av[1] - av[0]
     
     def set_secondary_axis(self, min_val, max_val) :
@@ -513,9 +505,10 @@ class CursorPlot(pg.PlotWidget) :
             self.cursor_color = color
 
         if width is None :
-            width = self.slider_width.get_value()
+#            width = self.slider_width.get_value()
+            width = self.pen_width
         else :
-            self.slider_width.set_value(width)
+            self.pen_width = width
 
         if hover_color is None :
             hover_color = self.hover_color
@@ -535,7 +528,14 @@ class CursorPlot(pg.PlotWidget) :
         new_width = old_width + 2*step
         if new_width < 0 :
             new_width = 1
-        self.set_slider_pen(width=new_width)
+        self.slider_width.set_value(new_width)
+
+        # Convert width in steps to width in pixels
+        dmin, dmax = self.viewRange()[self.slider_axis_index]
+        pmax = self.rect().getRect()[self.slider_axis_index+2]
+        pixel_per_step = pmax/(dmax-dmin)
+        pen_width = new_width * pixel_per_step
+        self.set_slider_pen(width=pen_width)
 
     def increase_pos(self, step=1) :
         """ Increase (or decrease) `self.pos` by a reasonable amount. 
@@ -543,7 +543,7 @@ class CursorPlot(pg.PlotWidget) :
         """
         allowed_values = self.pos.allowed_values
         old_index = indexof(self.pos.get_value(), allowed_values)
-        new_index = old_index + step
+        new_index = (old_index + step)%len(allowed_values)
         new_value = allowed_values[new_index]
         self.pos.set_value(new_value)
 
@@ -555,17 +555,33 @@ class CursorPlot(pg.PlotWidget) :
             self.increase_pos(1)
         elif key == qt.QtCore.Qt.Key_Left :
             self.increase_pos(-1)
-        elif key == qt.QtCore.Qt.Key_Up :
-#            self.set_slider_pen(width=self.slider_width+1)
+        elif self.change_width_enabled and key == qt.QtCore.Qt.Key_Up :
             self.increase_width(1)
-        elif key == qt.QtCore.Qt.Key_Down :
-#            self.set_slider_pen(width=self.slider_width-1)
+        elif self.change_width_enabled and key == qt.QtCore.Qt.Key_Down :
             self.increase_width(-1)
         else :
             event.ignore()
             return
         # If any if-statement matched, we accept the event
         event.accept()
+
+    def wheelEvent(self, event) :
+        """ Override of the Qt wheelEvent method. Fired on mousewheel 
+        scrolling inside the widget. Change the position of the 
+        """
+        # Get the relevant coordinate of the mouseWheel scroll
+        delta = event.pixelDelta().y()
+        logger.debug('<{}>wheelEvent(); delta = {}'.format(self.name, delta))
+        if delta > 0 :
+            sign = 1
+        elif delta < 0 :
+            sign = -1
+        else :
+            # It seems that in some cases delta==0
+            sign = 0
+        increment = sign*self.wheel_frames
+        logger.debug('<{}>wheelEvent(); increment = {}'.format(self.name, increment))
+        self.increase_pos(increment)
 
 class Scalebar(CursorPlot) :
     """ Simple subclass of :class: `CursorPlot 
