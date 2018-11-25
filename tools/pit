@@ -7,13 +7,14 @@ from pyqtgraph.Qt import QtGui
 from arpys.pit import mainwindow as mw
 
 parser = argparse.ArgumentParser()
-parser.add_argument('filename')
+parser.add_argument('filename', nargs='?', default='')
 
 args = parser.parse_args()
 
 app = QtGui.QApplication([])
 
 main_window = mw.MainWindow()
-main_window.data_handler.prepare_data(args.filename)
+if args.filename :
+    main_window.data_handler.prepare_data(args.filename)
 app.exec_()
 

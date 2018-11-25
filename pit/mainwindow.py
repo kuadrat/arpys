@@ -85,6 +85,8 @@ class PITDataHandler() :
     n_rolls = 0 #unused
     # Index along the z axis at which to produce a slice
     z = TracedVariable(name='z')
+    # Name of currently loaded file
+    filename = ''
 
     def __init__(self, main_window) :
         self.main_window = main_window
@@ -108,6 +110,7 @@ class PITDataHandler() :
         logger.debug('prepare_data()')
 
         self.D = dl.load_data(filename)
+        self.filename = filename
         self.data = TracedVariable(self.D.data, name='data')
 
         # Retain a copy of the original datadict so that we can reset later
