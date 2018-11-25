@@ -158,8 +158,8 @@ class PITDataHandler() :
         """ Create a list containing the three original x-, y- and z-scales. """
         # Define the scales in the initial view. The data is arranged as 
         # (z,y,x) and we initially display (y,x)
-        xscale = self.D.yscale
-        yscale = self.D.xscale
+        xscale = self.D.xscale
+        yscale = self.D.yscale
         zscale = self.D.zscale
         self.scales = np.array([zscale, yscale, xscale])
         # Avoid undefined axes scales and replace them with len(1) sequences
@@ -462,7 +462,7 @@ class MainWindow(QtGui.QMainWindow) :
         """
         if image is None :
             image = self.image_data
-        self.main_plot.set_image(image, *args, lut=self.lut, **kwargs)
+        self.main_plot.set_image(image.T, *args, lut=self.lut, **kwargs)
 
     def update_main_plot(self, **image_kwargs) :
         """ Change the *self.main_plot*`s currently displayed
