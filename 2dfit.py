@@ -156,21 +156,20 @@ def g11(k, E, sig, band, gap) :
 def g11_alt(k, E, sig, band, gap) :
     """
     Variation of :func: `g11 <arpys.2dfit.g11>` which takes precalculated 
-    values of `band` and `gap`.
+    values of `sig`, `band` and `gap`.
 
     *Parameters*
     ====  ======================================================================
     k     array of length 2; k vector (in-plane) at which to evaluate g11
     E     float; energy at which to evaluate g11
-    sig   func; function that returns the complex self-energy at E
+    sig   float; value of the complex self-energy at E
     band  float; value of the bare band at this k
     gap   float; value of the gap at this k
     ====  ======================================================================
     """
     # Precalculate some values
-    sig_E = sig(E)
-    re_sig = sig_E.real
-    e_diff = E - sig_E
+    re_sig = sig.real
+    e_diff = E - sig
 
     nominator = e_diff + band
     denominator = e_diff**2 - band**2 - gap * (1-re_sig/E)
@@ -220,27 +219,27 @@ if __name__=="__main__" :
     from datetime import datetime
 
     im_kwargs = dict(T=15,
-                     lamb=0.0,
+                     lamb=0.05,
                      i_step=0,
                      e_step=-0.1,
                      e_gauss=-0.25,
                      i_gauss=0,
-                     offset = 0.08)
+                     offset = 0.1)
     re_kwargs = dict()
 
     i0 = 1
 
-    nk = 30
+    nk = 80
     kmin = 0
     kmax = 1
     ks = np.array([np.linspace(kmin, kmax, nk), np.zeros(nk)])
-    ne = 10
+    ne = 100
     emin = -0.5
     emax = 0.1
     es = np.linspace(emax, emin, ne)
 
     def gap(k) :
-        return 0
+        return 0.0
 
     def band(k) :
 #        return 0*k[0]+0.8*emin
@@ -249,26 +248,36 @@ if __name__=="__main__" :
     self_energy = self_energy_factory(im_kwargs, re_kwargs)
 
     intensity = np.zeros([ne, nk])
+    real_part = np.zeros([ne, nk])
 
     tstart = datetime.now()
+
+    # Precalculate as much as possible
+    self_energies = np.array([self_energy(e) for e in es])
+    fd = pp.fermi_dirac(es, T=im_kwargs['T'], eV=True)
+
     for i in range(nk) :
         k = ks[:,i]
-#        this_band = band(k)
-#        this_gap = gap(k)
+        this_band = band(k)
+        this_gap = gap(k)
         for j,e in enumerate(es) :
-            intensity[j,i] = -arpes_intensity(k, e, i0, im_kwargs, re_kwargs, 
-                                              band, gap)
-#            a = g11_alt(k, e, self_energy, this_band, this_gap)
-#            intensity[j,i] += i0*a.imag/np.pi
+#            intensity[j,i] = -arpes_intensity(k, e, i0, im_kwargs, re_kwargs, 
+#                                              band, gap)
+            a = g11_alt(k, e, self_energies[j], this_band, this_gap)
+            intensity[j,i] += i0*a.imag/np.pi * fd[j]
+            real_part[j,i] += i0*a.real/np.pi * fd[j]
     tend = datetime.now()
     print(tend-tstart)
 
     k_abs = np.sqrt(ks[0]**2 + ks[1]**2)
 
     fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(k_abs, band(ks), 'r-')
-    ax.pcolormesh(k_abs, es, intensity)
+    ax_im = fig.add_subplot(121)
+    ax_re = fig.add_subplot(122)
+    for ax in [ax_im, ax_re] :
+        ax.plot(k_abs, band(ks), 'r--', dashes=(3,10), lw=1)
+    ax_im.pcolormesh(k_abs, es, intensity)
+    ax_re.pcolormesh(k_abs, es, real_part)
 
     plt.show()
 

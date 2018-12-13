@@ -1363,7 +1363,7 @@ def gaussian_step(x, step_x=0, a=1, mu=0, sigma=1, flip=False, after_step=None) 
     # Convert to float
     return result.astype(float)
 
-def fermi_dirac(E, mu=0, T=4.2) :
+def fermi_dirac(E, mu=0, T=4.2, eV=False) :
     """ Return the Fermi Dirac distribution with `step value` mu at 
     temperature T for energy E. The Fermi Dirac distribution is given by
 
@@ -1372,8 +1372,18 @@ def fermi_dirac(E, mu=0, T=4.2) :
             exp((E-mu)/(kT)) + 1
 
     and assumes values from 0 to 1.
+
+    *Parameters*
+    ==  ========================================================================
+    E   float or 1d-array; energy values in Joule or, if `eV` is `True`, in eV
+    mu  float; energy at which the Fermi level lies
+    T   float; Temperature in Kelvin
+    eV  bool; all energies are specified in electronvolt if this is `True`
+    ==  ========================================================================
     """
     kT = constants.k_B * T
+    if eV :
+        kT /= constants.eV
     return 1/(np.exp((E-mu)/kT) + 1)
 
 # +---------+ #
