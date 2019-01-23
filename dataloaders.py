@@ -106,6 +106,60 @@ class Dataloader_Pickle(Dataloader) :
             filedata = pickle.load(f)
         return filedata
 
+class Dataloader_i05(Dataloader) :
+    """
+    Dataloader object for the i05 beamline at the Diamond Light Source.
+    """
+    name = 'i05'
+
+    def load_data(self, filename) :
+        # Read file with h5py reader
+        infile = h5py.File(filename, 'r')  
+
+        data = np.array(infile['/entry1/analyser/data'])
+        angles = np.array(infile['/entry1/analyser/angles'])
+        energies = np.array(infile['/entry1/analyser/energies'])
+        hv = np.array(infile['/entry1/instrument/monochromator/energy'])
+        
+        xscale = energies
+        yscale = angles
+
+        # Find which zscale is appropriate
+        #"""
+        #sapolar : map
+        #salong  : combined x & y scan along beam
+        #saperp  : combined x & y scan perpendicular to beam
+        #"""
+        #for z_name in ['salong', 'saperp'] :
+        #    index = '/entry1/analyser/{}'.format(z_name)
+        #    try :
+        #        zscale = np.array(infile[index])
+        #    except KeyError :
+        #        continue
+
+        # Check if we have a scan
+        if data.shape[0] == 1 :
+            zscale = np.array([0])
+        else :
+            # Otherwise, extract third dimension from scan command
+            command = infile['entry1/scan_command']
+            start_stop_step = command.value.split()[2:5]
+            start, stop, step = [float(s) for s in start_stop_step] 
+            zscale = np.arange(start, stop+0.5*step, step)
+        
+        res = Namespace(
+           data = data,
+           xscale = xscale,
+           yscale = yscale,
+           zscale = zscale,
+           angles = angles,
+#           theta = theta,
+#           phi = phi,
+#           E_b = E_b,
+           hv = hv
+        )
+        return res
+
 class Dataloader_ALS(Dataloader) :
     """ 
     Object that allows loading and saving of ARPES data from the MAESTRO
@@ -870,8 +924,9 @@ class Dataloader_CASSIOPEE(Dataloader) :
 all_dls = [
            Dataloader_SIS,
            Dataloader_ADRESS,
-           Dataloader_ALS,
+           Dataloader_i05,
            Dataloader_CASSIOPEE,
+           Dataloader_ALS,
            Dataloader_Pickle
           ]
 
