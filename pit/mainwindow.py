@@ -85,6 +85,8 @@ class PITDataHandler() :
     n_rolls = 0 #unused
     # Index along the z axis at which to produce a slice
     z = TracedVariable(name='z')
+    # Number of slices to integrate along z
+#    integrate_z = TracedVariable(value=0, name='integrate_z')
     # Name of currently loaded file
     filename = ''
 
@@ -347,8 +349,11 @@ class MainWindow(QtGui.QMainWindow) :
         self.console.setStyleSheet(console_style)
 
         # Create the integrated intensity plot
-        self.integrated_plot = CursorPlot(name='z selector')
-        self.integrated_plot.register_traced_variable(self.data_handler.z)
+        ip = CursorPlot(name='z selector')
+        ip.register_traced_variable(self.data_handler.z)
+        ip.change_width_enabled = True
+        ip.slider_width.sig_value_changed.connect(self.update_main_plot)
+        self.integrated_plot = ip
 
         # Add ROI to the main ImageView
         self.cutline = Cutline(self.main_plot)
@@ -509,8 +514,10 @@ class MainWindow(QtGui.QMainWindow) :
         """
         logger.debug('update_image_data()')
         z = self.data_handler.z.get_value()
+        integrate_z = int(self.integrated_plot.slider_width.get_value()/2)
+        data = self.data_handler.get_data()
         try :
-            self.image_data = self.data_handler.get_data()[z,:,:]
+            self.image_data = pp.make_slice(data, 0, z, integrate_z)
         except IndexError :
             logger.debug(('update_image_data(): z index {} out of range for '
                           'data of length {}.').format(
