@@ -78,6 +78,7 @@ class PITDataHandler() :
     """
     # np.array that contains the 3D data
     data = None
+    is_2d = False
     scales = np.array([[0, 1], [0, 1], [0, 1]])
     # Indices of *data* that are displayed in the main plot 
     axes = (1,2)
@@ -112,6 +113,10 @@ class PITDataHandler() :
         logger.debug('prepare_data()')
 
         self.D = dl.load_data(filename)
+        if 1 in self.D.data.shape :
+            self.is_2d = True
+        else :
+            self.is_2d = False
         self.filename = filename
         self.data = TracedVariable(self.D.data, name='data')
 
@@ -129,6 +134,11 @@ class PITDataHandler() :
         self.main_window.set_scales()
 
     def load(self, filename) :
+        """ Convenient alias for :func: `prepare_data 
+        <arpys.pit.mainwindow.PITDataHandler.prepare_data>`. """
+        self.prepare_data(filename)
+
+    def open(self, filename) :
         """ Convenient alias for :func: `prepare_data 
         <arpys.pit.mainwindow.PITDataHandler.prepare_data>`. """
         self.prepare_data(filename)
@@ -278,6 +288,28 @@ class PITDataHandler() :
         self.on_z_dim_change()
         self.main_window.set_scales()
 
+    def a2k(self, lattice_constant, dx=0, dy=0) :
+        """ Carry out angle to k space conversion and try to apply the result 
+        to the image axes.
+        """
+        zscale, yscale, xscale = self.scales
+        # Calculate kx and ky with the given parameters
+        kx, ky = pp.new_a2k(xscale, yscale, hv=self.D.hv, 
+                            lattice_constant=lattice_constant, dtheta=dx, 
+                            dtilt=dy)
+        # Set ky only if it is strictly monotonous
+        subsequent_pairs = zip(ky, ky[1:])
+        if not self.is_2d and \
+           all([i<j for i,j in subsequent_pairs]) or \
+           all([i>j for i,j in subsequent_pairs]) :
+            self.main_window.main_plot.set_yscale(ky)
+        else :
+            logger.info('a2k(): ky not strictly monotonous.')
+
+        self.main_window.main_plot.set_xscale(kx, update=True)
+
+        return kx, ky
+
 class MainWindow(QtGui.QMainWindow) :
     """ (Currently) The main window of PIT. Defines the basic GUI layouts and 
     acts as the controller, keeping track of the data and handling the 
@@ -289,7 +321,7 @@ class MainWindow(QtGui.QMainWindow) :
     size = (1200, 800)
 
     # Plot transparency alpha
-    alpha = 0.5
+    alpha = 1
     # Plot powerlaw normalization exponent gamma
     gamma = 1
     # Relative colormap maximum

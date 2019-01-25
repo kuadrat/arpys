@@ -116,15 +116,17 @@ class Dataloader_i05(Dataloader) :
         # Read file with h5py reader
         infile = h5py.File(filename, 'r')  
 
-        data = np.array(infile['/entry1/analyser/data'])
+        print('[DEB0]')
+        data = np.array(infile['/entry1/analyser/data']).T
         angles = np.array(infile['/entry1/analyser/angles'])
         energies = np.array(infile['/entry1/analyser/energies'])
         hv = np.array(infile['/entry1/instrument/monochromator/energy'])
+        print('[DEB1]')
         
-        xscale = energies
+        zscale = energies
         yscale = angles
 
-        # Find which zscale is appropriate
+        # Find which xscale is appropriate
         #"""
         #sapolar : map
         #salong  : combined x & y scan along beam
@@ -138,24 +140,33 @@ class Dataloader_i05(Dataloader) :
         #        continue
 
         # Check if we have a scan
-        if data.shape[0] == 1 :
+        if data.shape[2] == 1 :
+            xscale = energies
             zscale = np.array([0])
+            data = data.T
         else :
             # Otherwise, extract third dimension from scan command
             command = infile['entry1/scan_command']
             start_stop_step = command.value.split()[2:5]
             start, stop, step = [float(s) for s in start_stop_step] 
-            zscale = np.arange(start, stop+0.5*step, step)
+            xscale = np.arange(start, stop+0.5*step, step)
         
+        # What we usually call theta is tilt in this beamline
+        theta = infile['entry1/instrument/manipulator/satilt'].value[0]
+        phi = infile['entry1/instrument/manipulator/sapolar'].value[0]
+
+        # Take the mean of the given binding energies as an estimate
+        E_b = -np.mean(infile['entry1/analyser/binding_energies'])
+
         res = Namespace(
            data = data,
            xscale = xscale,
            yscale = yscale,
            zscale = zscale,
            angles = angles,
-#           theta = theta,
-#           phi = phi,
-#           E_b = E_b,
+           theta = theta,
+           phi = phi,
+           E_b = E_b,
            hv = hv
         )
         return res

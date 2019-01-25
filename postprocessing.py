@@ -1176,7 +1176,19 @@ def new_a2k(thetas, tilts, hv, work_func=4, E_b=0, dtheta=0, dtilt=0,
     else :
         raise ValueError('Orientation not understood: {}.'.format(orientation))
 
-def a2k(angle, dtilt, dtheta, dphi, hv, work_func, orientation='horizontal') :
+def a2k(D, lattice_constant, dtheta=0, dtilt=0) :
+    """
+    Shorthand angle to k conversion that takes the output of a `Dataloader 
+    <arpys.dataloaders.Dataloader>` object as input and passes all necessary 
+    information on to the actual converter (`new_a2k 
+    <arpys.postprocessing.new_a2k>`).
+    """
+    kx, ky = new_a2k(D.xscale, D.yscale, hv=D.hv, 
+                     lattice_constant=lattice_constant, dtheta=dtheta, 
+                     dtilt=dtilt)
+    return kx, ky
+
+def alt_a2k(angle, dtilt, dtheta, dphi, hv, work_func, orientation='horizontal') :
     """ 
     *Unfinished*
     Alternative angle-to-k conversion approach using rotation matrices. 
