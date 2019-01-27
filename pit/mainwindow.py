@@ -300,8 +300,8 @@ class PITDataHandler() :
         # Set ky only if it is strictly monotonous
         subsequent_pairs = zip(ky, ky[1:])
         if not self.is_2d and \
-           all([i<j for i,j in subsequent_pairs]) or \
-           all([i>j for i,j in subsequent_pairs]) :
+           (all([i<j for i,j in subsequent_pairs]) or \
+            all([i>j for i,j in subsequent_pairs])) :
             self.main_window.main_plot.set_yscale(ky)
         else :
             logger.info('a2k(): ky not strictly monotonous.')
@@ -326,6 +326,9 @@ class MainWindow(QtGui.QMainWindow) :
     gamma = 1
     # Relative colormap maximum
     vmax = 1
+
+    # Need to store original transformation information for `rotate()`
+    transform_factors = []
 
     def __init__(self, filename=None, background='default') :
         super().__init__()
@@ -497,6 +500,7 @@ class MainWindow(QtGui.QMainWindow) :
         See :func: `<arpys.pit.imageplot.ImagePlot3d.set_image>`. *image* can 
         be *None* i.e. in order to just update the plot with a new colormap.
         """
+        self.transform_factors = []
         if image is None :
             image = self.image_data
         self.main_plot.set_image(image, *args, lut=self.lut, **kwargs)
@@ -644,6 +648,40 @@ class MainWindow(QtGui.QMainWindow) :
         """
         self.lut = self.cmap.getLookupTable()
         self.redraw_plots()
+
+    def rotate(self, alpha=0) :
+        """ Rotate the main image by the given angle *alpha* (in degrees). 
+
+        *NOTE* There seems to be some sort of bug with this when applying to 
+        certain datasets (so far only to 2D data).
+        """
+        image_item = self.main_plot.image_item
+        # Get the details of the current transformation
+        transform = image_item.transform()
+
+        if self.transform_factors == [] :
+            dx, dy = transform.dx(), transform.dy()
+            sx, sy = transform.m11(), transform.m22()
+            wx, wy = image_item.width(), image_item.height()
+            self.transform_factors = [dx, dy, sx, sy, wx, wy]
+        else :
+            dx, dy, sx, sy, wx, wy = self.transform_factors
+
+        # Build the transformation anew, adding a rotation
+        # Remember that the order in which transformations are applied is 
+        # reverted to how they added in the code, i.e. last transform added 
+        # in the code will come first (this is the reason we have to 
+        # completely rebuild the transformation instead of just adding a rotation...)
+        transform.reset()
+        transform.translate(dx/sx, dy/sy)
+        transform.translate(wx/2, wy/2)
+        transform.rotate(alpha)
+        transform.scale(sx, sy)
+        transform.translate(-wx/2, -wy/2)
+
+        self.main_plot.release_viewrange()
+
+        image_item.setTransform(transform)
 
     def keyPressEvent(self, event) :
         """ Define all responses to keyboard presses. """
