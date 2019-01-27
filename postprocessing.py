@@ -10,6 +10,7 @@ import numpy as np
 from matplotlib.colors import PowerNorm
 from matplotlib.patheffects import withStroke
 from scipy import ndimage
+from scipy.optimize import curve_fit
 
 from arpys.utilities import constants
 
@@ -52,7 +53,7 @@ from arpys.utilities import constants
 # | ARPES processing | # ======================================================
 # +------------------+ #
 
-def make_slice(data, d, i, integrate=0) :
+def make_slice(data, d, i, integrate=0, silent=False) :
     """ Create a slice out of the 3d data (l x m x n) along dimension d 
     (0,1,2) at index i. Optionally integrate around i.
 
@@ -64,6 +65,7 @@ def make_slice(data, d, i, integrate=0) :
     i          int, 0 <= i < data.size[d]; The index at which to create the slice
     integrate  int, 0 <= integrate < |i - n|; the number of slices above 
                and below slice i over which to integrate
+    silent     bool; toggle warning messages
     ============================================================================
 
     *Returns*
@@ -80,32 +82,28 @@ def make_slice(data, d, i, integrate=0) :
         print('d ({}) can only be 0, 1 or 2 and data must be 3D.'.format(d))
         return
 
-    output_shape = shape[:d] + shape[d+1:]
-
     # Set the integration indices and adjust them if they go out of scope
     start = i - integrate
     stop = i + integrate + 1
     if start < 0 :
-        warnings.warn(
-        'i - integrate ({}) < 0, setting start=0'.format(start))       
+        if not silent :
+            warnings.warn(
+            'i - integrate ({}) < 0, setting start=0'.format(start))       
         start = 0
     if stop > n_slices :
-        warning = ('i + integrate ({}) > n_slices ({}), setting '
-                   'stop=n_slices').format(stop, n_slices)       
-        warnings.warn(warning)
+        if not silent :
+            warning = ('i + integrate ({}) > n_slices ({}), setting '
+                       'stop=n_slices').format(stop, n_slices)       
+            warnings.warn(warning)
         stop = n_slices
 
     # Initialize data container and fill it with data from selected slices
-    sliced = np.zeros(output_shape)
     if d == 0 :
-        for i in range(start, stop, 1) :
-            sliced += data[i, :, :]
+        sliced = data[start:stop,:,:].sum(0)
     elif d == 1 :
-        for i in range(start, stop, 1) :
-            sliced += data[:, i, :]
+        sliced = data[start:stop,:,:].sum(0)
     elif d == 2 :
-        for i in range(start, stop, 1) :
-            sliced += data[:, :, i]
+        sliced = data[start:stop,:,:].sum(0)
 
     return sliced
 
@@ -1084,7 +1082,7 @@ def fermi_fit_func(E, E_F, sigma, a, b, T=10) :
     y += (a*E+b)*step_function(E, E_F, flip=True)
 
     # Convolve with instrument resolution
-    y = gaussian_filter(y, sigma)
+    y = ndimage.gaussian_filter(y, sigma)
     return y
 
 def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
@@ -2016,8 +2014,6 @@ def plot_cuts(data, dim=0, zs=None, labels=None, max_ppf=16, max_nfigs=4,
 
 if __name__ == '__main__' :    
     import matplotlib.pyplot as plt
-    from scipy.ndimage import gaussian_filter
-    from scipy.optimize import curve_fit
 
     import arpys as arp
     filename = ('/home/kevin/Documents/qmap/experiments/2019_01_I05/' +
