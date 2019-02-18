@@ -10,6 +10,7 @@ import numpy as np
 from matplotlib.colors import PowerNorm
 from matplotlib.patheffects import withStroke
 from scipy import ndimage
+from scipy.optimize import curve_fit
 
 from arpys.utilities import constants
 
@@ -52,7 +53,7 @@ from arpys.utilities import constants
 # | ARPES processing | # ======================================================
 # +------------------+ #
 
-def make_slice(data, d, i, integrate=0) :
+def make_slice(data, d, i, integrate=0, silent=False) :
     """ Create a slice out of the 3d data (l x m x n) along dimension d 
     (0,1,2) at index i. Optionally integrate around i.
 
@@ -64,6 +65,7 @@ def make_slice(data, d, i, integrate=0) :
     i          int, 0 <= i < data.size[d]; The index at which to create the slice
     integrate  int, 0 <= integrate < |i - n|; the number of slices above 
                and below slice i over which to integrate
+    silent     bool; toggle warning messages
     ============================================================================
 
     *Returns*
@@ -80,32 +82,28 @@ def make_slice(data, d, i, integrate=0) :
         print('d ({}) can only be 0, 1 or 2 and data must be 3D.'.format(d))
         return
 
-    output_shape = shape[:d] + shape[d+1:]
-
     # Set the integration indices and adjust them if they go out of scope
     start = i - integrate
     stop = i + integrate + 1
     if start < 0 :
-        warnings.warn(
-        'i - integrate ({}) < 0, setting start=0'.format(start))       
+        if not silent :
+            warnings.warn(
+            'i - integrate ({}) < 0, setting start=0'.format(start))       
         start = 0
     if stop > n_slices :
-        warning = ('i + integrate ({}) > n_slices ({}), setting '
-                   'stop=n_slices').format(stop, n_slices)       
-        warnings.warn(warning)
+        if not silent :
+            warning = ('i + integrate ({}) > n_slices ({}), setting '
+                       'stop=n_slices').format(stop, n_slices)       
+            warnings.warn(warning)
         stop = n_slices
 
     # Initialize data container and fill it with data from selected slices
-    sliced = np.zeros(output_shape)
     if d == 0 :
-        for i in range(start, stop, 1) :
-            sliced += data[i, :, :]
+        sliced = data[start:stop,:,:].sum(0)
     elif d == 1 :
-        for i in range(start, stop, 1) :
-            sliced += data[:, i, :]
+        sliced = data[start:stop,:,:].sum(0)
     elif d == 2 :
-        for i in range(start, stop, 1) :
-            sliced += data[:, :, i]
+        sliced = data[start:stop,:,:].sum(0)
 
     return sliced
 
@@ -950,7 +948,7 @@ def smooth(x, n_box, recursion_level=1) :
     'n_box' over the data points 'x' and replace every point with the mean 
     value of the box centered at that point.
     Can be called recursively to apply the smoothing n times in a row 
-    by setting with 'recursion_level' to n.
+    by setting 'recursion_level' to n.
 
     At the endpoints, the arrays are assumed to continue by repeating their 
     value at the start/end as to minimize endpoint effects. I.e. the array 
@@ -1059,13 +1057,144 @@ def zero_crossings(x, direction=0) :
 
     return crossings
 
-def detect_fermi_level(edc, n_box, n_smooth, orientation=1) :
+def old_detect_fermi_level(edc, n_box, n_smooth, orientation=1) :
     """ This routine is more useful for detecting local extrema, not really 
     for detecting steps. 
     """
     smoothdev = smooth_derivative(edc, n_box, n_smooth)
     crossings = zero_crossings(smoothdev[::orientation])
     return crossings
+
+def detect_step(signal, n_box=15, n_smooth=3) :
+    """ Try to detect the biggest, clearest step in a signal by smoothing 
+    it and looking at the maximum of the first derivative.
+    """
+    smoothened = smooth(signal, n_box, n_smooth)
+    grad = np.gradient(smoothened)
+    step_index = np.argmax(np.abs(grad))
+    return step_index
+
+def fermi_fit_func(E, E_F, sigma, a, b, T=10) :
+    """ Fermi Dirac distribution with an additional linear inelastic 
+    background and convoluted with a Gaussian for the instrument resolution.
+
+    *Parameters*
+    =====  =====================================================================
+    E      1d-array; energy values in eV
+    E_F    float; Fermi energy in eV
+    sigma  float; instrument resolution in units of the energy step size in *E*.
+    a      float; slope of the linear background.
+    b      float; offset of the linear background.
+    T      float; temperature.
+    =====  =====================================================================
+    """
+    # Basic Fermi Dirac distribution at given T
+    y = fermi_dirac(E, E_F, T) 
+    
+    # Add a linear contribution to the 'below-E_F' part
+    y += (a*E+b)*step_function(E, E_F, flip=True)
+
+    # Convolve with instrument resolution
+    if sigma > 0 :
+        y = ndimage.gaussian_filter(y, sigma)
+    return y
+
+def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
+    """ Try fitting a Fermi Dirac distribution convoluted by a Gaussian 
+    (simulating the instrument resolution) plus a linear component on the 
+    side with E<E_F to a given energy distribution curve.
+
+    *Parameters*
+    ========  ==================================================================
+    energies  1D array of float; energy values.
+    edc       1D array of float; corresponding intensity counts.
+    e_0       float; starting guess for the Fermi energy. The fitting 
+              procedure is quite sensitive to this.
+    T         float; temperature.
+    sigma0    float; starting guess for the standard deviation of the 
+              Gaussian in units of pixels (i.e. the step size in *energies*).
+    a0        float; starting guess for the slope of the linear component.
+    b0        float; starting guess for the linear offset.
+    ========  ==================================================================
+
+    *Returns*
+    ========  ==================================================================
+    p         list of float; contains the fit results for [E_F, sigma, a, b].
+    res_func  callable; the fit function with the optimized parameters. With 
+              this you can just do res_func(E) to get the value of the 
+              Fermi-Dirac distribution at energy E.
+    ========  ==================================================================
+    """
+    # Normalize the EDC
+    edc = edc/edc.max()
+
+    # Initial guess and bounds for parameters
+    p0 = [e_0, sigma0, a0, b0]
+    de = 1
+    lower = [e_0-de, 0, -10, -1]
+    upper = [e_0+de, 100, 10, 1]
+
+    def fit_func(E, E_F, sigma, a, b) :
+        """ Wrapper around fermi_fit_func that fixes T. """
+        return fermi_fit_func(E, E_F, sigma, a, b, T=T)
+
+    # Carry out the fit
+    p, cov = curve_fit(fit_func, energies, edc, p0=p0, bounds=(lower, upper)) 
+
+    res_func = lambda x : fit_func(x, *p) 
+    return p, res_func
+
+def fit_gold(D, e_0=None, T=10) :
+    """ Apply a Fermi-Dirac fit to all EDCs of an ARPES Gold spectrum. 
+    
+    *Parameters*
+    ===  =======================================================================
+    D    argparse.Namespace object; ARPES data and metadata as is created by a
+         :class: `Dataloader <arpys.dataloaders.Dataloader>` object.
+    e_0  float; starting guess for the Fermi energy in the energy units 
+         provided in *D*. If this is not given, a starting guess will be 
+         estimated by detecting the step in the integrated spectrum using :func:
+         `detect_step <arpys.postprocessing.detect_step>`.
+
+    T    float; Temperature
+    ===  =======================================================================
+
+    *Returns*
+    ============  ==============================================================
+    fermi_levels  list; Fermi energy for each EDC.
+    sigmas        list; standard deviations of instrument resolution Gaussian 
+                  for each EDC. This is in units of energy steps. To convert 
+                  to energy, just multiply by the energy step in *D*.
+    functions     list of callables; functions of energy that produce the fit 
+                  for each EDC.
+    ============  ==============================================================
+    """
+    # Extract data
+    gold = D.data[0]
+    n_pixels, n_energies = gold.shape
+    energies = D.xscale
+    pixels = np.arange(n_pixels)
+
+    # If no hint for the Fermi energy is given, try to detect it from the 
+    # gradient of the integrated spectrum
+    if e_0 is None :
+        integrated = gold.sum(0)
+        step_index = detect_step(integrated)
+        e_0 = energies[step_index]
+
+    params = []
+    functions = []
+    for i,edc in enumerate(gold) :
+        p, res_func = fit_fermi_dirac(energies, edc, e_0, T=T)
+        params.append(p)
+        functions.append(res_func)
+
+    # Prepare the results
+    params = np.array(params)
+    fermi_levels = params[:,0]
+    sigmas = params[:,1]
+
+    return fermi_levels, sigmas, functions
 
 # +------------------------------------------------+ #
 # | Conversion from angular coordinates to k space | # =========================
@@ -1176,7 +1305,19 @@ def new_a2k(thetas, tilts, hv, work_func=4, E_b=0, dtheta=0, dtilt=0,
     else :
         raise ValueError('Orientation not understood: {}.'.format(orientation))
 
-def a2k(angle, dtilt, dtheta, dphi, hv, work_func, orientation='horizontal') :
+def a2k(D, lattice_constant, dtheta=0, dtilt=0) :
+    """
+    Shorthand angle to k conversion that takes the output of a `Dataloader 
+    <arpys.dataloaders.Dataloader>` object as input and passes all necessary 
+    information on to the actual converter (`new_a2k 
+    <arpys.postprocessing.new_a2k>`).
+    """
+    kx, ky = new_a2k(D.xscale, D.yscale, hv=D.hv, 
+                     lattice_constant=lattice_constant, dtheta=dtheta, 
+                     dtilt=dtilt)
+    return kx, ky
+
+def alt_a2k(angle, dtilt, dtheta, dphi, hv, work_func, orientation='horizontal') :
     """ 
     *Unfinished*
     Alternative angle-to-k conversion approach using rotation matrices. 
@@ -1364,8 +1505,8 @@ def gaussian_step(x, step_x=0, a=1, mu=0, sigma=1, flip=False, after_step=None) 
     return result.astype(float)
 
 def fermi_dirac(E, mu=0, T=4.2) :
-    """ Return the Fermi Dirac distribution with `step value` mu at 
-    temperature T for energy E. The Fermi Dirac distribution is given by
+    """ Return the Fermi Dirac distribution with chemical potential *mu* at 
+    temperature *T* for energy *E*. The Fermi Dirac distribution is given by
 
                      1
     n(E) = ----------------------
@@ -1373,8 +1514,9 @@ def fermi_dirac(E, mu=0, T=4.2) :
 
     and assumes values from 0 to 1.
     """
-    kT = constants.k_B * T
-    return 1/(np.exp((E-mu)/kT) + 1)
+    kT = constants.k_B * T / constants.eV
+    res = 1 / (np.exp((E-mu)/kT) + 1)
+    return res
 
 # +---------+ #
 # | Various | # ================================================================
@@ -1887,15 +2029,39 @@ def plot_cuts(data, dim=0, zs=None, labels=None, max_ppf=16, max_nfigs=4,
 # +---------+ #
 
 if __name__ == '__main__' :    
-    from matplotlib import pyplot
-    import arpys as arp
-    filename = ('/home/kevin/Documents/qmap/experiments/2018_07_CASSIOPEE/' + 
-                'CaMnSb/S3_hv50_hv100_T230')
-    D = arp.dl.load_data(filename)
+    import matplotlib.pyplot as plt
 
-#    pyplot.ion()
-    figs = plot_cuts(D.data, dim=1)
-    print(len(figs))
-    pyplot.show()
+    import arpys as arp
+    filename = ('/home/kevin/Documents/qmap/experiments/2019_01_I05/' +
+                'Ca327_1_A/i05-95358.nxs')
+    D = arp.dl.load_data(filename)
+    data = D.data[0]
+    energies = D.xscale
+    pixels = np.arange(len(D.yscale))
+
+    T = 10
+
+    levels, sigmas, funcs = fit_gold(D, T=T)
+    print(np.mean(levels), np.mean(sigmas))
+
+    offset = 0.5
+
+    nrow = 1
+    ncol = 2
+
+    fig = plt.figure()
+
+    ax0 = fig.add_subplot(nrow, ncol, 1)
+    ax0.pcolormesh(energies, pixels, data)
+
+    ax1 = fig.add_subplot(nrow, ncol, 2)
+    for j,i in enumerate(range(5, 500, 50)) :
+        edc = D.data[0][i]
+        edc = edc/edc.max()
+        f = funcs[i]
+        ax1.plot(energies, edc+j*offset, 'k-',
+                 energies, f(energies)+j*offset, 'r-')
+
+    plt.show()
 
 

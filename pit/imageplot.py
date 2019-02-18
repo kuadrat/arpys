@@ -134,6 +134,16 @@ class ImagePlot(pg.PlotWidget) :
         if update :
             self._set_axes_scales(emit=True)
 
+    def set_xlabel(self, label) :
+        """ Shorthand for setting this plots x axis label. """
+        xaxis = self.getAxis('bottom')
+        xaxis.setLabel(label)
+
+    def set_ylabel(self, label) :
+        """ Shorthand for setting this plots y axis label. """
+        xaxis = self.getAxis('left')
+        xaxis.setLabel(label)
+
     def _set_axes_scales(self, emit=False) :
         """ Transform the image such that it matches the desired x and y 
         scales.
