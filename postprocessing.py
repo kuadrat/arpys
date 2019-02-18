@@ -1066,7 +1066,7 @@ def old_detect_fermi_level(edc, n_box, n_smooth, orientation=1) :
     return crossings
 
 def detect_step(signal, n_box=15, n_smooth=3) :
-    """ Try to detect a the biggest, clearest step in a signal by smoothing 
+    """ Try to detect the biggest, clearest step in a signal by smoothing 
     it and looking at the maximum of the first derivative.
     """
     smoothened = smooth(signal, n_box, n_smooth)
@@ -1075,6 +1075,19 @@ def detect_step(signal, n_box=15, n_smooth=3) :
     return step_index
 
 def fermi_fit_func(E, E_F, sigma, a, b, T=10) :
+    """ Fermi Dirac distribution with an additional linear inelastic 
+    background and convoluted with a Gaussian for the instrument resolution.
+
+    *Parameters*
+    =====  =====================================================================
+    E      1d-array; energy values in eV
+    E_F    float; Fermi energy in eV
+    sigma  float; instrument resolution in units of the energy step size in *E*.
+    a      float; slope of the linear background.
+    b      float; offset of the linear background.
+    T      float; temperature.
+    =====  =====================================================================
+    """
     # Basic Fermi Dirac distribution at given T
     y = fermi_dirac(E, E_F, T) 
     
@@ -1082,7 +1095,8 @@ def fermi_fit_func(E, E_F, sigma, a, b, T=10) :
     y += (a*E+b)*step_function(E, E_F, flip=True)
 
     # Convolve with instrument resolution
-    y = ndimage.gaussian_filter(y, sigma)
+    if sigma > 0 :
+        y = ndimage.gaussian_filter(y, sigma)
     return y
 
 def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
@@ -1097,7 +1111,8 @@ def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
     e_0       float; starting guess for the Fermi energy. The fitting 
               procedure is quite sensitive to this.
     T         float; temperature.
-    sigma0    float; starting guess for the standard deviation of the Gaussian.
+    sigma0    float; starting guess for the standard deviation of the 
+              Gaussian in units of pixels (i.e. the step size in *energies*).
     a0        float; starting guess for the slope of the linear component.
     b0        float; starting guess for the linear offset.
     ========  ==================================================================
@@ -1120,7 +1135,7 @@ def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
     upper = [e_0+de, 100, 10, 1]
 
     def fit_func(E, E_F, sigma, a, b) :
-        """ Wrapper around fermi_fit_func whta fixes T. """
+        """ Wrapper around fermi_fit_func that fixes T. """
         return fermi_fit_func(E, E_F, sigma, a, b, T=T)
 
     # Carry out the fit
@@ -1147,8 +1162,9 @@ def fit_gold(D, e_0=None, T=10) :
     *Returns*
     ============  ==============================================================
     fermi_levels  list; Fermi energy for each EDC.
-    sigmas        list; standard deviations of insrtument resolution Gaussian 
-                  for each EDC.
+    sigmas        list; standard deviations of instrument resolution Gaussian 
+                  for each EDC. This is in units of energy steps. To convert 
+                  to energy, just multiply by the energy step in *D*.
     functions     list of callables; functions of energy that produce the fit 
                   for each EDC.
     ============  ==============================================================
