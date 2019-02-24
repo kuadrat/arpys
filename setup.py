@@ -8,7 +8,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="arpys",
-    version="0.1.0",
+    version="0.1.1",
     author="Kevin Kramer",
     author_email="kevin.kramer@uzh.ch",
     description="Python tools and scripts for ARPES data analysis",
@@ -22,5 +22,8 @@ setuptools.setup(
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Operating System :: OS Independent",
     ],
+    scripts=['arpys/tools/pit'],
+    include_package_data=True,
 )
+
 
