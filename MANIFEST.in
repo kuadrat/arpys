@@ -1,0 +1,5 @@
+include README.md
+include COPYING
+include COPYING.LESSER
+include LICENSE-3RD-PARTY.txt
+include arpys/pit/example_data.p

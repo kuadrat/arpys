@@ -1,3 +1,4 @@
+ TEST
 # ARPYS: python module for ARPES (**A**ngle **R**esolved **P**hoto**E**mission **S**pectroscopy) data analysis 
 
 ![](https://raw.githubusercontent.com/kuadrat/arpys/master/screenshots/pit_demo.gif)
@@ -9,18 +10,16 @@ General Public License v3+. See file 'COPYING' for more information.
 The file 'LICENSE-3RD-PARTY.txt' covers the different licenses of libraries 
 and other programs used by ARPYS.
 
+## Requirements
+
+The requirements are listed in `requirements.txt`. Most notable are 
+`pyqtgraph`, a nice library that's built on PyQt and allows fast real-time 
+data visualization. Consequently, `arpys` requires `PyQt5` and its dependency 
+`SIP`. Confer `INSTALLING.md` for more info.
+
 ## Installation
 
-`arpys` requires `PyQt5` which requires `SIP` version 4.19.1 or higher, which 
-as of this writing cannot be installed using `pip` (at least not with 
-python3.4 or older).  Therefore, you'll have to download and install those 
-from source.  The source packages can be found 
-[here](https://www.riverbankcomputing.com/software/sip/download "SIP") and 
-[here](https://riverbankcomputing.com/software/pyqt/download5 "PyQt5").
-Follow the installation instructions that are found in the respective README 
-files.
-
-Once these are installed a simple `pip install arpys` _should_ do the trick.
+Please refer to the file `INSTALLING.md`
 
 ## Rough description of files
 
@@ -53,7 +52,7 @@ pit
 ---
 
 The **P**ython **I**mage **T**ool: A graphical data analysis tool (in the 
-making) based on the pyqtgraph module.
+making) based on the `pyqtgraph` module.
 
 tools/
 ------
