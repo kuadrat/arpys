@@ -701,13 +701,7 @@ class MainWindow(QtGui.QMainWindow) :
 
 if __name__ == '__main__' :
     app = QtGui.QApplication([])
-#    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00428.fits'
-#    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2018_06_SIS/20180609_0007.h5'
-#    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00398.fits'
-#    filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00399.fits'
-#    filename = '/home/kevin/qmap/experiments/2018_07_CASSIOPEE/CaMnSb/S3_FSM_fine_hv75_T65'
-    filename = '/home/kevin/qmap/experiments/2018_11_CASSIOPEE/CRO_s3/02_FSM/'
-
+    filename = 'example_data.p'
     logger.info(filename)
     main_window = MainWindow()
     main_window.data_handler.prepare_data(filename)
