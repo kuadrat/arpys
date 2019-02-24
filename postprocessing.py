@@ -2024,6 +2024,45 @@ def plot_cuts(data, dim=0, zs=None, labels=None, max_ppf=16, max_nfigs=4,
 
     return figures
 
+def k_abs(hv, E_B=0, phi=4, lattice_constant=None) :
+    """ Calculate the absolute value of the electron momentum k (in inverse 
+    Angstrom or in units of pi/*lattice_constant*) for an incident photon 
+    energy hv, electron binding energy E_B and work function phi (all given 
+    in electronvolt).
+
+    *Parameters*
+    ================  ==========================================================
+    hv                float or 1d-array; incident photon energy (eV)
+    E_B               float; electron binding energy (eV)
+    phi               float; work function (eV)
+    lattice_constant  float; lattice constant along a direction of interest. 
+                      If this is given, the result will be expressed in units of
+                      pi/*lattice_constant* instead of inverse Angstrom.
+    ================  ==========================================================
+
+    *Returns*
+    =====  =====================================================================
+    k_abs  float or 1d-array; Absolute value of the photoelectron momentum 
+           given either in units of inverse Angstrom (if *lattice_constant* 
+           is *None*) or in pi/*lattice_constant*.
+    =====  =====================================================================
+    """
+    if lattice_constant is None :
+        conversion = 1
+    else :
+        conversion = lattice_constant/np.pi
+    return 0.5123 * np.sqrt(hv - E_B - phi) * conversion
+
+def hv(k, E_B=0, phi=4, lattice_constant=None) :
+    """ Inverse of `k_abs <arpys.postprocessing.k_abs>`. Refer to the 
+    documentation there.
+    """
+    if lattice_constant is None :
+        conversion = 1
+    else :
+        conversion = lattice_constant/np.pi
+    return 1/(0.5123**2) * (k/conversion)**2 + E_B + phi
+
 # +---------+ #
 # | Testing | # ================================================================
 # +---------+ #
