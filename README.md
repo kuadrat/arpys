@@ -1,4 +1,3 @@
- TEST
 # ARPYS: python module for ARPES (**A**ngle **R**esolved **P**hoto**E**mission **S**pectroscopy) data analysis 
 
 ![](https://raw.githubusercontent.com/kuadrat/arpys/master/screenshots/pit_demo.gif)
