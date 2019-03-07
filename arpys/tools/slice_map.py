@@ -26,9 +26,8 @@ args = parser.parse_args()
 # Parameters
 # ==============================================================================
 filename = args.filename
-filename = '/home/kevin/Documents/qmap/materials/Bi2201/2017_12_ALS/20171215_00438.fits'
 
-outfile = '20171215_00438_slice_x290.p'
+outfile = filename + '_slice.p'
 
 z = 415
 integrate = 10

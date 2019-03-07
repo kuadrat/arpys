@@ -487,7 +487,7 @@ class Gui :
             initialdir = None
         else :
             default_file = None
-            initialdir = '/home/kevin/qmap/'
+            initialdir = '/'
 
         # Open a browser dialog
         new_filepath = askopenfilename(initialfile=default_file,

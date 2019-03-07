@@ -879,18 +879,18 @@ def laplacian(data, dx=1, dy=1, a=None) :
     """ Apply the second derivative (Laplacian) to the data.
 
     *Parameters*
-    ============================================================================
+    ====  ======================================================================
     data  array-like; the input data with shape (m x n) or (1 x m x n)
     dx    float; distance at x axis
     dy    float; distance at y axis
     a     float; scaling factor for between x and y derivatives.  
           Should be close to dx/dy. 
-    ============================================================================
+    ====  ======================================================================
 
     *Returns*
-    ============================================================================
-    res   np.array; second derivative of input array in same dimensions
-    ============================================================================
+    ===  =======================================================================
+    res  np.array; second derivative of input array in same dimensions
+    ===  =======================================================================
  
     """
     # Get the partial derivatives
@@ -906,16 +906,18 @@ def curvature(data, dx=1, dy=1, cx=1, cy=1) :
     """ Apply the curvature method (DOI: 10.1063/1.3585113) to the data.
  
     *Parameters*
-    ============================================================================
+    ====  ======================================================================
     data  array-like; the input data with shape (m x n) or (1 x m x n)
     dx    float; distance at x axis
     dy    float; distance at y axis
-    ============================================================================
+    cx    float; weight of gradient in x direction
+    cy    float; weight of gradient in y direction
+    ====  ======================================================================
 
     *Returns*
-    ============================================================================
-    res   np.array; curvature of input array in same dimensions
-    ============================================================================
+    ===  =======================================================================
+    res  np.array; curvature of input array in same dimensions
+    ===  =======================================================================
     """
     # Get the partial derivatives
     grad_x, grad_y, grad2_x, grad2_y = _derivatives(data, dx, dy)
@@ -1110,7 +1112,7 @@ def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
     edc       1D array of float; corresponding intensity counts.
     e_0       float; starting guess for the Fermi energy. The fitting 
               procedure is quite sensitive to this.
-    T         float; temperature.
+    T         float; (fixed) temperature.
     sigma0    float; starting guess for the standard deviation of the 
               Gaussian in units of pixels (i.e. the step size in *energies*).
     a0        float; starting guess for the slope of the linear component.
@@ -2068,39 +2070,4 @@ def hv(k, E_B=0, phi=4, lattice_constant=None) :
 # +---------+ #
 
 if __name__ == '__main__' :    
-    import matplotlib.pyplot as plt
-
-    import arpys as arp
-    filename = ('/home/kevin/Documents/qmap/experiments/2019_01_I05/' +
-                'Ca327_1_A/i05-95358.nxs')
-    D = arp.dl.load_data(filename)
-    data = D.data[0]
-    energies = D.xscale
-    pixels = np.arange(len(D.yscale))
-
-    T = 10
-
-    levels, sigmas, funcs = fit_gold(D, T=T)
-    print(np.mean(levels), np.mean(sigmas))
-
-    offset = 0.5
-
-    nrow = 1
-    ncol = 2
-
-    fig = plt.figure()
-
-    ax0 = fig.add_subplot(nrow, ncol, 1)
-    ax0.pcolormesh(energies, pixels, data)
-
-    ax1 = fig.add_subplot(nrow, ncol, 2)
-    for j,i in enumerate(range(5, 500, 50)) :
-        edc = D.data[0][i]
-        edc = edc/edc.max()
-        f = funcs[i]
-        ax1.plot(energies, edc+j*offset, 'k-',
-                 energies, f(energies)+j*offset, 'r-')
-
-    plt.show()
-
-
+    pass

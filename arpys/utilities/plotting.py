@@ -6,12 +6,13 @@ from matplotlib import rc
 rc("axes", prop_cycle=<insert your cycler here>)
 
 """
+from itertools import islice
 
 import matplotlib.pyplot as plt
 import matplotlib.colors
 import numpy as np
+import pkg_resources
 from cycler import cycler
-from itertools import islice
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.widgets import PolygonSelector
@@ -165,11 +166,13 @@ def make_n_colors(n=8, cmap='plasma') :
 # | Colormap | # ===============================================================
 # +----------+ #
 
+DATAPATH = pkg_resources.resource_filename('arpys', 'utilities/cmaps/')
+
 # Rainbow ligth colormap from ALS
 # ------------------------------------------------------------------------------
 
 # Load the colormap data from file
-filepath = '/home/kevin/bin/kustom/cmaps/rainbow_light.dat'
+filepath = DATAPATH + '/rainbow_light.dat'
 data = np.loadtxt(filepath)
 colors = np.array([(i[0], i[1], i[2]) for i in data])
 
@@ -185,7 +188,7 @@ cm.register_cmap(name='rainbow_light', cmap=rainbow_light)
 # ------------------------------------------------------------------------------
 
 # Load the colormap data from file
-filepath = '/home/kevin/bin/kustom/cmaps/hanin.dat'
+filepath = DATAPATH + '/hanin.dat'
 data = np.loadtxt(filepath)
 colors = np.array([(i[0], i[1], i[2]) for i in data])
 
@@ -198,7 +201,7 @@ cm.register_cmap(name='hanin', cmap=hanin)
 # ------------------------------------------------------------------------------
 
 # Load the colormap data from file
-filepath = '/home/kevin/bin/kustom/cmaps/kocean_red.dat'
+filepath = DATAPATH + '/kocean_red.dat'
 data = np.loadtxt(filepath)
 colors = np.array([(i[0], i[1], i[2], i[3]) for i in data]) #rgba
 

@@ -330,8 +330,8 @@ class Dataloader_ALS(Dataloader) :
 
         # In recent ALS data the above determined x, y and z scales did not 
         # match the actual shape of the data...
-        self.print_m(*data.shape)
-        self.print_m(nx, ny, nz)
+#        self.print_m(*data.shape)
+#        self.print_m(nx, ny, nz)
         scales = [zscale, yscale, xscale]
         for i,scale in enumerate(scales) :
             try :
@@ -339,7 +339,7 @@ class Dataloader_ALS(Dataloader) :
             except Exception :
                 self.print_m('length problem')
                 continue
-            self.print_m(length)
+#            self.print_m(length)
             n = data.shape[i]
             if length != n :
                 self.print_m(('Shape mismatch in dim {}: {} != {}. Setting ' +
@@ -1066,35 +1066,4 @@ def add_attributes(filename, *attributes) :
 # +---------+ #
 
 if __name__ == '__main__' :
-#    sis = Dataloader_SIS()
-#    path = '/home/kevin/qmap/experiments/2017_10_PSI/Tl2201/Tl_1_0003.h5'
-#    datadict = sis.load_data(path)
-#    print(datadict['data'].shape)
-#    print(datadict['xscale'].shape)
-#    print(datadict['yscale'].shape)
-
-#    adress = Dataloader_ADRESS()
-#    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/003_quickmap_540eV.h5'
-#    ns = adress.load_data(path)
-#
-#    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/002_quick_kz_350to800.h5'
-#    ns = adress.load_data(path)
-#
-#    path = '/home/kevin/qmap/experiments/2018_03_PSI/Tl2201/014_HSscan_nodal_428eV.h5'
-#    ns = adress.load_data(path)
-    
-#    D = Namespace(a=0, b=1)
-#    dump(D, 'foo.p')
-
-#    add_attributes('foo.p', ('c', 2), ['d', 'three'])
-
-#    dl = Dataloader_Pickle()
-#    D = dl.load_data('foo.p')
-#    print(D)
-
-    D = load_data('/home/kevin/qmap/experiments/2018_07_CASSIOPEE/S1_FSM/FS_1_ROI1_.txt')
-    import matplotlib.pyplot as plt
-
-    plt.pcolormesh(D.xscale, D.yscale, D.data[0])
-    plt.show()
-
+    pass

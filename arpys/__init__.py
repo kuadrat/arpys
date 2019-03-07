@@ -1,10 +1,10 @@
 name = 'arpys'
 
-import arpys.dataloaders as dl
-import arpys.postprocessing as pp
+import arpys.dataloaders as dataloader
+import arpys.postprocessing as postprocessing
 
 #print('Loading arpys.__init__.py')
 
-#dl = dataloaders
-#pp = postprocessing 
+dl = dataloader
+pp = postprocessing 
 
