@@ -20,7 +20,44 @@ data visualization. Consequently, `arpys` requires `PyQt5` and its dependency
 
 Please refer to the file `INSTALLING.md`
 
-## Rough description of files
+## Rough description of contents
+
+The recommended way of using `arpys` currently is to make use of the classes 
+in `dataloaders.py` (if the beamline in question has already been implemented) 
+to get the relevant data into a usable format in python. Then, one can use the
+functions provided in `postprocessing.py` (normalizations, background 
+subtractions, etc.) on the so loaded data. Here's a simple example:
+```
+# Import the dataloaders and postprocessings
+from arpys import dl, pp 
+
+# Load the data (this requires an appropriate dataloader to be defined in 
+# dataloaders.py. If it isn't, check the file to see how you should define it
+# in your case.
+D = dl.load_data('your_arpes_data_file.suffix')
+
+# D is a Namespace object which stores the data array and some meta-data.
+# In this example we're assuming the data to contain a single energy-k cut.
+# arpys always loads data as 3d-arrays, however, so we need to take D.data[0]
+# here.
+data = D.data[0]
+energies = D.xscale
+angles = D.yscale
+
+# Apply some background subtraction (use at your own discretion):
+bg_subtracted = pp.subtract_bg_matt(data)
+
+# Try taking the second derivative to make the bands more visible. This often
+# requires smoothing first and is very susceptible to the various parameters.
+from scipy.ndimage import filters
+smoothened = filters.gaussian_filter(bg_subtracted, sigma=10)
+dx = energies[1] - energies[0]
+dy = angles[1] - angles[0]
+second_derivative = pp.laplacian(smoothened, dx, dy)
+```
+
+The tools that ship with `arpys` should be considered to be in an untested 
+stage and used at your own discretion.
 
 postprocessing.py
 -----------------
