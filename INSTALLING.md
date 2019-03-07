@@ -10,6 +10,15 @@ source.
 Once that is done, the rest of the installation can be carried out with a 
 simply `pip install arpys`.
 
+OS notes
+--------
+
+This installation procedure has been tested on Linux.
+For macOS, the package `PyOBJus` is necesssary additionally in order for 
+`screeninfo` to work.
+The installation on Windows remains experimental. Note that the executables 
+are not going to work straight away, without some sort of translation between
+shell executables and Windows .exe files.
 
 Installing SIP
 --------------
