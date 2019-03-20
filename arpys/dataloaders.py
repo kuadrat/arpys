@@ -116,12 +116,10 @@ class Dataloader_i05(Dataloader) :
         # Read file with h5py reader
         infile = h5py.File(filename, 'r')  
 
-        print('[DEB0]')
         data = np.array(infile['/entry1/analyser/data']).T
         angles = np.array(infile['/entry1/analyser/angles'])
         energies = np.array(infile['/entry1/analyser/energies'])
         hv = np.array(infile['/entry1/instrument/monochromator/energy'])
-        print('[DEB1]')
         
         zscale = energies
         yscale = angles
@@ -174,9 +172,142 @@ class Dataloader_i05(Dataloader) :
 class Dataloader_ALS(Dataloader) :
     """ 
     Object that allows loading and saving of ARPES data from the MAESTRO
-    beamline at ALS, Berkely, which is in .fits format. 
+    beamline at ALS, Berkely, in the newer .h5 format
+    Organization of the ALS h5 file: (June, 2018)
+
+    /-0D_Data
+    | |
+    | +-Cryostat_A
+    | +-Cryostat_B
+    | +-Cryostat_C
+    | +-Cryostat_D
+    | +-I0_NEXAFS
+    | +-IG_NEXAFS
+    | +-X                       <--- only present for xy scans (probably)
+    | +-Y                       <--- "
+    | +-Sorensen Program        <--- only present for dosing scans
+    | +-time
+    | 
+    +-1D_Data
+    | |
+    | +-Swept_SpectraN          <--- Not always present
+    |
+    +-2D_Data
+    | |
+    | +-Swept_SpectraN          <--- Usual location of data. There can be 
+    |                                several 'Swept_SpectraN', each with an 
+    |                                increasing value of N. The relevant data 
+    |                                seems to be in the highest numbered 
+    |                                Swept_Spectra.
+    |
+    +-Comments
+    | |
+    | +-PreScan
+    |
+    +-Headers
+      |
+      +-Beamline
+      | |
+      | +-[...]
+      | +-EPU_POL               <--- Polarization (Integer encoded)
+      | +-BL_E                  <--- Beamline energy (hv)
+      | +-[...]
+      | 
+      +-Computer
+      +-DAQ_Swept
+      | |
+      | +-[...]
+      | +-SSPE_0                <--- Pass energy (eV)
+      | +-[...]
+      | |
+      +-FileFormat
+      +-Low_Level_Scan
+      +-Main
+      +-Motors_Logical
+      +-Motors_Logical_Offset
+      +-Motors_Physical
+      +-Motors_Sample           <--- Contains sample coordinates (xyz & angles)
+      | |
+      | +-[...]
+      | +-SMOTOR3               <--- Theta
+      | +-SMOTOR5               <--- Phi
+      | +-[...]
+      |
+      +-Motors_Sample_Offset
+      +-Notebook
     """
     name = 'ALS'
+
+    def get(self, group, field_name) :
+        """
+        Return the value of property *field_name* from h5File group *group*.
+        *field_name* must be a bytestring (e.g. b'some_string')!
+        This also returns a bytes object, remember to cast it correctly.
+        Returns *None* if *field_name* was not found in *group*.
+        """
+        for entry in group.value :
+            if entry[1].strip() == field_name :
+                return entry[2]
+
+    def load_data(self, filename) :
+        h5file = h5py.File(filename, 'r')
+        # The relevant data seems to be the highest numbered "Swept_SpectraN" 
+        # entry in "2D_Data". Find the highest N:
+        Ns = [int(spectrum[-1]) for spectrum in list(h5file['2D_Data'])]
+        i = np.argmax(Ns)
+        path = '2D_Data/Swept_Spectra{}'.format(Ns[i])
+
+        # Convert the data to a numpy array
+        self.print_m('Converting data to numpy array (this may take a '
+                     'while)...')
+        data = np.array(h5file[path])
+
+        # Get hv
+        hv = self.get(h5file['Headers/Beamline/'], b'BL_E')
+        hv = float(hv)
+
+        # Build x-, y- and zscales
+        # TODO Detect cuts (i.e. factual 2D Datasets)
+        nz, ny, nx = data.shape
+        # xscale is the outer loop (if present)
+        x_group = h5file['Headers/Low_Level_Scan']
+        x_start = float(self.get(x_group, b'ST_0_0'))
+        x_end = float(self.get(x_group, b'EN_0_0'))
+        if x_start is not None :
+            xscale = np.linspace(x_start, x_end, nx)
+        else :
+            xscale = np.arange(nx)
+        # y- and zscale are the axis of one spectrum (i.e. pixels and energies)
+        attributes = h5file[path].attrs
+        y_start, z_start = attributes['scaleOffset']
+        y_step, z_step = attributes['scaleDelta']
+        yscale = start_step_n(y_start, y_step, ny)
+        zscale = start_step_n(z_start, z_step, nz)
+#        zscale, yscale, xscale = [np.arange(s) for s in shape]
+
+        # TODO pixel to angle conversion
+
+        # Get theta and phi
+        theta = float(self.get(h5file['Headers/Motors_Sample'], b'SMOTOR3'))
+        phi = float(self.get(h5file['Headers/Motors_Sample'], b'SMOTOR5'))
+        
+        res = Namespace(data=data,
+                        xscale=xscale,
+                        yscale=yscale,
+                        zscale=zscale,
+                        angles=yscale,
+                        theta=theta,
+                        phi=phi,
+                        E_b=0,
+                        hv=hv)
+        return res
+
+class Dataloader_ALS_fits(Dataloader) :
+    """ 
+    Object that allows loading and saving of ARPES data from the MAESTRO
+    beamline at ALS, Berkely, which is in .fits format. 
+    """
+    name = 'ALS .fits'
     # A factor required to reach a reasonable result for the k space 
     # coordinates 
     k_stretch = 1.05
@@ -792,7 +923,7 @@ class Dataloader_CASSIOPEE(Dataloader) :
             # Put the pair in a dictionary for later access
             metadata.update({name: val})
         
-        # NOTE Unreliabel hv
+        # NOTE Unreliable hv
         hv = metadata['Excitation Energy']
         res = Namespace(
                 data = data,
@@ -807,11 +938,9 @@ class Dataloader_CASSIOPEE(Dataloader) :
         return res
 
     def load_from_txt(self, filename) :
-        print('[CASSIPEE]Loading from txt')
         i, energy, angles = self.get_metadata(filename)
-        print(i)
+        self.print_m('Loading from txt')
         data0 = np.loadtxt(filename, skiprows=i+1)
-        print(data0.shape)
         # The first column in the datafile contains the angles
         angles_from_data = data0[:,0]
         data = np.array([data0[:,1:]])
@@ -938,6 +1067,7 @@ all_dls = [
            Dataloader_i05,
            Dataloader_CASSIOPEE,
            Dataloader_ALS,
+           Dataloader_ALS_fits,
            Dataloader_Pickle
           ]
 
