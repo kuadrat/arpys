@@ -1127,8 +1127,10 @@ def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
               Fermi-Dirac distribution at energy E.
     ========  ==================================================================
     """
-    # Normalize the EDC
-    edc = edc/edc.max()
+    # Normalize the EDC to interval [0, 1]
+    edcmin = edc.min()
+    edcmax = edc.max()
+    edc = (edc-edcmin)/(edcmax-edcmin)
 
     # Initial guess and bounds for parameters
     p0 = [e_0, sigma0, a0, b0]
@@ -1585,7 +1587,10 @@ def rotate_xy(x, y, theta=45) :
     return rotate_XY(X, Y, theta)
 
 def symmetrize_around(data, p0, p1) :
-    """ TODO p0, p1: indices of points """
+    """ :UNFINISHED:
+    Symmetrize around the line connecting the points p0 and p1.
+    p0, p1: indices of points 
+    """
     # Data has to be 2D and dimensions (y, x) (which is flipped by pcolormesh)
     ny, nx = data.shape
 
@@ -1692,7 +1697,7 @@ def symmetrize_rectangular(data, i, k=None) :
     Here's a graphical explanation for the coordinates used in the code for 
     the case i < nx0/2. If i > nx0/2 we flip the data first such that we can 
     apply the same procedure and coordinates.
-    ```
+
     Original image:
 
             +----------+
@@ -1726,7 +1731,7 @@ def symmetrize_rectangular(data, i, k=None) :
          0  |   i  nx0 |
             |          |
          nx0-2*i      nx1 = 2*(nx0-i)
-    ```
+
     """
     # Flip the image if i>nx0/2
     ny, nx0 = data.shape

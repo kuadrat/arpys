@@ -271,10 +271,10 @@ class Dataloader_ALS(Dataloader) :
         nz, ny, nx = data.shape
         # xscale is the outer loop (if present)
         x_group = h5file['Headers/Low_Level_Scan']
-        x_start = float(self.get(x_group, b'ST_0_0'))
-        x_end = float(self.get(x_group, b'EN_0_0'))
+        x_start = self.get(x_group, b'ST_0_0')
+        x_end = self.get(x_group, b'EN_0_0')
         if x_start is not None :
-            xscale = np.linspace(x_start, x_end, nx)
+            xscale = np.linspace(float(x_start), float(x_end), nx)
         else :
             xscale = np.arange(nx)
         # y- and zscale are the axis of one spectrum (i.e. pixels and energies)
