@@ -1321,7 +1321,7 @@ def a2k(D, lattice_constant, dtheta=0, dtilt=0) :
                      dtilt=dtilt)
     return kx, ky
 
-def alt_a2k(angle, dtilt, dtheta, dphi, hv, work_func, orientation='horizontal') :
+def alt_a2k(angle, tilt, theta, phi, hv, a, b=None, c=None, work_func=4) :
     """ 
     *Unfinished*
     Alternative angle-to-k conversion approach using rotation matrices. 
@@ -1333,8 +1333,34 @@ def alt_a2k(angle, dtilt, dtheta, dphi, hv, work_func, orientation='horizontal')
     Then initiate a k vector in the direction measured and rotate it with the 
     given tilt, theta and phi angles.
     
+    This follows Denys' definitions (github ilikecarbs)
     """
-    pass
+    # c0 = sqrt(2*&m_e)/hbar
+    c0 = 0.5124
+
+    # Convert angles to radians
+    angle, tilt, theta, phi = [np.pi*a/180 for a in [angle, tilt, theta, phi]]
+
+    # Calculate the norm of the k vector
+    k_norm = c0 * np.sqrt(hv + work_func)
+
+    # Set upt rotation matrices
+    s, c = np.sin, np.cos
+    M_tilt = np.array([[1,       0,       0],
+                       [0, c(tilt), s(tilt)],
+                       [0,-s(tilt), c(tilt)]])
+    M_phi = np.array([[c(phi),-s(phi), 0],
+                      [s(phi), c(phi), 0],
+                      [     0,      0, 1]])
+    M_theta = np.array([[1,       0,       0],
+                       [0, c(tilt), s(tilt)],
+                       [0,-s(tilt), c(tilt)]])
+
+    # Initialize k vector and rotate it
+    k = k_norm * np.array([np.sin(angle), np.zeros(len(angle)), np.cos(angle)])
+    k = M_phi.dot(M_tilt.dot(M_theta.dot(k)))
+    return k
+
 
 
 # +---------+ #
