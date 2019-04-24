@@ -4,11 +4,14 @@ al. in `Coherent organization of electronic correlations as a mechanism to
 enhance and stabilize high-Tc cuprate superconductivity` 
 (DOI: 10.1038/s41467-017-02422-2).
 """
+import multiprocessing
+from datetime import datetime
+
 import numpy as np
 import scipy.integrate as integrate
 
-import postprocessing as pp
-import utilities.constants as const
+from arpys import pp
+import arpys.utilities.constants as const
 
 # Boltzmann constant in eV/K
 K_B_IN_eV_PER_K = 1.38064852e-23 / 1.6021766208e-19
@@ -169,7 +172,7 @@ def g11_alt(k, E, sig, band, gap) :
     ====  ======================================================================
     k     array of length 2; k vector (in-plane) at which to evaluate g11
     E     float; energy at which to evaluate g11
-    sig   float; value of the complex self-energy at E
+    sig   complex; value of the complex self-energy at E
     band  float; value of the bare band at this k
     gap   float; value of the gap at this k
     ====  ======================================================================
@@ -221,6 +224,144 @@ def arpes_intensity(k, E, i0, im_kwargs, re_kwargs, band, gap) :
 
     return i0 * A * pp.fermi_dirac(E, T=T)
 
+def compute_self_energy_parallel(self_energy_func, n_proc, E) :
+    """ Calculate the self energy more efficiently by splitting the work to 
+    several subprocesses. Since multiprocessing.Pool cannot handle local 
+    functions and lambdas, we have to do the job splitting by hand.
+
+    *Parameters*
+    ================  ==========================================================
+    self_energy_func  func; function of E that returns the complex self-energy.
+    n_proc            int; number of subprocesses to spawn (should be smaller 
+                      or equal to the number of availabel cpus)
+    E                 1d-array; energies at which to evaluate the self-energy.
+    ================  ==========================================================
+
+    *Returns*
+    =============  =============================================================
+    self_energies  1d-array of same length as *E*;
+    =============  =============================================================
+
+    This function simply splits the evaluation
+    ```
+    self_energies = [self_energy_func(e) for e in E]
+    ```
+    into *n_proc* separate parts:
+    ```
+    self_energies = [self_energy_func(e) for e in E[i0:i1]] + 
+                    [self_energy_func(e) for e in E[i1:i2]] + 
+                    [self_energy_func(e) for e in E[i2:i3]] + 
+                    ...
+    ```
+    all of which can be evaluated simultaneously by a different subprocess.
+    """
+    # Calculate the index ranges which will split up our energy array
+    indices = [int(i*len(E)/n_proc) for i in range(n_proc+1)]
+    # ind contains (i0, i1) tuples representing start and stop index for 
+    # every sub-range
+    ind = [(indices[i], indices[i+1]) for i in range(n_proc)]
+
+    # Keep a list of spawned processes. Their outputs will be stored in a 
+    # multiprocessing.Queue.
+    processes = []
+    outputs = multiprocessing.Queue()
+    
+    def loop(i, ind) :
+        """ Calculate the self_energy for all energy values *E[i0:i1]* 
+        where *ind*=(i0, i1). Write the result, along with the 
+        corresponding subprocess index *i* into the Queue *outputs*. 
+        """
+        i0, i1 = ind
+        self_energies = [self_energy_func(e) for e in E[i0:i1]]
+        outputs.put((i, self_energies))
+
+    # Create *n_proc* subprocesses that each calculate a portion of the 
+    # self-energies.
+    for i in range(n_proc) :
+        p = multiprocessing.Process(target=loop, args=(i, ind[i]))
+        processes.append(p)
+    # Start all subprocesses...
+    [p.start() for p in processes]
+    # ...and wait until the last one has completed.
+    [p.join() for p in processes]
+    # Extract and stitch together the results into a numpy array.
+    res = [outputs.get() for p in processes]
+#    print([(r[0], len(r[1])) for r in res])
+    res.sort()
+    lists = [r[1] for r in res]
+    self_energies = []
+    for l in lists :
+        self_energies += l
+    return np.array(self_energies)
+
+def arpes_intensity_alt(k, E, i0, im_kwargs, re_kwargs, band, gap, n_proc=1) :
+    """
+    Alternative implementation o `arpes_intensity` that is hopefully a bit 
+    faster.
+
+    Return the expected ARPES intensity at point (E,k) as modeled by:
+
+                             g11(k, E)
+        I_ARPES = i0 * (-Im -----------) * f(E, T)
+                                pi
+
+    Note that no broadening is applied.
+
+    *Parameters*
+    =========  =================================================================
+    k          2D array of shape (2,nk); k vectors (in-plane)
+    E          array of length ne; energies at which to evaluate ARPES intensity
+    i0         float; global amplitude multiplier
+    im_kwargs  dict; kwargs to :func: `im_sigma_factory 
+               <arpys.2dfit.im_sigma_factory>`
+    re_kwargs  dict; kwargs to :func: `re_sigma <arpys.2dfit.re_sigma_factory>`
+    band       func; function that returns the bare band at k
+    gap        func; function that returns the superconducting gap at k
+    =========  =================================================================
+
+    *Returns*
+    =========  =================================================================
+    intensity  2D array of shape (ne, nk);
+    =========  =================================================================
+    """
+    # Try extracting T from im_kwargs
+    try :
+        T = im_kwargs['T']
+    except KeyError :
+        # Otherwise revert to default value
+        T = 15
+
+#    start_prep = datetime.now()
+    # Build the self-energy function and evaluate it
+    self_energy_func = self_energy_factory(im_kwargs, re_kwargs)
+    if n_proc==1 :
+        self_energies = np.array([self_energy_func(e) for e in E])
+    else :
+        self_energies = compute_self_energy_parallel(self_energy_func, 
+                                                     n_proc, E)
+#    print('Preparations done in: {}'.format(datetime.now()-start_prep))
+
+    # Precalculate as much as possible
+    ne = len(E)
+    nk = k.shape[1]
+    intensity = np.zeros([ne, nk])
+    fermi_dirac = pp.fermi_dirac(E, T=T)
+
+    # Calculate the spectral function as the imaginary part of the Green's 
+    # function
+#    start_loop = datetime.now()
+    for i in range(nk) :
+        this_k = k[:,i]
+        this_band = band(this_k)
+        this_gap = gap(this_k)
+        for j,e in enumerate(E) :
+            fdj = fermi_dirac[j]
+            a = g11_alt(this_k, e, self_energies[j], this_band, this_gap)
+            intensity[j,i] += fdj * i0*a.imag/np.pi
+#    print('Loop finished in: {}'.format(datetime.now()-start_loop))
+
+    return intensity
+
 def band_factory(bottom, m_e=1) :
     """
     Create a function that represents a parabolic band with band bottom at 
@@ -248,7 +389,7 @@ def band_factory(bottom, m_e=1) :
         """
         # Unit conversion to eV
         conversion = 1e20/const.eV
-        k2 = k.dot(k)
+        k2 = k[0]**2 + k[1]**2
         return conversion * const.h**2 * k2 / (4*np.pi**2*m_e*const.m_e) + bottom
     return band
 
@@ -326,7 +467,7 @@ if __name__=="__main__" :
 
     # Precalculate as much as possible
     self_energies = np.array([self_energy(e) for e in es])
-    fd = pp.fermi_dirac(es, T=im_kwargs['T'], eV=True)
+    fd = pp.fermi_dirac(es, T=im_kwargs['T'])
 
     for i in range(nk) :
         k = ks[:,i]

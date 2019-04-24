@@ -286,6 +286,7 @@ class Dataloader_ALS(Dataloader) :
 #        zscale, yscale, xscale = [np.arange(s) for s in shape]
 
         # TODO pixel to angle conversion
+        yscale *= 0.193/2
 
         # Get theta and phi
         theta = float(self.get(h5file['Headers/Motors_Sample'], b'SMOTOR3'))

@@ -99,11 +99,11 @@ def make_slice(data, d, i, integrate=0, silent=False) :
 
     # Initialize data container and fill it with data from selected slices
     if d == 0 :
-        sliced = data[start:stop,:,:].sum(0)
+        sliced = data[start:stop,:,:].sum(d)
     elif d == 1 :
-        sliced = data[start:stop,:,:].sum(0)
+        sliced = data[:,start:stop,:].sum(d)
     elif d == 2 :
-        sliced = data[start:stop,:,:].sum(0)
+        sliced = data[:,:,start:stop].sum(d)
 
     return sliced
 
@@ -1159,7 +1159,6 @@ def fit_gold(D, e_0=None, T=10) :
          provided in *D*. If this is not given, a starting guess will be 
          estimated by detecting the step in the integrated spectrum using :func:
          `detect_step <arpys.postprocessing.detect_step>`.
-
     T    float; Temperature
     ===  =======================================================================
 
@@ -1275,7 +1274,7 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
 
 def new_a2k(thetas, tilts, hv, work_func=4, E_b=0, dtheta=0, dtilt=0, 
             lattice_constant=1, orientation='horizontal', 
-            photon_momentum=True, alpha=20) :
+            photon_momentum=True, alpha=20, phi=0) :
     """ Cleaner implementation of angle to k conversion, particularly more 
     suitable for maps. 
     Confer docstring of :func: `angle_to_k
@@ -1301,10 +1300,20 @@ def new_a2k(thetas, tilts, hv, work_func=4, E_b=0, dtheta=0, dtilt=0,
         kx -= c2*np.cos(c1*(alpha+dtheta))
         ky += c2*np.sin(c1*(alpha+dtheta))*np.sin(c1*(dtilt))
 
+#    # Apply rotation by phi
+#    phi_mat = np.array([[np.cos(phi), np.sin(phi)],
+#                        [-np.sin(phi), np.cos(phi)]])
+#    KX, KY = np.meshgrid(kx, ky)
+#    nx, ny = KX.shape
+#    k = np.array([KX.flatten(), KY.flatten()])
+#    KX, KY = phi_mat.dot(k).reshape((2, nx, ny))
+
     o = orientation.lower()[0]
     if o == 'h' :
+#        return KX, KY
         return kx, ky
     elif o == 'v' :
+#        return KY, KX
         return ky, kx
     else :
         raise ValueError('Orientation not understood: {}.'.format(orientation))
