@@ -288,15 +288,18 @@ class PITDataHandler() :
         self.on_z_dim_change()
         self.main_window.set_scales()
 
-    def a2k(self, lattice_constant, dx=0, dy=0, phi=0) :
+    def a2k(self, a, b=None, dx=0, dy=0, azimuth=0) :
         """ Carry out angle to k space conversion and try to apply the result 
         to the image axes.
         """
         zscale, yscale, xscale = self.scales
         # Calculate kx and ky with the given parameters
-        kx, ky = pp.new_a2k(xscale, yscale, hv=self.D.hv, 
-                            lattice_constant=lattice_constant, dtheta=dx, 
-                            dtilt=dy, phi=phi)
+        KX, KY = pp.new_a2k(xscale, yscale, hv=self.D.hv, 
+                            a=a, b=b, dtheta=dx, 
+                            dtilt=dy, azimuth=azimuth)
+        kx = KX[0]
+        ky = KY[:,0]
+
         # Set ky only if it is strictly monotonous
         subsequent_pairs = zip(ky, ky[1:])
         if not self.is_2d and \

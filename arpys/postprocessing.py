@@ -1155,6 +1155,8 @@ def fit_gold(D, e_0=None, T=10) :
     ===  =======================================================================
     D    argparse.Namespace object; ARPES data and metadata as is created by a
          :class: `Dataloader <arpys.dataloaders.Dataloader>` object.
+         Assumes the energies to be stored in D.xscale and the data to be of 
+         shape (1, n_angles, n_energies).
     e_0  float; starting guess for the Fermi energy in the energy units 
          provided in *D*. If this is not given, a starting guess will be 
          estimated by detecting the step in the integrated spectrum using :func:
@@ -1272,13 +1274,34 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
 
     return kx, ky
 
-def new_a2k(thetas, tilts, hv, work_func=4, E_b=0, dtheta=0, dtilt=0, 
-            lattice_constant=1, orientation='horizontal', 
-            photon_momentum=True, alpha=20, phi=0) :
+def new_a2k(thetas, tilts, hv, a=np.pi, b=None, dtheta=0, dtilt=0, azimuth=0, 
+            work_func=4, E_b=0, alpha=20, photon_momentum=True, 
+            orientation='horizontal') :
     """ Cleaner implementation of angle to k conversion, particularly more 
     suitable for maps. 
-    Confer docstring of :func: `angle_to_k
-    <arpys.postprocessing.angle_to_k>` for now.
+    
+    *Parameters*
+    ===============  ===========================================================
+    thetas           1d-array; angles in parallel direction
+    tilts            1d-array; angles in perpendicular direction
+    hv               float; incoming photon energy
+    a                float; lattice constant in parallel direction. If the 
+                     default value of *pi* is left, the output will be in 
+                     units of inverse Angstrom.
+    b                float; lattice const. in perp. direction. If *None* 
+                     assume the same value as for *a*.
+    dtheta           float; angular offset in parallel direction
+    dtilt            float; angular offset in perp. direction
+    azimuth          float; azimuth (rotation) in degree
+    work_func        float; actually work function + inner potential
+    E_b              float; typical binding energy
+    alpha            float; analyzer angle
+    photon_momentum  boolean; whether or not to correct for the photon momentum
+    orientation      str; either 'horizontal' or 'vertical'. Slit alignment.
+    ===============  ===========================================================
+
+    *Returns*
+    KX, KY
     """
     # c0 = sqrt(2*&m_e)/hbar
     c0 = 0.5124
@@ -1287,34 +1310,39 @@ def new_a2k(thetas, tilts, hv, work_func=4, E_b=0, dtheta=0, dtilt=0,
     
     prefactor = c0 * np.sqrt(hv - E_b - work_func)
     # Convert to units of pi/a
-    prefactor *= lattice_constant/np.pi
+    prefactor_x = prefactor * a/np.pi
+    if b is None : b = a
+    prefactor_y = prefactor * b/np.pi
 
-    kx = prefactor * np.sin(c1*(thetas+dtheta))
-    ky = prefactor * np.cos(c1*(tilts+dtilt))
+    kx = prefactor_x * np.sin(c1*(thetas+dtheta))
+    ky = prefactor_y * np.cos(c1*(tilts+dtilt))
 
     if photon_momentum :
         # TODO Change this in other slit orientation
         # TODO Use actual manipulator values instead of dtheta and dtilt
-        # c2 is the eV to Angstrom conversion
-        c2 = 2*lattice_constant/12400
-        kx -= c2*np.cos(c1*(alpha+dtheta))
-        ky += c2*np.sin(c1*(alpha+dtheta))*np.sin(c1*(dtilt))
+        # c2xy is the eV to lattice units conversion
+        c2x = 2*a/12400
+        c2y = 2*b/12400
+        kx -= c2x*np.cos(c1*(alpha+dtheta))
+        ky += c2y*np.sin(c1*(alpha+dtheta))*np.sin(c1*(dtilt))
 
-#    # Apply rotation by phi
-#    phi_mat = np.array([[np.cos(phi), np.sin(phi)],
-#                        [-np.sin(phi), np.cos(phi)]])
-#    KX, KY = np.meshgrid(kx, ky)
-#    nx, ny = KX.shape
-#    k = np.array([KX.flatten(), KY.flatten()])
-#    KX, KY = phi_mat.dot(k).reshape((2, nx, ny))
+    ## Apply rotation by azimuth phi
+    # Convert angle to radian
+    phi = azimuth * c1
+    phi_mat = np.array([[np.cos(phi), np.sin(phi)],
+                        [-np.sin(phi), np.cos(phi)]])
+    KX, KY = np.meshgrid(kx, ky)
+    nx, ny = KX.shape
+    k = np.array([KX.flatten(), KY.flatten()])
+    KX, KY = phi_mat.dot(k).reshape((2, nx, ny))
 
     o = orientation.lower()[0]
     if o == 'h' :
-#        return KX, KY
-        return kx, ky
+        return KX, KY
+#        return kx, ky
     elif o == 'v' :
-#        return KY, KX
-        return ky, kx
+        return KY, KX
+#        return ky, kx
     else :
         raise ValueError('Orientation not understood: {}.'.format(orientation))
 
