@@ -1086,7 +1086,7 @@ def fermi_fit_func(E, E_F, sigma, a, b, T=10) :
     E_F    float; Fermi energy in eV
     sigma  float; instrument resolution in units of the energy step size in *E*.
     a      float; slope of the linear background.
-    b      float; offset of the linear background.
+    b      float; offset of the linear background at *E_F*.
     T      float; temperature.
     =====  =====================================================================
     """
@@ -1094,7 +1094,7 @@ def fermi_fit_func(E, E_F, sigma, a, b, T=10) :
     y = fermi_dirac(E, E_F, T) 
     
     # Add a linear contribution to the 'below-E_F' part
-    y += (a*E+b)*step_function(E, E_F, flip=True)
+    y += (a*(E-E_F)+b) * step_function(E, E_F, flip=True)
 
     # Convolve with instrument resolution
     if sigma > 0 :
