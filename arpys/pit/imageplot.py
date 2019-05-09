@@ -2,12 +2,15 @@
 
 import logging
 
+import matplotlib.pyplot as plt
 import pyqtgraph as pg
-from numpy import clip, inf, linspace, ndarray
+from matplotlib.colors import ListedColormap
+from numpy import array, clip, inf, linspace, ndarray
 from pyqtgraph import Qt as qt #import QtCore
 from pyqtgraph.graphicsItems.ImageItem import ImageItem
 from pyqtgraph.widgets import PlotWidget, GraphicsView
 
+from arpys.pit.pitviewbox import PITViewBox
 from arpys.pit.utilities import TracedVariable, indexof
 
 logger = logging.getLogger('pit.'+__name__)
@@ -26,6 +29,9 @@ class ImagePlot(pg.PlotWidget) :
     sig_axes_changed   emitted when the axes are updated
     =================  =========================================================
     """
+    # np.array, raw image data
+    image_data = None
+    # pg.ImageItem of *image_data*
     image_item = None
     image_kwargs = {}
     xlim = None
@@ -45,7 +51,8 @@ class ImagePlot(pg.PlotWidget) :
         name        str; allows giving a name for debug purposes
         ==========  ============================================================
         """
-        super().__init__(parent=parent, background=background, **kwargs) 
+        super().__init__(parent=parent, background=background, 
+                         viewBox=PITViewBox(imageplot=self), **kwargs) 
         self.name = name
 
         # Show top and tight axes by default, but without ticklabels
@@ -81,6 +88,8 @@ class ImagePlot(pg.PlotWidget) :
         kwargs  `ImageItem <pyqtgraph.graphicsItems.ImageItem.ImageItem>`
         ======  ================================================================
         """
+        self.image_data = image
+
         # Convert array to ImageItem
         if isinstance(image, ndarray) :
             image = ImageItem(image, *args, **kwargs)
@@ -211,6 +220,41 @@ class ImagePlot(pg.PlotWidget) :
                        yMax=inf,
                        maxXRange=inf,
                        maxYRange=inf)
+
+    def mpl_export(self) :
+        """ Export the content of this plot to a png image using matplotlib. 
+        The resulting image will have a white background and black ticklabes 
+        and should therefore be more readable than pyqtgraph's native plot
+        export options.
+        """
+        logger.debug('<ImagePlot.mpl_export()>')
+
+        # Get a filename first
+        fd = qt.QtGui.QFileDialog()
+        filename = fd.getSaveFileName()[0]
+        logger.debug('Outfilename: {}'.format(filename))
+
+        # Access data and all relevant display options
+        data = self.image_data.T
+        lut = self.image_item.lut
+
+        # Convert the lookuptable (lut) to a matplotlib colormap
+        lut = lut/lut.max()
+        cmap_array = array([[a[0], a[1], a[2], 1.] for a in lut])
+        cmap = ListedColormap(cmap_array)
+
+        # Temporarily turn matplotlib's interactive mode off
+        was_interactive = plt.isinteractive() 
+        if was_interactive:
+            plt.ioff()
+
+        # Create a matplotlib figure and save it
+        fig, ax = plt.subplots(1)
+        mesh = ax.pcolormesh(self.xscale, self.yscale, data, cmap=cmap)
+        fig.savefig(filename, dpi=300)
+
+        if was_interactive:
+            plt.ion()
 
 class Crosshair() :
     """ Crosshair made up of two InfiniteLines. """

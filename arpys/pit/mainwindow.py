@@ -540,9 +540,6 @@ class MainWindow(QtGui.QMainWindow) :
             return
 
         self.data_handler.cut_data = cut
-        # Convert np.array *cut* to an ImageItem and set it as *cut_plot*'s 
-        # Image
-        cut_image = pg.ImageItem(cut)
         self.cut_plot.set_image(cut, lut=self.lut)
 
     def update_image_data(self) :
@@ -674,7 +671,8 @@ class MainWindow(QtGui.QMainWindow) :
         # Remember that the order in which transformations are applied is 
         # reverted to how they added in the code, i.e. last transform added 
         # in the code will come first (this is the reason we have to 
-        # completely rebuild the transformation instead of just adding a rotation...)
+        # completely rebuild the transformation instead of just adding a 
+        # rotation...)
         transform.reset()
         transform.translate(dx/sx, dy/sy)
         transform.translate(wx/2, wy/2)
