@@ -123,8 +123,19 @@ def indexof(value, array) :
     """
     return np.argmin(np.abs(array - value))
 
-def argsort(lst, index_list) :
+def sort_together(*lists) :
+    """ 
+    Sort the given lists by the elements in the first list.
+
+    Example
+    -------
+    >>> l0 = [3, 1, 2]
+    >>> l1 = ['b', 'c', 'a']
+    >>> l2 = [11, 22, 33]
+    >>> sort_together(l0, l1, l2)
+    [[1, 2, 3], ['c', 'a', 'b'], [22, 33, 11]]
+    >>> sort_together(l1, l0, l2)
+    [['a', 'b', 'c'], [2, 3, 1], [33, 11, 22]]
     """
-    Sort 
-    """
-    pass
+    return [list(x) for x in zip(*sorted(zip(*lists)))]
+

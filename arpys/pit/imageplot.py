@@ -221,11 +221,23 @@ class ImagePlot(pg.PlotWidget) :
                        maxXRange=inf,
                        maxYRange=inf)
 
-    def mpl_export(self) :
+    def mpl_export(self, *args, figsize=(5,5), title='', xlabel='', 
+                   ylabel='', dpi=300) :
         """ Export the content of this plot to a png image using matplotlib. 
         The resulting image will have a white background and black ticklabes 
         and should therefore be more readable than pyqtgraph's native plot
         export options.
+
+        *Parameters*
+        =======  ===============================================================
+        figsize  tuple of float; (height, width) of figure in inches
+        title    str; figure title
+        xlabel   str; x axis label
+        ylabel   str; y axis label
+        dpi      int; png resolution in pixels per inch
+        args     positional arguments are absorbed and discarded (necessary 
+                 to connect this method to signal handling)
+        =======  ===============================================================
         """
         logger.debug('<ImagePlot.mpl_export()>')
 
@@ -249,9 +261,13 @@ class ImagePlot(pg.PlotWidget) :
             plt.ioff()
 
         # Create a matplotlib figure and save it
-        fig, ax = plt.subplots(1)
+        fig, ax = plt.subplots(1, figsize=figsize)
         mesh = ax.pcolormesh(self.xscale, self.yscale, data, cmap=cmap)
-        fig.savefig(filename, dpi=300)
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+
+        fig.savefig(filename, dpi=dpi)
 
         if was_interactive:
             plt.ion()

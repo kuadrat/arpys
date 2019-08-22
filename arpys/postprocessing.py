@@ -644,7 +644,8 @@ def subtract_bg_shirley(data, dim=0, profile=False, normindex=0) :
     data     np.array; input data with shape (m x n) or (1 x m x n) containing 
              an E(k) cut
     dim      int; either 0 or 1. Determines whether the input is aranged as 
-             E(k) (n EDCs of length m, dim=0) or k(E) (m EDCs of length n, dim=1) 
+             E(k) (n EDCs of length m, dim=0) or k(E) (m EDCs of length n, 
+             dim=1)
     profile  boolean; if True, a list of the background values for each MDC 
              is returned additionally.
     normindex  TESTING
@@ -1353,9 +1354,10 @@ def a2k(D, lattice_constant, dtheta=0, dtilt=0) :
     information on to the actual converter (`new_a2k 
     <arpys.postprocessing.new_a2k>`).
     """
-    kx, ky = new_a2k(D.xscale, D.yscale, hv=D.hv, 
-                     lattice_constant=lattice_constant, dtheta=dtheta, 
-                     dtilt=dtilt)
+    kx, ky = new_a2k(D.xscale, D.yscale, hv=D.hv, dtheta=dtheta, dtilt=dtilt)
+    # Convert to units of pi/a
+    conversion = np.pi/lattice_constant
+    kx, ky = [k/conversion for k in [kx, ky]]
     return kx, ky
 
 def alt_a2k(angle, tilt, theta, phi, hv, a, b=None, c=None, work_func=4) :
