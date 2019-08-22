@@ -1,14 +1,14 @@
 ARPYS installation instructions
 ===============================
 
-Most of arpys'' dependencies (as listed in `requirements.txt`) can be fetched 
+Most of arpys' dependencies (as listed in `requirements.txt`) can be fetched 
 by `pip`. However, the GUI that arpys comes with (the *P*ython *I*mage *T*ool 
 PIT) makes use of Qt5, which depends on SIP.
 As of this writing (February 2019) SIP seemingly cannot be installed via pip.
 The first step in installing arpys is therefore the compilation of SIP from 
 source.
 Once that is done, the rest of the installation can be carried out with a 
-simply `pip install arpys`.
+simple `pip install arpys`.
 
 OS notes
 --------
