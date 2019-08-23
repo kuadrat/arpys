@@ -8,6 +8,78 @@ from pyqtgraph.functions import affineSlice
 
 logger = logging.getLogger('pit.'+__name__)
 
+class CustomizableLineSegmentROI(pg.LineSegmentROI) :
+    """ Subclass of :class: `LineSegmentROI 
+    <pyqtgraph.graphicsItems.ROI.LineSegmentROI`. Implements a few features 
+    that were missing from the parent class, namely customizable hover pen.
+    """
+
+    def __init__(self, *args, **kwargs) :
+        super().__init__(*args, **kwargs)
+        # Set a default pen
+        self.set_hover_pen(color=(255, 255, 0))
+
+    def set_hover_pen(self, *args, **kwargs) :
+        """ Set the pen used for drawing this widget when it is in the 
+        `hovered` state. Accepts function arguments to :func: `mkPen 
+        <pyqtgraph.mkPen()>`
+        """
+        self.hover_pen = pg.mkPen(*args, **kwargs)
+
+    def _makePen(self) :
+        """ Overrided parent's :func: `_makePen 
+        <pyqtgrapch.graphicsItems.ROI.makePen()>` function to allow custom 
+        hover styles.
+        """
+        if self.mouseHovering :
+            return self.hover_pen
+        else :
+            return self.pen
+
+class CustomizableHandle(pg.graphicsItems.ROI.Handle) :
+    """ Same concept as :class: `CustomizableLineSegmentROI 
+    <arpys.pit.cutline.CustomizableLineSegmentROI`>. Subclass to allow 
+    customization of hover pen.
+
+    .. :Unused: because that would require setting these handles as the 
+       handles for `CustomizableLineSegmentROI`. Too much work for a 
+       relatively unimportant feature.
+    """
+
+    def __init__(self, *args, **kwargs) :
+        super().__init__(*args, **kwargs)
+        # Set a default pen
+        self.set_hover_pen(color=(255, 255, 0))
+
+    def set_hover_pen(self, *args, **kwargs) :
+        """ Set the pen used for drawing this widget when it is in the 
+        `hovered` state. Accepts function arguments to :func: `mkPen 
+        <pyqtgraph.mkPen()>`
+        """
+        self.hover_pen = pg.mkPen(*args, **kwargs)
+
+    def hoverEvent(self, ev) :
+        """ This just copies the code of the parent class with the difference 
+        of a variable hover pen.
+        """
+        hover = False
+        # Check if it is appropriate to change the state to `hover`
+        if not ev.isExit() :
+            if ev.acceptDrags(QtCore.Qt.LeftButton) :
+                hover=True
+            for btn in [QtCore.Qt.LeftButton, QtCore.Qt.RightButton, 
+                        QtCore.Qt.MidButton] :
+                if (int(self.acceptedMouseButtons() & btn) > 0 and 
+                    ev.acceptClicks(btn)) : 
+                    hover=True
+
+        if hover :
+            # This is the only changed line
+            self.currentPen = self.hover_pen
+        else :
+            self.currentPen = self.pen
+        self.update()
+
 class Cutline(qt.QtCore.QObject) :
     """ Wrapper class allowing easy adding and removing of :class: 
     `LineSegmentROI <pyqtgraph.LineSegmentROI>`s to a :class: `PlotWidget 
@@ -34,12 +106,17 @@ class Cutline(qt.QtCore.QObject) :
 
     sig_initialized = qt.QtCore.Signal()
 
-    def __init__(self, plot_widget=None, orientation='horizontal', **kwargs) :
+    def __init__(self, plot_widget=None, orientation='horizontal', 
+                 handles=(None, None), **kwargs) :
         super().__init__(**kwargs)
         if plot_widget :
             self.add_to_plot(plot_widget)
         self.orientation = orientation
         self.roi = None
+
+        # Define default pens
+        self.pen = pg.mkPen((255, 255, 0), width=3)
+        self.hover_pen = pg.mkPen((255, 150, 10), width=3)
 
     def add_to_plot(self, plot_widget) :
         """ Add this cutline to a :class: `PlotWidget <pyqtgraph.PlotWidget>`.
@@ -69,8 +146,12 @@ class Cutline(qt.QtCore.QObject) :
         # Put a new LineSegmentROI in the center of the plot in the right 
         # orientation
         lower_left, upper_right = self.calculate_endpoints()
-        self.roi = pg.LineSegmentROI(positions=[lower_left, upper_right], 
-                                     pen='m')
+        self.roi = CustomizableLineSegmentROI(positions=[lower_left, upper_right], 
+                                              pen='m')
+        self.roi.setPen(self.pen)
+        self.roi.set_hover_pen(self.hover_pen)
+        # Set default handle style
+        self.set_handle_style()
 #        self.roi.setPos(lower_left)
         self.plot.addItem(self.roi, ignoreBounds=True)
 
@@ -81,6 +162,17 @@ class Cutline(qt.QtCore.QObject) :
 
         logger.info('Emitting sig_initialized.')
         self.sig_initialized.emit()
+
+    def set_handle_style(self, radius=8, color=(200, 255, 200), width=2) :
+        """ Set the size and pen of the handles. """
+        for h in self.roi.getHandles() :
+            # Delete cached shapes
+            h._shape = None
+            h.radius = radius
+            h.pen = pg.mkPen(color, width=width)
+
+            # Need to redraw path
+            h.buildPath()
 
     def recenter(self) :
         """ Put the ROI in the center of the current plot. """

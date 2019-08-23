@@ -8,7 +8,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="arpys",
-    version="0.1.4",
+    version="0.1.5",
     author="Kevin Kramer",
     author_email="kevin.kramer@uzh.ch",
     description="Python tools and scripts for ARPES data analysis",
