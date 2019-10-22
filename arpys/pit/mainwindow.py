@@ -263,6 +263,7 @@ class PITDataHandler() :
         zscale = self.scales[0]
         zmin = zscale[0]
         zmax = zscale[-1]
+        print(zmin, zmax)
         ip.set_secondary_axis(zmin, zmax)
 
     def calculate_integrated_intensity(self) :

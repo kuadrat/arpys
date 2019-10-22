@@ -10,6 +10,7 @@ import numpy as np
 from matplotlib.colors import PowerNorm
 from matplotlib.patheffects import withStroke
 from scipy import ndimage
+from scipy.integrate import quad
 from scipy.optimize import curve_fit
 
 from arpys.utilities import constants
@@ -1202,6 +1203,25 @@ def fit_gold(D, e_0=None, T=10) :
 
     return fermi_levels, sigmas, functions
 
+def adjust_fermi_level(energies, fermi_levels) :
+    """ Use the output from :func: `fit_gold <arpys.postprocessing.fit_gold>` 
+    to create an adjusted energy mesh, useful for plotting.
+
+    *Parameters*
+    ============  ==============================================================
+    energies      1d-array, length N; kinetic energies as output by most 
+                  beamlines
+    fermi_levels  1d-array, length M; detected Fermi steps in energy units, 
+                  as output by :func: `fit_gold <arpys.postprocessing.fit_gold>`
+    ============  ==============================================================
+
+    *Returns*
+    =================  =========================================================
+    adjusted_energies  2d-array, NxM; 
+    =================  =========================================================
+    """
+    return np.array([energies - level for level in fermi_levels])
+
 # +------------------------------------------------+ #
 # | Conversion from angular coordinates to k space | # =========================
 # +------------------------------------------------+ #
@@ -2134,6 +2154,45 @@ def hv(k, E_B=0, phi=4, lattice_constant=None) :
     else :
         conversion = lattice_constant/np.pi
     return 1/(0.5123**2) * (k/conversion)**2 + E_B + phi
+
+def kramers_kronig(f, omega, e0=-10, e1=10, points=[], verbosity=0) :
+    """
+    Directly calculate the Kramers-Kronig transform of a function 
+    *f(omega)*. This uses numerical integration as opposed to :func: `hilbert 
+    <scipy.signal.hilber>` which makes use of the Fourier transform.
+    Performance-wise, this is therefore much slower, as a diverging integral 
+    has to be calculated for every point *omega*. The result, however, should 
+    be more precise.
+
+    *Parameters*
+    =========  =================================================================
+    f          callable; the function on which the Kramer-Kronig transform is 
+               applied.
+    omega      array; list of points at which to evaluate the KK transform. One 
+               can often save some calculations by making use of 
+               evenness/oddness of the input function *f*.
+    e0         float; lower integration bound.
+    e1         float; upper integration bound.
+    points     list; _dangerous_points at which a divergence is expected.
+    verbosity  int; if > 0, print progress report
+    =========  =================================================================
+    """
+    res = []
+    for om in omega :
+        if verbosity > 0 :
+            print(om)
+        # Define the integrand
+        def integrand(e) :
+            return f(e) / (e-om)
+
+        # Add *omega* to the list of dangerous points
+        these_points = points + [om]
+        
+        # Calculate the integral using scipy.integrate.quad
+        this_res = quad(integrand, e0, e1, points=these_points, 
+                        full_output=True)[0] 
+        res.append(this_res)
+    return np.array(res)/np.pi
 
 # +---------+ #
 # | Testing | # ================================================================

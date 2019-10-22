@@ -49,6 +49,7 @@ programs and routines that receive from a dataloader (which is pretty much
 everything in this module) and previously pickled files.
 """
 
+import ast
 import os
 import pickle
 import re
@@ -145,12 +146,62 @@ class Dataloader_i05(Dataloader) :
         else :
             # Otherwise, extract third dimension from scan command
             command = infile['entry1/scan_command']
-            start_stop_step = command.value.split()[2:5]
-            start, stop, step = [float(s) for s in start_stop_step] 
-            xscale = np.arange(start, stop+0.5*step, step)
-        
+
+            # Special case for 'pathgroup'
+            if command.value.split()[1] == 'pathgroup' :
+                print(80*'=')
+                print('is pathgroup')
+                # Extract points from a ([polar, x, y], [polar, x, y], ...) 
+                # tuple
+                points = command.value.split('(')[-1].split(')')[0]
+                tuples = points.split('[')[1:]
+                xscale = []
+                for t in tuples :
+                    point = t.split(',')[0]
+                    xscale.append(float(point))
+                xscale = np.array(xscale)
+
+                # Now, if this was a scan with varying centre_energy, the 
+                # zscale contains a list of energies...
+                # for now, just take the first one
+#                zscale = zscale[0]
+
+            # Special case for 'scangroup'
+            elif command.value.split()[1] == 'scan_group' :
+                print(80*'=')
+                print('is scan_group')
+                # Extract points from a ([polar, x, y], [polar, x, y], ...) 
+                # tuple
+                print(command.value)
+                points = command.value.split('((')[-1].split('))')[0]
+                points = '((' + points + '))'
+                xscale = np.array(ast.literal_eval(points))[:,0]
+
+                # Now, if this was a scan with varying centre_energy, the 
+                # zscale contains a list of energies...
+                # for now, just take the first one
+                zscale = zscale[0]
+
+           # "Normal" case
+            else :
+                print(90*'*')
+                print(command.value)
+                start_stop_step = command.value.split()[2:5]
+                start, stop, step = [float(s) for s in start_stop_step] 
+                xscale = np.arange(start, stop+0.5*step, step)
+                print(80*'y')
+                print(xscale.shape)
+                print(yscale.shape)
+                print(zscale.shape)
+                print(data.shape)
+                print(80*'z')
+                print(zscale)
+
         # What we usually call theta is tilt in this beamline
         theta = infile['entry1/instrument/manipulator/satilt'].value[0]
+        print(80*'2')
+        print(infile['entry1/instrument/manipulator/sapolar'])
+        print(80*'3')
         phi = infile['entry1/instrument/manipulator/sapolar'].value[0]
 
         # Take the mean of the given binding energies as an estimate
