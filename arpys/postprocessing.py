@@ -1678,7 +1678,7 @@ def fermi_dirac(E, mu=0, T=4.2) :
 
 def rotation_matrix(theta) :
     """ Return the 2x2 rotation matrix for an angle theta (in degrees). """
-    # Build the rotation matrix (convert angle to radians first)
+    # Convert angle to radians and build the rotation matrix
     t = np.pi * theta/180.
     R = np.array([[np.cos(t), -np.sin(t)],
                   [np.sin(t),  np.cos(t)]])
@@ -1704,6 +1704,11 @@ def rotate_XY(X, Y, theta=45) :
 
     .. :see also: `<arpes.postprocessing.rotate_xy>`
     """
+    if X.shape != Y.shape :
+        message = '*X* {} and *Y* {} should have the same shape.'
+        raise ValueError(message.format(X.shape, Y.shape))
+    n, m = X.shape
+
     # Create the rotation matrix
     R = rotation_matrix(theta)
 
@@ -1711,7 +1716,7 @@ def rotate_XY(X, Y, theta=45) :
     # organize them correctly
     U, V = np.dot(R, [X.ravel(), Y.ravel()])
 
-    return U, V
+    return U.reshape(n, m), V.reshape(n, m)
 
 def rotate_xy(x, y, theta=45) :
     """ Rotate the x and y cooridnates of rectangular 2D data by angle theta.
