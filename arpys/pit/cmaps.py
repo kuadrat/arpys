@@ -89,7 +89,7 @@ def convert_matplotlib_to_pyqtgraph(matplotlib_cmap, alpha=0.5) :
     """
     # Get the colormap object if a colormap name is given 
     if isinstance(matplotlib_cmap, str) :
-        matplotlib_cmap = cmap.cmap_d[matplotlib_cmap]
+        matplotlib_cmap = cm.cmap_d[matplotlib_cmap]
     # Number of entries in the matplotlib colormap
     N = matplotlib_cmap.N
     # Create the mapping values in the interval [0, 1]

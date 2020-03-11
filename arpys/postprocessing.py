@@ -1228,7 +1228,10 @@ def adjust_fermi_level(energies, fermi_levels) :
 
 def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124, 
                shift=0, lattice_constant=1, degrees=True) :
-    """ Convert the angular information you get from beamline data into 
+    """ 
+    :Deprecated:
+    
+    Convert the angular information you get from beamline data into 
     proper k-space coordinates (in units of pi/a, a being the lattice 
     constant) using the formula:
 
@@ -1298,7 +1301,10 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
 def new_a2k(thetas, tilts, hv, a=np.pi, b=None, dtheta=0, dtilt=0, azimuth=0, 
             work_func=4, E_b=0, alpha=20, photon_momentum=True, 
             orientation='horizontal') :
-    """ Cleaner implementation of angle to k conversion, particularly more 
+    """ 
+    :Deprecated:
+    
+    Cleaner implementation of angle to k conversion, particularly more 
     suitable for maps. 
     
     *Parameters*
@@ -1366,6 +1372,65 @@ def new_a2k(thetas, tilts, hv, a=np.pi, b=None, dtheta=0, dtilt=0, azimuth=0,
 #        return ky, kx
     else :
         raise ValueError('Orientation not understood: {}.'.format(orientation))
+
+def best_a2k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='h', work_func=4) :
+    """ 
+    Convert angles of the experimental geometry to k space coordinates.
+    Confer the sheet "ARPES angle to k-space conversion" for detailed 
+    explanations.
+
+    *Parameters*
+    ===========  ===============================================================
+    alpha        array of length *nkx*; angles in degrees along the 
+                 independent rotation (often called "theta" or "polar" at 
+                 beamlines.
+    beta         array of length *nky*; angles in degrees along the dependent 
+                 rotation (not the azimuth, often called "tilt").
+    hv           float; used photon energy in eV.
+    dalpha       float; offset to *alpha* in degrees.
+    dbeta        float; offset to *alpha* in degrees.
+    orientation  str; determines the analyzer slit orientation, which can be 
+                 horizontal (default) or vertical. The first letter of the 
+                 given string must be either 'h' or 'v'.
+    work_func    float; value of the work function in eV.
+    ===========  ===============================================================
+
+    *Returns*
+    ==  ========================================================================
+    KX  array of shape (nkx, nky); mesh of k values in parallel direction in 
+        units of inverse Angstrom.
+    KY  array of shape (nkx, nky); mesh of k valies in perpendicular 
+        direction in units of inverse Angstrom.
+    ==  ========================================================================
+    """
+    k0 = 0.5124 * np.sqrt(hv - work_func)
+    # Angle to radian conversion
+    c = np.pi/180
+    a = c*(alpha+dalpha)
+    b = c*(beta+dbeta)
+
+    # Prepare containers
+    nkx = len(alpha)
+    nky = len(beta)
+    KX = np.empty((nkx, nky))
+    KY = np.empty((nkx, nky))
+
+    slit = orientation.lower()[0]
+    if slit == 'h' :
+        for i in range(nkx) :
+            KX[i] = np.sin(b) * np.cos(a[i])
+            KY[i] = np.sin(a[i])
+    elif slit == 'v' :
+        cos_da = np.cos(c*dalpha)
+        sin_theta_cos_beta = np.sin(c*dalpha) * np.cos(b)
+        for i in range(nkx) :
+            KX[i] = sin_theta_cos_beta + cos_da * np.cos(a[i]) * \
+                    np.sin(b) 
+            KY[i] = cos_da * np.sin(a[i])
+    else :
+        raise ValueError(('Orientation "{}" not '
+                          'understood.').format(orientation)) 
+    return k0*KX, k0*KY
 
 def a2k(D, lattice_constant, dtheta=0, dtilt=0) :
     """
