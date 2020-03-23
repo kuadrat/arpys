@@ -1189,9 +1189,7 @@ def dump(D, filename, force=False) :
     the given name already exists, unless :param: `force` is True.
 
     ========  ==================================================================
-    D         argparse.Namespace; the namespace holding the data and 
-              metadata. The format is the same as what is returned by a 
-              dataloader.
+    D         python object to be stored.
     filename  str; name of the output file to create.
     force     boolean; if True, overwrite existing file.
     ========  ==================================================================
@@ -1209,6 +1207,16 @@ def dump(D, filename, force=False) :
 
     message = 'Wrote to file {}.'.format(filename)
     print(message)
+
+def load_pickle(filename) :
+    """ Shorthand for loading python objects stored in pickle files.
+
+    ========  ==================================================================
+    filename  str; name of file to load.
+    ========  ==================================================================
+    """
+    with open(filename, 'rb') as f :
+        return pickle.load(f)
 
 def update_namespace(D, *attributes) :
     """ Add arbitrary attributes to a :class: `Namespace <argparse.Namespace>`.
