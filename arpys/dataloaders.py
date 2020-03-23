@@ -1196,7 +1196,7 @@ def dump(D, filename, force=False) :
     """
     # Check if file already exists
     if not force and os.path.isfile(filename) :
-        question = 'File {} exists. Overwrite it? (y/N)'.format(filename)
+        question = 'File <{}> exists. Overwrite it? (y/N)'.format(filename)
         answer = input(question)
         # If the answer is anything but a clear affirmative, stop here
         if answer.lower() not in ['y', 'yes'] :
@@ -1205,7 +1205,7 @@ def dump(D, filename, force=False) :
     with open(filename, 'wb') as f :
         pickle.dump(D, f)
 
-    message = 'Wrote to file {}.'.format(filename)
+    message = 'Wrote to file <{}>.'.format(filename)
     print(message)
 
 def load_pickle(filename) :
