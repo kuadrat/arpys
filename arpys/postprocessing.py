@@ -1275,6 +1275,10 @@ def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124,
     ============================================================================
 
     """
+    warnings.warn(('This function is deprecated and exists only for backwards '
+                   'compatibility. Use :func: '
+                   '`<arpys.postprocessing.best_a2k()>` instead.'))
+
     # Precalculate the prefactor (*lattice_constant to get lattice constant 
     # units)
     prefactor = c1 * np.sqrt(hv - work_func + E_b) * lattice_constant / np.pi
@@ -1330,6 +1334,10 @@ def new_a2k(thetas, tilts, hv, a=np.pi, b=None, dtheta=0, dtilt=0, azimuth=0,
     *Returns*
     KX, KY
     """
+    warnings.warn(('This function is deprecated and exists only for backwards '
+                   'compatibility. Use :func: '
+                   '`<arpys.postprocessing.best_a2k()>` instead.'))
+
     # c0 = sqrt(2*&m_e)/hbar
     c0 = 0.5124
     # c1 is the angle to radian conversion
@@ -1375,9 +1383,9 @@ def new_a2k(thetas, tilts, hv, a=np.pi, b=None, dtheta=0, dtilt=0, azimuth=0,
 
 def best_a2k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='h', work_func=4) :
     """ 
-    Convert angles of the experimental geometry to k space coordinates.
-    Confer the sheet "ARPES angle to k-space conversion" for detailed 
-    explanations.
+    Convert angles of the experimental geometry to k-space coordinates.
+    Confer the sheet "ARPES angle to k-space conversion" [doc/a2k.pdf] for 
+    detailed explanations.
 
     *Parameters*
     ===========  ===============================================================
