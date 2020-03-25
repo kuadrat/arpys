@@ -842,7 +842,7 @@ def apply_to_map(data, func, dim=1, output=True, fargs=(), fkwargs={}) :
         return results
 
 # +--------------------------------+ #
-# | Derivatieves/Data manipulation | # ========================================
+# | Derivatives/Data manipulation | # ========================================
 # +--------------------------------+ #
 
 def _derivatives(data, dx, dy) :
@@ -1493,8 +1493,6 @@ def alt_a2k(angle, tilt, theta, phi, hv, a, b=None, c=None, work_func=4) :
     k = M_phi.dot(M_tilt.dot(M_theta.dot(k)))
     return k
 
-
-
 # +---------+ #
 # | Fitting | # ================================================================
 # +---------+ #
@@ -2094,6 +2092,75 @@ def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4,
         return kx, ky, symmetrized, product
     else :
         return kx, ky, symmetrized
+
+def find_symmetry_index(spectrum, eps=0.13, sub_ac=None) :
+    """ 
+    Find the symmetry center of an ARPES spectrum (angle vs energy) by 
+    autocorrelating it with its shifted mirror image.
+
+    *Parameters*
+    ========  ==================================================================
+    spectrum  2d-array; shape (n_e, n_k) where *n_e* is the number of energy 
+              channels and *n_k* the number of angular or k channels.
+    eps       float; threshold value under which circumstances not to 
+              subtract the autocorrelation. It should not be subtracted when 
+              the image is already very symmetric around its center. Higher 
+              values make it less likely that it is subtracted.
+    sub_ac    boolean or *None*; manually fix whether or not the 
+              autocorrelation should be subtracted. Overrides *eps*.
+    ========  ==================================================================
+
+    *Returns*
+    =====  =====================================================================
+    imax   int; the index along the angular dimension (dimension 1 in 
+           *spectrum*) at which the symmetry center is found to be.
+    debug  list; debug information [corr, autocorr, delta, delta0, 
+           SUBTRACT_AUTOCORR]
+    =====  =====================================================================
+    """
+    n_e, n_k = spectrum.shape
+    mirrored = spectrum[:,::-1]
+
+    # Prepare containers for the cross- and autocorrelations
+    corr = np.zeros(2*n_k)
+    autocorr = np.zeros(2*n_k)
+    # Calculate the (auto)correlation
+    for i in range(2*n_k) :
+        if i < n_k :
+            c = spectrum[:,:i] * mirrored[:,n_k-i:]
+            a = spectrum[:,:i] * spectrum[:,n_k-i:]
+        elif i >= n_k :
+            c = spectrum[:,i-n_k:] * mirrored[:,:2*n_k-i]
+            a = spectrum[:,i-n_k:] * spectrum[:,:2*n_k-i]
+        corr[i] = c.sum()
+        autocorr[i] = a.sum()
+
+    # Check if subtracting the autocorrelation would be a good idea
+    if sub_ac is None :
+        norm = max([corr.max(), autocorr.max()])
+        delta = corr/norm - autocorr/norm
+        delta0 = np.abs(delta[n_k])
+        if delta0 > eps :
+            SUBTRACT_AUTOCORR = True
+        else :
+            SUBTRACT_AUTOCORR = False
+    else :
+        SUBTRACT_AUTOCORR = sub_ac
+
+    # Find the maximum of the crosscorrelation
+    if SUBTRACT_AUTOCORR :
+        imax = np.argmax(delta)
+    else :
+        imax = np.argmax(corr)
+
+    # Prepare debug information
+    try :
+        debug = [corr, autocorr, delta, delta0, SUBTRACT_AUTOCORR]
+    except UnboundLocalError :
+        debug = [corr, autocorr, None, None, SUBTRACT_AUTOCORR]
+
+    # Shift the found index into the original spectrums pixel coordinates
+    return int(imax/2), debug
 
 def plot_cuts(data, dim=0, zs=None, labels=None, max_ppf=16, max_nfigs=4, 
               **kwargs) :
