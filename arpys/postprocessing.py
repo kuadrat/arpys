@@ -2162,6 +2162,131 @@ def find_symmetry_index(spectrum, eps=0.13, sub_ac=None) :
     # Shift the found index into the original spectrums pixel coordinates
     return int(imax/2), debug
 
+def get_lines(data, n, dim=0, i0=0, i1=-1, offset=0.2, integrate='max', 
+              **kwargs) :
+    """
+    Extract *n* evenly spaced rows/columns from data along dimension *dim* 
+    between indices *i0* and *i1*. The extracted lines are normalized and offset
+    such that they can be nicely plotted close by each other - like for 
+    example in a typical EDC or MDC plot.
+
+    *Parameters*
+    =========  =================================================================
+    data       2d np.array; the data from which to extract lines.
+    n          int; the number of lines to extract.
+    dim        int; either 0 or 1, specifying the dimension along which to 
+               extract lines.
+    i0         int; starting index in *data* along *dim*.
+    i1         int; ending index in *data* along *dim*.
+    offset     float; how much to vertically translate each successive line.
+    integrate  int or other; specifies how many channels around each line 
+               index should be integrated over. If anything but a small 
+               enough integer is given, defaults to the maximally available 
+               integration range.
+    kwargs     any other passed keyword arguments are discarded.
+    =========  =================================================================
+
+    *Returns*
+    =======  ===================================================================
+    lines    list of 1d np.arrays; the extracted lines.
+    indices  list of int; the indices at which the lines were extracted.
+    =======  ===================================================================
+    """
+    # Sanity check
+    shape = data.shape
+    try :
+        assert len(shape) == 2
+    except AssertionError :
+        message = '*data* should be a 2d np.array. Found: {} dimensions.'
+        message = message.format(len(shape))
+        raise TypeError(message)
+
+    # Normalize data and transpose if necessary
+    if dim == 1 :
+        data = data.T
+    norm = np.max(data[i0:i1])
+    data /= norm
+
+    # Calculate the indices at which to extract lines.
+    # First the raw step size *delta*
+    if i1 == -1 : i1 = shape[dim]-1
+    delta = (i1 - i0)/n
+    # The maximum number of channels we can integrate around each index is 
+    # delta/2
+    max_integrate = int(delta/2)
+    # Adjust the user supplied *integrate* value, if necessary
+    if type(integrate) != int or integrate > max_integrate :
+        integrate = max_integrate
+    # Construct equidistantly spaced center indices, leaving space above and 
+    # below for the integration.
+    indices = [int(round(i)) for i in 
+               np.linspace(i0+integrate+1, i1-integrate, n)]
+
+    # Extract the lines
+    lines = []
+    sumnorm = 2*integrate + 1
+    for i in range(n) :
+        start = indices[i] - integrate
+        stop = indices[i] + integrate + 1
+        line = np.sum(data[start:stop], 0)/sumnorm + i*offset
+        lines.append(line)
+    return lines, indices
+
+def plot_edcs(ax, data, energy, momenta=None, lw=0.5, color='k', 
+              label_fmt='{:.2f}', n=10, offset=0.2, **getlines_kwargs) :
+    """
+    Create an EDC plot by plotting every *nth* EDC in *data* against *energy*.
+    The EDCs are normalized to their overall maximum and shifted from each 
+    other by *offset*. See :func: `get_lines <arpys.postprocessing.get_lines>`
+    for more options on the extraction of EDCs.
+
+    *Parameters*
+    ===============  ===========================================================
+    ax               matplotlib.axes.Axes; the axes in which to plot.
+    data             2d np.array; the data from which to extract EDCs.
+    energy           1d np.array; the associated energy values.
+    momenta          1d np.array; the associated angle or momentum values. 
+                     This is optional but if given, will be used to calculate 
+                     appropriate tick values.
+    lw               float; the linewidth of the plotted lines.
+    color            any color argument understood by matplotlib. Color of 
+                     the plotted lines.
+    label_fmt        str; a format string for the ticklabels.
+    n                int; number of lines to extract from *data*.
+    offset           float; how far apart to space the lines from each other.
+    getlines_kwargs  other kwargs are passed to :func: `get_lines 
+                     <arpys.postprocessing.get_lines>`
+    ===============  ===========================================================
+
+    *Returns*
+    ===========  ===============================================================
+    lines2ds     list of Line2D objects; the drawn lines.
+    xticks       list of float; locations of the 0 intensity value of each line
+    xtickvalues  list of float; if *momenta* were supplied, corresponding xtick
+                 values in units of *momenta*. Otherwise this is just a copy 
+                 of *xticks*.
+    xticklabels  list of str; *xtickvalues* formatted according to *label_fmt*.
+    ===========  ===============================================================
+    """
+    # Get the EDCs
+    lines, indices = get_lines(data, n, offset=offset, **getlines_kwargs)
+
+    line2ds = []
+    for line in lines :
+        line2d = ax.plot(line, energy, lw=lw, color=color)[0]
+        line2ds.append(line2d)
+
+    # Create tick positions and labels
+    xticks = [i*offset for i in range(n)]
+    if momenta is not None :
+        xtickvalues = momenta[indices]
+    else :
+        xtickvalues = xticks
+
+    xticklabels = [label_fmt.format(x) for x in xtickvalues]
+
+    return line2ds, xticks, xtickvalues, xticklabels
+
 def plot_cuts(data, dim=0, zs=None, labels=None, max_ppf=16, max_nfigs=4, 
               **kwargs) :
     """ Plot all (or only the ones specified by `zs`) cuts along dimension `dim` 
