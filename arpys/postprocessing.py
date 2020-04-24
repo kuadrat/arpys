@@ -14,6 +14,7 @@ from scipy.integrate import quad
 from scipy.optimize import curve_fit
 
 from arpys.utilities import constants
+from arpys.utilities import functions as af
 
 # +------------+ #
 # | Decorators | # ============================================================
@@ -155,6 +156,66 @@ def make_map(data, i, integrate=0) :
         fsm += data[i, :, :]
 
     return fsm
+
+def arbitrary_slice_discrete(data, p0, p1, xunits=None, yunits=None) :
+    """
+    Create a slice of some 3d data cube along the plane defined by two given 
+    points *p0* and *p1* and parallel to the z-axis, taking only discrete 
+    values at the pixels (as opposed to using an interpolation).
+
+    *Parameters*
+    ======  ====================================================================
+    data    3d array of shape (z, y, x); the data cube to slice from.
+    p0      2d array-like; starting point in the xy plane.
+    p1      2d array-like; endpoint in the xy plane
+    xunits  1d array of length x; units used along the x axis.
+    yunits  1d array of length y; units used along the y axis.
+    ======  ====================================================================
+
+    *Returns*
+    ===  =======================================================================
+    cut  2d array of shape (z, h); the extracted cut. h is the distance in 
+         pixels between p0 and p1.
+    ===  =======================================================================
+    """
+    # Convert units to pixel coordinates
+    if xunits is not None and yunits is not None :
+        x0 = af.indexof(p0[0], xunits)
+        x1 = af.indexof(p1[0], xunits)
+        y0 = af.indexof(p0[1], yunits)
+        y1 = af.indexof(p1[1], yunits)
+    else :
+        # Assume p0 and p1 to be given in pixels if units are not provides
+        x0, y0 = p0
+        x1, y1 = p1
+
+    # Make sure pixels don't cross array borders
+    nz, ny, nx = data.shape
+    if x0 >= nx :
+        x0 = nx-1
+    if x1 >= nx :
+        x1 = nx-1
+    if y0 >= ny :
+        y0 = ny-1
+    if y1 >= ny :
+        y1 = ny-1
+
+    # Create coordinates along a line connecting *p0* and *p1*
+    num = int(np.sqrt((y1-y0)**2 + (x1-x0)**2))
+    xcut, ycut = np.linspace(x0, x1, num), np.linspace(y0, y1, num)
+    zcut = np.arange(nz, dtype=np.int)
+    # Convert to integers
+    xind = np.array(nz*list(xcut.astype(np.int)))
+    yind = np.array(nz*list(ycut.astype(np.int)))
+    zind = np.array([num*[i] for i in range(nz)]).flatten()
+
+    # Extract cut
+    cut = data[zind, yind, xind].reshape(nz, num)
+
+    return cut
+
+def arbitrary_slice_interpolated() :
+    pass
 
 # +---------------+ #
 # | Normalization | # ========================================================
@@ -1226,162 +1287,8 @@ def adjust_fermi_level(energies, fermi_levels) :
 # | Conversion from angular coordinates to k space | # =========================
 # +------------------------------------------------+ #
 
-def angle_to_k(angles, theta, phi, hv, E_b, work_func=4, c1=0.5124, 
-               shift=0, lattice_constant=1, degrees=True) :
-    """ 
-    :Deprecated:
-    
-    Convert the angular information you get from beamline data into 
-    proper k-space coordinates (in units of pi/a, a being the lattice 
-    constant) using the formula:
-
-        k_x = c1 * sqrt(hv - e*phi + E_B) * sin(theta_a + theta_m)
-        k_y = c1 * sqrt(hv - e*phi + E_B) * sin(phi_a + phi_m)
-
-    with:
-             c1 : numeric constant
-             hv : photon energy (eV)
-          e*phi : work function (eV)
-            E_B : electron binding energy (eV)
-        theta_a : in-plane angle along analyzer slit
-        theta_m : in-plane manipulator angle
-          phi_a : angle along analyzer slit in vertical configuration
-          phi_m : tilt (?)
-
-    Confer the sheet 'Electron momentum calculations' from ADDRESS beamline 
-    for more information on the used notation.
-        
-    *Parameters*
-    ============================================================================
-    angles     1D array; angles (in degree) to be converted into k space
-               (currently equal theta_a)
-    theta      float; corresponds to theta_m 
-    phi        float; corresponds to phi_m
-    hv         float; photon energy in eV
-    E_B        float; binding energy of electrons in eV
-    work_func  float; corresponds to e*phi (eV)
-    c1         float; numeric constant. Shouldn't really be changed 
-    shift      float; shift in units of `angle` to get zero at right 
-               position 
-    lattice_constant    
-               float; lattice constant a in Angstrom used to convert to 
-               units of pi/a
-    degrees    bool; allows giving the angles in either degrees or radians
-    ============================================================================
-
-    *Returns*
-    ============================================================================
-    kx, ky     tuple of floats; kx and ky coordinates in units of pi/a
-    ============================================================================
-
-    """
-    warnings.warn(('This function is deprecated and exists only for backwards '
-                   'compatibility. Use :func: '
-                   '`<arpys.postprocessing.best_a2k()>` instead.'))
-
-    # Precalculate the prefactor (*lattice_constant to get lattice constant 
-    # units)
-    prefactor = c1 * np.sqrt(hv - work_func + E_b) * lattice_constant / np.pi
-
-    # Apply a shift to the angles
-    angles = angles.copy() + shift
-
-    # Convert all angles from degrees to radians
-    if degrees :
-        conversion = np.pi/180
-        # Leave the original array unchanged
-        angles = angles.copy()
-        angles *= conversion
-        theta *= conversion
-        phi *= conversion
-
-    # kx and ky in inverse Angstrom or lattice constant units if 
-    # lattice_constant!=1
-    kx = prefactor * np.sin((theta + angles))
-    ky = prefactor * np.sin(phi) 
-
-    return kx, ky
-
-def new_a2k(thetas, tilts, hv, a=np.pi, b=None, dtheta=0, dtilt=0, azimuth=0, 
-            work_func=4, E_b=0, alpha=20, photon_momentum=True, 
-            orientation='horizontal') :
-    """ 
-    :Deprecated:
-    
-    Cleaner implementation of angle to k conversion, particularly more 
-    suitable for maps. 
-    
-    *Parameters*
-    ===============  ===========================================================
-    thetas           1d-array; angles in parallel direction
-    tilts            1d-array; angles in perpendicular direction
-    hv               float; incoming photon energy
-    a                float; lattice constant in parallel direction. If the 
-                     default value of *pi* is left, the output will be in 
-                     units of inverse Angstrom.
-    b                float; lattice const. in perp. direction. If *None* 
-                     assume the same value as for *a*.
-    dtheta           float; angular offset in parallel direction
-    dtilt            float; angular offset in perp. direction
-    azimuth          float; azimuth (rotation) in degree
-    work_func        float; actually work function + inner potential
-    E_b              float; typical binding energy
-    alpha            float; analyzer angle
-    photon_momentum  boolean; whether or not to correct for the photon momentum
-    orientation      str; either 'horizontal' or 'vertical'. Slit alignment.
-    ===============  ===========================================================
-
-    *Returns*
-    KX, KY
-    """
-    warnings.warn(('This function is deprecated and exists only for backwards '
-                   'compatibility. Use :func: '
-                   '`<arpys.postprocessing.best_a2k()>` instead.'))
-
-    # c0 = sqrt(2*&m_e)/hbar
-    c0 = 0.5124
-    # c1 is the angle to radian conversion
-    c1 = np.pi/180
-    
-    prefactor = c0 * np.sqrt(hv - E_b - work_func)
-    # Convert to units of pi/a
-    prefactor_x = prefactor * a/np.pi
-    if b is None : b = a
-    prefactor_y = prefactor * b/np.pi
-
-    kx = prefactor_x * np.sin(c1*(thetas+dtheta))
-    ky = prefactor_y * np.cos(c1*(tilts+dtilt))
-
-    if photon_momentum :
-        # TODO Change this in other slit orientation
-        # TODO Use actual manipulator values instead of dtheta and dtilt
-        # c2xy is the eV to lattice units conversion
-        c2x = 2*a/12400
-        c2y = 2*b/12400
-        kx -= c2x*np.cos(c1*(alpha+dtheta))
-        ky += c2y*np.sin(c1*(alpha+dtheta))*np.sin(c1*(dtilt))
-
-    ## Apply rotation by azimuth phi
-    # Convert angle to radian
-    phi = azimuth * c1
-    phi_mat = np.array([[np.cos(phi), np.sin(phi)],
-                        [-np.sin(phi), np.cos(phi)]])
-    KX, KY = np.meshgrid(kx, ky)
-    nx, ny = KX.shape
-    k = np.array([KX.flatten(), KY.flatten()])
-    KX, KY = phi_mat.dot(k).reshape((2, nx, ny))
-
-    o = orientation.lower()[0]
-    if o == 'h' :
-        return KX, KY
-#        return kx, ky
-    elif o == 'v' :
-        return KY, KX
-#        return ky, kx
-    else :
-        raise ValueError('Orientation not understood: {}.'.format(orientation))
-
-def best_a2k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='h', work_func=4) :
+def angle_to_k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='horizontal', 
+               work_func=4) :
     """ 
     Convert angles of the experimental geometry to k-space coordinates.
     Confer the sheet "ARPES angle to k-space conversion" [doc/a2k.pdf] for 
@@ -1440,14 +1347,21 @@ def best_a2k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='h', work_func=4) :
                           'understood.').format(orientation)) 
     return k0*KX, k0*KY
 
-def a2k(D, lattice_constant, dtheta=0, dtilt=0) :
+def best_a2k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='horizontal', 
+             work_func=4) :
+    """ Alias for :func: `angle_to_k <arpys.postprocessing.angle_to_k>` """
+    return angle_to_k(alpha, beta, hv, dalpha=dalpha, dbeta=dbeta, 
+                      orientation=orientation, work_func=work_func)
+
+def a2k(D, lattice_constant, dalpha=0, dbeta=0, orientation='horizontal') :
     """
     Shorthand angle to k conversion that takes the output of a `Dataloader 
     <arpys.dataloaders.Dataloader>` object as input and passes all necessary 
-    information on to the actual converter (`new_a2k 
-    <arpys.postprocessing.new_a2k>`).
+    information on to the actual converter (`angle_to_k 
+    <arpys.postprocessing.angle_to_k>`).
     """
-    kx, ky = new_a2k(D.xscale, D.yscale, hv=D.hv, dtheta=dtheta, dtilt=dtilt)
+    kx, ky = angle_to_k(D.xscale, D.yscale, hv=D.hv, dalpha=dalpha, dbeta=dbeta,
+                        orientation=orientation)
     # Convert to units of pi/a
     conversion = np.pi/lattice_constant
     kx, ky = [k/conversion for k in [kx, ky]]
@@ -1705,7 +1619,7 @@ def rotate_XY(X, Y, theta=45) :
     *Returns*
     ===  =======================================================================
     U,V  n by m arrays; U (V) contains the x (y) components of the rotated 
-    coordinates. These can be used as arguments to :func: pcolormesh()
+         coordinates. These can be used as arguments to :func: pcolormesh()
     ===  =======================================================================
 
     .. :see also: `<arpes.postprocessing.rotate_xy>`
