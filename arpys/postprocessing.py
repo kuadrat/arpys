@@ -61,8 +61,7 @@ def make_slice(data, d, i, integrate=0, silent=False) :
 
     *Parameters*
     ============================================================================
-    data       array-like; map data of the shape (l x m x n) where l 
-               corresponds to the number of energy values
+    data       array-like; map data of the shape (l x m x n)
     d          int, d in (0, 1, 2); dimension along which to slice
     i          int, 0 <= i < data.size[d]; The index at which to create the slice
     integrate  int, 0 <= integrate < |i - n|; the number of slices above 
@@ -118,7 +117,6 @@ def make_map(data, i, integrate=0) :
     ============================================================================
     data       array-like; map data of the shape (l x m x n) where l 
                corresponds to the number of energy values
-                
     i          int, 0 <= i < n; The index at which to create the slice
     integrate  int, 0 <= integrate < |i - n|; the number of slices above 
                and below slice i over which to integrate
@@ -305,10 +303,12 @@ def normalize_per_segment(data, dim=0, minimum=False) :
         elif dim == 1 :
             row = data[:,:,i] 
 
-        row /= row.__getattribute__(min_or_max)()
+        norm = row.__getattribute__(min_or_max)()
+        if norm != 0 :
+            row /= norm
 
     # Convert back to original shape, if necessary
-    convert_data_back(data, d, m, n)
+    data = convert_data_back(data, d, m, n)
 
     return data
 
@@ -1314,7 +1314,7 @@ def angle_to_k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='horizontal',
     ==  ========================================================================
     KX  array of shape (nkx, nky); mesh of k values in parallel direction in 
         units of inverse Angstrom.
-    KY  array of shape (nkx, nky); mesh of k valies in perpendicular 
+    KY  array of shape (nkx, nky); mesh of k values in perpendicular 
         direction in units of inverse Angstrom.
     ==  ========================================================================
     """
