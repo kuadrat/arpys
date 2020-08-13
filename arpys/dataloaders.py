@@ -53,6 +53,7 @@ import ast
 import os
 import pickle
 import re
+import zipfile
 from argparse import Namespace
 from errno import ENOENT
 from warnings import catch_warnings, simplefilter, warn
@@ -631,11 +632,6 @@ class Dataloader_SIS(Dataloader) :
     def __init__(self, filename=None) :
         pass
 
-    def load_file(self, filename) :
-        """ Load and store the full h5 file. """
-        # Load the hdf5 file
-        self.datfile = h5py.File(filename, 'r')
-
     def load_data(self, filename) :
         """ 
         Extract and return the actual 'data', i.e. the recorded map/cut. 
@@ -647,8 +643,96 @@ class Dataloader_SIS(Dataloader) :
         # it is written now, though hard to read, turns out to do the right 
         # thing and leads to readable code from after this point.
 
-        self.load_file(filename)
+        if filename.endswith('h5') :
+            return self.load_h5(filename)
+        elif filename.endswith('zip') :
+            return self.load_zip(filename)
+        else :
+            raise NotImplementedError('File suffix not supported.')
 
+    def load_zip(self, filename) :
+        """ Load and store a deflector mode file from SIS-ULTRA. """
+        # Prepare metadata key-value pairs for the different metadata files
+        # and their expected types
+        keys1 = [
+                 ('width', 'n_energy', int),
+                 ('height', 'n_x', int),
+                 ('depth', 'n_y', int),
+                 ('first_full', 'first_energy', int),
+                 ('last_full', 'last_energy', int),
+                 ('widthoffset', 'start_energy', float),
+                 ('widthdelta', 'step_energy', float),
+                 ('heightoffset', 'start_x', float),
+                 ('heightdelta', 'step_x', float), 
+                 ('depthoffset', 'start_y', float),
+                 ('depthdelta', 'step_y', float)
+                ]
+        keys2 = [('Excitation Energy', 'hv', float)]
+
+        # Load the zipfile
+        with zipfile.ZipFile(filename, 'r') as z :
+            # Get the created filename from the viewer
+            with z.open('viewer.ini') as viewer :
+                file_id = self.read_viewer(viewer)
+            # Get most metadata from a metadata file
+            with z.open('Spectrum_' + file_id + '.ini') as metadata_file :
+                M = self.read_metadata(keys1, metadata_file)
+            # Get additional metadata from a second metadata file...
+            with z.open(file_id + '.ini') as metadata_file2 :
+                M2 = self.read_metadata(keys2, metadata_file2)
+            # Extract the binary data from the zipfile
+            with z.open('Spectrum_' + file_id + '.bin') as f :
+                data_flat = np.frombuffer(f.read(), dtype='float32')
+        # Put the data back into its actual shape
+        data = np.reshape(data_flat, (int(M.n_y), int(M.n_x), int(M.n_energy)))
+        # Cut off unswept region
+        data = data[:,:,M.first_energy:M.last_energy+1]
+        # Put into shape (energy, other angle, angle along analyzer)
+        data = np.moveaxis(data, 2, 0)
+
+        # Create axes
+        xscale = start_step_n(M.start_x, M.step_x, M.n_x)
+        yscale = start_step_n(M.start_y, M.step_y, M.n_y)
+        energies = start_step_n(M.start_energy, M.step_energy, M.n_energy)
+        energies = energies[M.first_energy:M.last_energy+1]
+
+        res = Namespace(
+            data = data,
+            xscale = xscale,
+            yscale = yscale,
+            zscale = energies,
+            hv = M2.hv
+        )
+        return res
+        
+    def read_viewer(self, viewer) :
+        """ Extract the file ID from a SIS-ULTRA deflector mode output file. """
+        for line in viewer.readlines() :
+            l = line.decode('UTF-8')
+            if l.startswith('name') :
+                # Make sure to split off unwanted whitespace
+                return l.split('=')[1].split()[0]
+
+    def read_metadata(self, keys, metadata_file) :
+        """ Read the metadata from a SIS-ULTRA deflector mode output file. """
+        # List of interesting keys and associated variable names
+        metadata = Namespace()
+        for line in metadata_file.readlines() :
+            # Split at 'equals' sign
+            tokens = line.decode('utf-8').split('=')
+            for key, name, dtype in keys :
+                if tokens[0] == key :
+                    # Split off whitespace or garbage at the end
+                    value = tokens[1].split()[0]
+                    # And cast to right type
+                    value = dtype(value)
+                    metadata.__setattr__(name, value)
+        return metadata
+
+    def load_h5(self, filename) :
+        """ Load and store the full h5 file and extract relevant information. """
+        # Load the hdf5 file
+        self.datfile = h5py.File(filename, 'r')
         # Extract the actual dataset and some metadata
         h5_data = self.datfile['Electron Analyzer/Image Data']
         attributes = h5_data.attrs
@@ -700,9 +784,12 @@ class Dataloader_SIS(Dataloader) :
             elims = ylims
 
         # Construct x, y and energy scale (x/ylims[1] contains the step size)
-        xscale = self.make_scale(xlims, y)
-        yscale = self.make_scale(ylims, x)
-        energies = self.make_scale(elims, N_E)
+        xscale = start_step_n(*xlims, y)
+        yscale = start_step_n(*ylims, x)
+        energies = start_step_n(*elims, N_E)
+#        xscale = self.make_scale(xlims, y)
+#        yscale = self.make_scale(ylims, x)
+#        energies = self.make_scale(elims, N_E)
 
         # Extract some data for ang2k conversion
         metadata = self.datfile['Other Instruments']
@@ -726,15 +813,15 @@ class Dataloader_SIS(Dataloader) :
         )
         return res
 
-    def make_scale(self, limits, nstep) :
-        """ 
-        Helper function to construct numbers starting from limits[0] 
-        and going in steps of limits[1] for nstep steps.
-        """
-        start = limits[0]
-        step = limits[1]
-        end = start + (nstep+1)*step
-        return np.linspace(start, end, nstep)
+#    def make_scale(self, limits, nstep) :
+#        """ 
+#        Helper function to construct numbers starting from limits[0] 
+#        and going in steps of limits[1] for nstep steps.
+#        """
+#        start = limits[0]
+#        step = limits[1]
+#        end = start + (nstep+1)*step
+#        return np.linspace(start, end, nstep)
 
 class Dataloader_ADRESS(Dataloader) :
    """ ADRESS beamline at SLS, PSI. """
@@ -1258,4 +1345,6 @@ def add_attributes(filename, *attributes) :
 # +---------+ #
 
 if __name__ == '__main__' :
-    pass
+    D = Dataloader_SIS().load_data('/home/kevin/qmap/experiments/2020_09_SIS/PrFeP_3P/PrFeP_3P_0001.zip')
+    print(D.data.shape)
+    print(D.xscale.shape)
