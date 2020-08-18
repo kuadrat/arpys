@@ -12,7 +12,7 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../../..'))
+#sys.path.insert(0, os.path.abspath('../../..'))
 
 import sphinx_rtd_theme
   
@@ -23,6 +23,8 @@ project = 'arpys'
 copyright = '2020, Kevin Kramer'
 author = 'Kevin Kramer'
 
+# The name of the main .rst file to work with
+master_doc = 'index'
 
 # -- General configuration ---------------------------------------------------
 
