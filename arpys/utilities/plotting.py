@@ -161,63 +161,63 @@ def make_n_colors(n=8, cmap='plasma') :
 # | Colormap | # ===============================================================
 # +----------+ #
 
-# Rainbow ligth colormap from ALS
-# ------------------------------------------------------------------------------
-
-# Load the colormap data from file
-filepath = '/home/kevin/bin/kustom/cmaps/rainbow_light.dat'
-data = np.loadtxt(filepath)
-colors = np.array([(i[0], i[1], i[2]) for i in data])
-
-# Normalize the colors
-colors /= colors.max()
-
-# Build the colormap
-rainbow_light = LinearSegmentedColormap.from_list('rainbow_light', colors, 
-                                                  N=len(colors))
-cm.register_cmap(name='rainbow_light', cmap=rainbow_light)
-
-# Hanin colormap: rainbow_light + viridis
-# ------------------------------------------------------------------------------
-
-# Load the colormap data from file
-filepath = '/home/kevin/bin/kustom/cmaps/hanin.dat'
-data = np.loadtxt(filepath)
-colors = np.array([(i[0], i[1], i[2]) for i in data])
-
-# Build the colormap
-hanin = LinearSegmentedColormap.from_list('hanin', colors, 
-                                                  N=len(colors))
-cm.register_cmap(name='hanin', cmap=hanin)
-
-# kocean colormap: ocean_r with different peak color
-# ------------------------------------------------------------------------------
-
-# Load the colormap data from file
-filepath = '/home/kevin/bin/kustom/cmaps/kocean_red.dat'
-data = np.loadtxt(filepath)
-colors = np.array([(i[0], i[1], i[2], i[3]) for i in data]) #rgba
-
-# Build the colormap
-kocean = LinearSegmentedColormap.from_list('kocean', colors, N=len(colors))
-cm.register_cmap(name='kocean', cmap=kocean)
-
-# ARPES colormap
-# ------------------------------------------------------------------------------
-
-#from kustom.kolormap import cmap
-#cm.register_cmap(name='arpes', cmap=cmap)
-
-# Neutron spectroscopy colormap
-# ------------------------------------------------------------------------------
-
-filepath = '/home/kevin/bin/kustom/cmaps/mslice.dat'
-data = np.loadtxt(filepath)
-colors = np.array([(i[0], i[1], i[2]) for i in data]) #rgb
-
-# Build the colormap
-mslice = LinearSegmentedColormap.from_list('mslice', colors, N=len(colors))
-cm.register_cmap(name='mslice', cmap=mslice)
+## Rainbow ligth colormap from ALS
+## ------------------------------------------------------------------------------
+#
+## Load the colormap data from file
+#filepath = '/home/kevin/bin/kustom/cmaps/rainbow_light.dat'
+#data = np.loadtxt(filepath)
+#colors = np.array([(i[0], i[1], i[2]) for i in data])
+#
+## Normalize the colors
+#colors /= colors.max()
+#
+## Build the colormap
+#rainbow_light = LinearSegmentedColormap.from_list('rainbow_light', colors, 
+#                                                  N=len(colors))
+#cm.register_cmap(name='rainbow_light', cmap=rainbow_light)
+#
+## Hanin colormap: rainbow_light + viridis
+## ------------------------------------------------------------------------------
+#
+## Load the colormap data from file
+#filepath = '/home/kevin/bin/kustom/cmaps/hanin.dat'
+#data = np.loadtxt(filepath)
+#colors = np.array([(i[0], i[1], i[2]) for i in data])
+#
+## Build the colormap
+#hanin = LinearSegmentedColormap.from_list('hanin', colors, 
+#                                                  N=len(colors))
+#cm.register_cmap(name='hanin', cmap=hanin)
+#
+## kocean colormap: ocean_r with different peak color
+## ------------------------------------------------------------------------------
+#
+## Load the colormap data from file
+#filepath = '/home/kevin/bin/kustom/cmaps/kocean_red.dat'
+#data = np.loadtxt(filepath)
+#colors = np.array([(i[0], i[1], i[2], i[3]) for i in data]) #rgba
+#
+## Build the colormap
+#kocean = LinearSegmentedColormap.from_list('kocean', colors, N=len(colors))
+#cm.register_cmap(name='kocean', cmap=kocean)
+#
+## ARPES colormap
+## ------------------------------------------------------------------------------
+#
+##from kustom.kolormap import cmap
+##cm.register_cmap(name='arpes', cmap=cmap)
+#
+## Neutron spectroscopy colormap
+## ------------------------------------------------------------------------------
+#
+#filepath = '/home/kevin/bin/kustom/cmaps/mslice.dat'
+#data = np.loadtxt(filepath)
+#colors = np.array([(i[0], i[1], i[2]) for i in data]) #rgb
+#
+## Build the colormap
+#mslice = LinearSegmentedColormap.from_list('mslice', colors, N=len(colors))
+#cm.register_cmap(name='mslice', cmap=mslice)
 
 # Custom normalizations
 # ------------------------------------------------------------------------------
@@ -647,7 +647,7 @@ if __name__ == "__main__" :
     r = range(256)
     d = np.array([r])
     ax1.pcolormesh(d, cmap='viridis')
-    ax2.pcolormesh(d, cmap='kocean')
+#    ax2.pcolormesh(d, cmap='kocean')
 
     fig2 = plt.figure()
     ax3 = fig2.add_subplot(111, projection='cursorpoly')
