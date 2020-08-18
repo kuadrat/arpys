@@ -1214,20 +1214,58 @@ def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
 def fit_gold(D, e_0=None, T=10) :
     """ Apply a Fermi-Dirac fit to all EDCs of an ARPES Gold spectrum. 
     
-    *Parameters*
+    **Parameters**
+
     ===  =======================================================================
     D    argparse.Namespace object; ARPES data and metadata as is created by a
-         :class: `Dataloader <arpys.dataloaders.Dataloader>` object.
+         :class:`Dataloader <arpys.dataloaders.Dataloader>` object.
          Assumes the energies to be stored in D.xscale and the data to be of 
          shape (1, n_angles, n_energies).
     e_0  float; starting guess for the Fermi energy in the energy units 
          provided in *D*. If this is not given, a starting guess will be 
-         estimated by detecting the step in the integrated spectrum using :func:
-         `detect_step <arpys.postprocessing.detect_step>`.
-    T    float; Temperature
+         estimated by detecting the step in the integrated spectrum using 
+         :func:`detect_step <arpys.postprocessing.detect_step>`.
+    T    float; Temperature.
     ===  =======================================================================
 
-    *Returns*
+    **Returns**
+
+    ============  ==============================================================
+    fermi_levels  list; Fermi energy for each EDC.
+    sigmas        list; standard deviations of instrument resolution Gaussian 
+                  for each EDC. This is in units of energy steps. To convert 
+                  to energy, just multiply by the energy step in *D*.
+    functions     list of callables; functions of energy that produce the fit 
+                  for each EDC.
+    ============  ==============================================================
+
+    :see also:
+        :func:`_fit_gold <arpys.postprocessing._fit_gold>`
+    """
+    # Extract data
+    gold = D.data[0]
+    n_pixels, n_energies = gold.shape
+    energies = D.xscale
+    return _fit_gold(gold, energies, e_0, T)
+
+def _fit_gold(gold, energies, e_0=None, T=10) :
+    """ Apply a Fermi-Dirac fit to all EDCs of an ARPES Gold spectrum.
+    
+    **Parameters**
+
+    ========  ==================================================================
+    gold      2d np.array; shape (n_angles, n_energies).
+    energies  1d np.array of length n_energies.
+    e_0       float; starting guess for the Fermi energy in the energy units 
+              provided in *D*. If this is not given, a starting guess will be 
+              estimated by detecting the step in the integrated spectrum using 
+              :func:`detect_step <arpys.postprocessing.detect_step>`.
+    T         float; Temperature.
+    ========  ==================================================================
+
+
+    **Returns**
+
     ============  ==============================================================
     fermi_levels  list; Fermi energy for each EDC.
     sigmas        list; standard deviations of instrument resolution Gaussian 
@@ -1237,12 +1275,6 @@ def fit_gold(D, e_0=None, T=10) :
                   for each EDC.
     ============  ==============================================================
     """
-    # Extract data
-    gold = D.data[0]
-    n_pixels, n_energies = gold.shape
-    energies = D.xscale
-    pixels = np.arange(n_pixels)
-
     # If no hint for the Fermi energy is given, try to detect it from the 
     # gradient of the integrated spectrum
     if e_0 is None :

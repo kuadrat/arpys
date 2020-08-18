@@ -748,11 +748,13 @@ class Dataloader_SIS(Dataloader) :
             y = shape[1]
             # Make data 3D
             data = data.reshape(1, x, y)
-            N_E = y
+#            N_E = y
+            N_E = 1
             # Extract the limits
             xlims = attributes['Axis1.Scale']
             ylims = attributes['Axis0.Scale']
-            elims = ylims
+#            elims = ylims
+            elims = [1, 1]
         # shape[2] should hold the number of cuts. If it is reasonably large, 
         # we have a map. Otherwise just a sequence of cuts.
         # Case map
@@ -799,7 +801,6 @@ class Dataloader_SIS(Dataloader) :
         hv = attributes['Excitation Energy (eV)']
         angles = xscale
         E_b = min(energies)
-
         res = Namespace(
                data = data,
                xscale = xscale,
