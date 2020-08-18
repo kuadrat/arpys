@@ -18,6 +18,10 @@ It is recommended to install with `pip`:
 $ pip install arpys
 ```
 
+## Documentation
+
+Please find the documentation [here]<https://arpys.readthedocs.io/en/latest/>.
+
 ## Rough description of contents
 
 The recommended way of using `arpys` currently is to make use of the classes 
