@@ -51,19 +51,23 @@ eV_nm_conversion = h*c/eV*1e9
 def convert_eV_nm(eV_or_nm) :
     """
     Convert between electronvolt and nanometers for electromagnetic waves.
-    The conversion follows from E = h*c/lambda and is simply:
+    The conversion follows from E = h*c/lambda and is simply::
 
         nm_or_eV = 1239.84193 / eV_or_nm
 
-    Inputs
-    ------
-    eV_or_nm    : float; value in electronvolts or nanometers to be converted.
+    **Parameters**
+
+    ========  ==================================================================
+    eV_or_nm  float; value in electronvolts or nanometers to be converted.
+    ========  ==================================================================
 
 
-    Outputs
-    -------
-    nm_or_eV    : float; if eV were given, this is the corresponding value in
-                  nanometers, or vice versa.
+    **Returns**
+
+    ========  ==================================================================
+    nm_or_eV  float; if eV were given, this is the corresponding value in 
+              nanometers, or vice versa.
+    ========  ==================================================================
     """
     nm_or_eV = eV_nm_conversion / eV_or_nm
     return nm_or_eV

@@ -21,15 +21,16 @@ def im_sigma_factory(lamb=1, T=0, i_step=0, e_step=0, w_step=0.01, i_gauss=0,
                      e_gauss=0, w_gauss=0.01, offset=0) :
     """
     Factory to create functions that represent the imaginary part of the 
-    self-energy. Confer the documentation of :func: `im_sigma 
-    <arpys.2dfit.im_sigma>` for explanations of the parameters.
+    self-energy. Confer the documentation of :func:`im_sigma 
+    <arpys.fit2d.im_sigma>` for explanations of the parameters.
     The factory pattern is used here because a function for 
     im_sigma is needed in the Kramers-Kroning relations that give re_sigma.  
 
     Returns a function of the energy.
 
-    ..:see also: :func: `im_sigma <arpys.2dfit.im_sigma>`
-    ..:see also: :func: `re_sigma <arpys.2dfit.re_sigma>`
+    :see also: 
+        :func:`im_sigma <arpys.fit2d.im_sigma>`
+        :func:`re_sigma <arpys.fit2d.re_sigma>`
     """
     def im_sigma(E) :
         res = lamb * np.sqrt(E**2 + (np.pi*K_B_IN_eV_PER_K*T)**2)
@@ -41,7 +42,7 @@ def im_sigma_factory(lamb=1, T=0, i_step=0, e_step=0, w_step=0.01, i_gauss=0,
 def im_sigma(E, lamb=1, T=0, i_step=0, e_step=0, w_step=0.1, i_gauss=0, 
              e_gauss=0, w_gauss=0.1, offset=0) :
     """
-    Imaginary part of the self-energy. It is parametrized as follows:
+    Imaginary part of the self-energy. It is parametrized as follows::
 
         im_sigma(E) = lamb * sqrt(E^2 + (pi*k*T)^2)
 
@@ -53,7 +54,8 @@ def im_sigma(E, lamb=1, T=0, i_step=0, e_step=0, w_step=0.1, i_gauss=0,
 
                       + offset
 
-    *Parameters*
+    **Parameters**
+
     =======  ===================================================================
     E        float or 1d-array; binding energy/argument to the self-energy in eV
     lamb     float; coefficient of "standard" self-energy term
@@ -69,7 +71,8 @@ def im_sigma(E, lamb=1, T=0, i_step=0, e_step=0, w_step=0.1, i_gauss=0,
 
     All energies are given in eV.
 
-    *Constants*
+    **Constants**
+
     ==  ========================================================================
     pi  3.14159...
     k   Boltzmann constant: 8.6173e-05 eV/K
@@ -85,7 +88,7 @@ def im_sigma(E, lamb=1, T=0, i_step=0, e_step=0, w_step=0.1, i_gauss=0,
 def re_sigma(E, im_sig, e0=-5, e1=5) :
     """
     Calculate the real part of the self-energy from its imaginary part using 
-    the Kramers-Kroning relation:
+    the Kramers-Kroning relation::
 
                              e1
                              /  im_sigma(E')
@@ -93,7 +96,8 @@ def re_sigma(E, im_sig, e0=-5, e1=5) :
                              /     E' - E
                             e0
 
-    *Parameters*
+    **Parameters**
+
     ======  ====================================================================
     E       float; energy at which to evaluate the self-energy
     im_sig  func; function for the imaginary part of the self-energy
@@ -116,12 +120,13 @@ def self_energy_factory(im_kwargs=dict(), re_kwargs=dict()) :
 
     Returns a function of the energy.
 
-    *Parameters*
+    **Parameters**
+
     =========  =================================================================
-    im_kwargs  dict; keyword arguments to :func: `im_sigma_factory 
-               <arpys.2dfit.im_sigma_factory>`
-    re_kwargs  dict; keyword arguments to :func: `re_sigma 
-               <arpys.2dfit.re_sigma_factory>`
+    im_kwargs  dict; keyword arguments to :func:`im_sigma_factory 
+               <arpys.fit2d.im_sigma_factory>`
+    re_kwargs  dict; keyword arguments to :func:`re_sigma 
+               <arpys.fit2d.re_sigma_factory>`
     =========  =================================================================
 
     Confer respective documentations for further explanations on the 
@@ -137,13 +142,14 @@ def self_energy_factory(im_kwargs=dict(), re_kwargs=dict()) :
 def g11(k, E, sig, band, gap) :
     """
     Return the complex electron removal portion of the Green's function in 
-    the Nambu-Gorkov formalism:
+    the Nambu-Gorkov formalism::
 
                                   E - sig(E) + band(k)
         g11(k, E) = -------------------------------------------------
                      (E-sig(E))^2 - band(k)^2 - gap*(1-Re(sig(E))/E)
 
-    *Parameters*
+    **Parameters**
+
     ====  ======================================================================
     k     array of length 2; k vector (in-plane) at which to evaluate g11
     E     float; energy at which to evaluate g11
@@ -165,10 +171,11 @@ def g11(k, E, sig, band, gap) :
 
 def g11_alt(k, E, sig, band, gap) :
     """
-    Variation of :func: `g11 <arpys.2dfit.g11>` which takes precalculated 
+    Variation of :func:`g11 <arpys.fit2d.g11>` which takes precalculated 
     values of `sig`, `band` and `gap`.
 
-    *Parameters*
+    **Parameters**
+
     ====  ======================================================================
     k     array of length 2; k vector (in-plane) at which to evaluate g11
     E     float; energy at which to evaluate g11
@@ -188,7 +195,7 @@ def g11_alt(k, E, sig, band, gap) :
 
 def arpes_intensity(k, E, i0, im_kwargs, re_kwargs, band, gap) :
     """
-    Return the expected ARPES intensity at point (E,k) as modeled by:
+    Return the expected ARPES intensity at point (E,k) as modeled by::
 
                              g11(k, E)
         I_ARPES = i0 * (-Im -----------) * f(E, T)
@@ -196,14 +203,15 @@ def arpes_intensity(k, E, i0, im_kwargs, re_kwargs, band, gap) :
 
     Note that no broadening is applied.
 
-    *Parameters*
+    **Parameters**
+
     =========  =================================================================
     k          array of length 2; k vector (in-plane) at which to evaluate
     E          float; energy at which to evaluate ARPES intensity
     i0         float; global amplitude multiplier
-    im_kwargs  dict; kwargs to :func: `im_sigma_factory 
-               <arpys.2dfit.im_sigma_factory>`
-    re_kwargs  dict; kwargs to :func: `re_sigma <arpys.2dfit.re_sigma_factory>`
+    im_kwargs  dict; kwargs to :func:`im_sigma_factory 
+               <arpys.fit2d.im_sigma_factory>`
+    re_kwargs  dict; kwargs to :func: `re_sigma <arpys.fit2d.re_sigma_factory>`
     band       func; function that returns the bare band at k
     gap        func; function that returns the superconducting gap at k
     =========  =================================================================
@@ -229,7 +237,8 @@ def compute_self_energy_parallel(self_energy_func, n_proc, E) :
     several subprocesses. Since multiprocessing.Pool cannot handle local 
     functions and lambdas, we have to do the job splitting by hand.
 
-    *Parameters*
+    **Parameters**
+
     ================  ==========================================================
     self_energy_func  func; function of E that returns the complex self-energy.
     n_proc            int; number of subprocesses to spawn (should be smaller 
@@ -237,22 +246,23 @@ def compute_self_energy_parallel(self_energy_func, n_proc, E) :
     E                 1d-array; energies at which to evaluate the self-energy.
     ================  ==========================================================
 
-    *Returns*
+    **Returns**
+
     =============  =============================================================
     self_energies  1d-array of same length as *E*;
     =============  =============================================================
 
-    This function simply splits the evaluation
-    ```
-    self_energies = [self_energy_func(e) for e in E]
-    ```
-    into *n_proc* separate parts:
-    ```
-    self_energies = [self_energy_func(e) for e in E[i0:i1]] + 
-                    [self_energy_func(e) for e in E[i1:i2]] + 
-                    [self_energy_func(e) for e in E[i2:i3]] + 
-                    ...
-    ```
+    This function simply splits the evaluation::
+
+        self_energies = [self_energy_func(e) for e in E]
+
+    into *n_proc* separate parts::
+
+        self_energies = [self_energy_func(e) for e in E[i0:i1]] + 
+                        [self_energy_func(e) for e in E[i1:i2]] + 
+                        [self_energy_func(e) for e in E[i2:i3]] + 
+                        ...
+
     all of which can be evaluated simultaneously by a different subprocess.
     """
     # Calculate the index ranges which will split up our energy array
@@ -296,10 +306,10 @@ def compute_self_energy_parallel(self_energy_func, n_proc, E) :
 
 def arpes_intensity_alt(k, E, i0, im_kwargs, re_kwargs, band, gap, n_proc=1) :
     """
-    Alternative implementation o `arpes_intensity` that is hopefully a bit 
-    faster.
+    Alternative implementation of :func:`arpes_intensity 
+    <arpys.fit2d.arpes_intensity>` that is hopefully a bit faster.
 
-    Return the expected ARPES intensity at point (E,k) as modeled by:
+    Return the expected ARPES intensity at point (E,k) as modeled by::
 
                              g11(k, E)
         I_ARPES = i0 * (-Im -----------) * f(E, T)
@@ -307,19 +317,21 @@ def arpes_intensity_alt(k, E, i0, im_kwargs, re_kwargs, band, gap, n_proc=1) :
 
     Note that no broadening is applied.
 
-    *Parameters*
+    **Parameters**
+
     =========  =================================================================
     k          2D array of shape (2,nk); k vectors (in-plane)
     E          array of length ne; energies at which to evaluate ARPES intensity
     i0         float; global amplitude multiplier
     im_kwargs  dict; kwargs to :func: `im_sigma_factory 
-               <arpys.2dfit.im_sigma_factory>`
-    re_kwargs  dict; kwargs to :func: `re_sigma <arpys.2dfit.re_sigma_factory>`
+               <arpys.fit2d.im_sigma_factory>`
+    re_kwargs  dict; kwargs to :func: `re_sigma <arpys.fit2d.re_sigma_factory>`
     band       func; function that returns the bare band at k
     gap        func; function that returns the superconducting gap at k
     =========  =================================================================
 
-    *Returns*
+    **Returns**
+
     =========  =================================================================
     intensity  2D array of shape (ne, nk);
     =========  =================================================================
@@ -367,7 +379,8 @@ def band_factory(bottom, m_e=1) :
     Create a function that represents a parabolic band with band bottom at 
     energy `bottom`.
 
-    *Parameters*
+    **Parameters**
+
     ======  ====================================================================
     bottom  float; energy of the band bottom in eV, measured from the Fermi 
             level.
@@ -375,7 +388,8 @@ def band_factory(bottom, m_e=1) :
             the opening of the parabola.
     ======  ====================================================================
 
-    *Returns*
+    **Returns**
+
     ====  ======================================================================
     band  func; a function of a length 2 array `k` that returns the energy of a 
           band at given `k`. `k` should be given in inverse Angstrom.

@@ -1,9 +1,9 @@
 """
 Useful propcycle elements for plotting.
-Usage:
+Usage::
 
-from matplotlib import rc
-rc("axes", prop_cycle=<insert your cycler here>)
+    from matplotlib import rc
+    rc("axes", prop_cycle=<insert your cycler here>)
 
 """
 
@@ -82,15 +82,13 @@ def advance_cycler(ax, n=1) :
     """
     Advance the state of a cycler by n steps.
 
-    Inputs:
-    -------
-    ax      : matplotlib.axes._suplots.AxesSubplot instance; The subplot in 
-    which to advance the cycler.
-    n       : int; The number of steps to advance the cycler by
+    **Parameters**
 
-    Outputs:
-    --------
-    None
+    ==  ========================================================================
+    ax  matplotlib.axes._suplots.AxesSubplot instance; The subplot in which 
+        to advance the cycler.
+    n   int; The number of steps to advance the cycler by
+    ==  ========================================================================
     """
     if n < 1 or type(n) != int :
         raise ValueError(
@@ -108,14 +106,12 @@ def rewind_cycler(ax) :
     might be better to just use the 'advance_cycler' method with argument 
     'len(cycler)-1'.
 
-    Inputs:
-    -------
-    ax      : matplotlib.axes._suplots.AxesSubplot instance; The subplot in 
-    which to advance the cycler.
+    **Parameters**
 
-    Outputs:
-    --------
-    None
+    ==  ========================================================================
+    ax  matplotlib.axes._suplots.AxesSubplot instance; The subplot in which 
+        to advance the cycler.
+    ==  ========================================================================
     """
     cyc = ax._get_lines.prop_cycler
     # In order to get the length, iterate until you get the same result again
@@ -487,34 +483,35 @@ class cursorpolyax(cursorax) :
     A cursorax that allows drawing of a draggable polygon-ROI. 
 
     By clicking on the plot, a cursor appears which behaves and can be 
-    accessed the same way as in :class: `cursorax <kustom.plotting.cursorax>`.
+    accessed the same way as in :class:`cursorax 
+    <arpys.utilities.plotting.cursorax>`.
     Additionally, hitting the `draw_key` (`d` by default) puts user in 
     `polygon-draw mode` where each subsequent click on the plot adds another 
     corner to a polygon until it is completed by clicking on the starting
     point again. 
     Once finished, each click just moves the cursor, as before. Hitting the 
     `remove_key` (`e` by default) removes the polygon from the plot.
-    At the moment of the polygon's completion, the function :func: 
-    `on_polygon_complete <kustom.plotting.cursorpolyax.on_polygon_complete>` 
+    At the moment of the polygon's completion, the function 
+    :meth:`on_polygon_complete 
+    <arpys.utilities.plotting.cursorpolyax.on_polygon_complete>` 
     is executed. This function is a stub in the class definition and can be 
     overwritten/reassigned by the user to perform any action desired on 
     polygon completion.
     The vertices of the last completed polygon are present as an argument to 
-    :func: `on_polygon_complete 
+    :meth:`on_polygon_complete 
     <kustom.plotting.cursorpolyax.on_polygon_complete>` and can also be 
-    accessed by :attr: `vertices` at any time.
+    accessed by :attr:`vertices` at any time.
 
-    #The actual magic here is done by :class: `PolygonSelector 
-    #<matplotlib.widgets.PolygonSelector>`. This class mostly provides a 
-    #simple interface for ...
+    The actual magic here is done by :class:`PolygonSelector 
+    <matplotlib.widgets.PolygonSelector>` which this class mostly just 
+    provides a simple interface for ...
 
-    Known bugs:
-    -----------
-    * Using :class: `PolygonSelector 
-      <matplotlib.widgets.PolygonSelector>`'s default 'remove' key (Esc) 
-      messes up reaction to :class: `cursorpolyax 
-      <kustom.plotting.cursorpolyax`' keybinds.
-    * Shift-dragging polygon makes the cursor jump.
+    :Known bugs:
+        * Using :class:`PolygonSelector 
+          <matplotlib.widgets.PolygonSelector>`'s default 'remove' key (Esc) 
+          messes up reaction to :class:`cursorpolyax 
+          <arpys.utilities.plotting.cursorpolyax>`' keybinds.
+        * Shift-dragging polygon makes the cursor jump.
     """
     # The name under which this class of axes will be accessible from matplotlib
     name = 'cursorpoly'

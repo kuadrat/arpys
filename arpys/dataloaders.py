@@ -3,8 +3,8 @@
 Provides several Dataloader objects which open different kinds of data files 
 - typically acquired at different sources (i.e. beamlines at various 
 synchrotrons) - and crunch them into the same shape and form.
-The output form is an argparse.Namespace object like this:
-```
+The output form is an :class:`argparse.Namespace` object like this::
+
     Namespace(data,
               xscale,
               yscale,
@@ -14,7 +14,7 @@ The output form is an argparse.Namespace object like this:
               phi,
               E_b,
               hv)
-```
+
 Where the entries are as follows:
 
 ======  ========================================================================
@@ -77,7 +77,7 @@ def start_step_n(start, step, n) :
 class Dataloader() :
     """ 
     Base dataloader class (interface) from which others inherit some 
-    methods (specifically the __repr__() function). 
+    methods (specifically the ``__repr__()`` function). 
     The `date` attribute should indicate the last date that this specific 
     dataloader worked properly for files of its type (as beamline filetypes 
     may vary with time).
@@ -152,8 +152,7 @@ class Dataloader_i05(Dataloader) :
 
             # Special case for 'pathgroup'
             if command.value.split()[1] == 'pathgroup' :
-                print(80*'=')
-                print('is pathgroup')
+                self.print_m('is pathgroup')
                 # Extract points from a ([polar, x, y], [polar, x, y], ...) 
                 # tuple
                 points = command.value.split('(')[-1].split(')')[0]
@@ -171,11 +170,9 @@ class Dataloader_i05(Dataloader) :
 
             # Special case for 'scangroup'
             elif command.value.split()[1] == 'scan_group' :
-                print(80*'=')
-                print('is scan_group')
+                self.print_m('is scan_group')
                 # Extract points from a ([polar, x, y], [polar, x, y], ...) 
                 # tuple
-                print(command.value)
                 points = command.value.split('((')[-1].split('))')[0]
                 points = '((' + points + '))'
                 xscale = np.array(ast.literal_eval(points))[:,0]
@@ -187,24 +184,12 @@ class Dataloader_i05(Dataloader) :
 
            # "Normal" case
             else :
-                print(90*'*')
-                print(command.value)
                 start_stop_step = command.value.split()[2:5]
                 start, stop, step = [float(s) for s in start_stop_step] 
                 xscale = np.arange(start, stop+0.5*step, step)
-                print(80*'y')
-                print(xscale.shape)
-                print(yscale.shape)
-                print(zscale.shape)
-                print(data.shape)
-                print(80*'z')
-                print(zscale)
 
         # What we usually call theta is tilt in this beamline
         theta = infile['entry1/instrument/manipulator/satilt'].value[0]
-        print(80*'2')
-        print(infile['entry1/instrument/manipulator/sapolar'])
-        print(80*'3')
         phi = infile['entry1/instrument/manipulator/sapolar'].value[0]
 
         # Take the mean of the given binding energies as an estimate
@@ -227,75 +212,75 @@ class Dataloader_ALS(Dataloader) :
     """ 
     Object that allows loading and saving of ARPES data from the MAESTRO
     beamline at ALS, Berkely, in the newer .h5 format
-    Organization of the ALS h5 file: (June, 2018)
+    Organization of the ALS h5 file (June, 2018)::
 
-    /-0D_Data
-    | |
-    | +-Cryostat_A
-    | +-Cryostat_B
-    | +-Cryostat_C
-    | +-Cryostat_D
-    | +-I0_NEXAFS
-    | +-IG_NEXAFS
-    | +-X                       <--- only present for xy scans (probably)
-    | +-Y                       <--- "
-    | +-Sorensen Program        <--- only present for dosing scans
-    | +-time
-    | 
-    +-1D_Data
-    | |
-    | +-Swept_SpectraN          <--- Not always present
-    |
-    +-2D_Data
-    | |
-    | +-Swept_SpectraN          <--- Usual location of data. There can be 
-    |                                several 'Swept_SpectraN', each with an 
-    |                                increasing value of N. The relevant data 
-    |                                seems to be in the highest numbered 
-    |                                Swept_Spectra.
-    |
-    +-Comments
-    | |
-    | +-PreScan
-    |
-    +-Headers
-      |
-      +-Beamline
-      | |
-      | +-[...]
-      | +-EPU_POL               <--- Polarization (Integer encoded)
-      | +-BL_E                  <--- Beamline energy (hv)
-      | +-[...]
-      | 
-      +-Computer
-      +-DAQ_Swept
-      | |
-      | +-[...]
-      | +-SSPE_0                <--- Pass energy (eV)
-      | +-[...]
-      | |
-      +-FileFormat
-      +-Low_Level_Scan
-      +-Main
-      +-Motors_Logical
-      +-Motors_Logical_Offset
-      +-Motors_Physical
-      +-Motors_Sample           <--- Contains sample coordinates (xyz & angles)
-      | |
-      | +-[...]
-      | +-SMOTOR3               <--- Theta
-      | +-SMOTOR5               <--- Phi
-      | +-[...]
-      |
-      +-Motors_Sample_Offset
-      +-Notebook
+        /-0D_Data
+        | |
+        | +-Cryostat_A
+        | +-Cryostat_B
+        | +-Cryostat_C
+        | +-Cryostat_D
+        | +-I0_NEXAFS
+        | +-IG_NEXAFS
+        | +-X                       <--- only present for xy scans (probably)
+        | +-Y                       <--- "
+        | +-Sorensen Program        <--- only present for dosing scans
+        | +-time
+        | 
+        +-1D_Data
+        | |
+        | +-Swept_SpectraN          <--- Not always present
+        |
+        +-2D_Data
+        | |
+        | +-Swept_SpectraN          <--- Usual location of data. There can be 
+        |                                several 'Swept_SpectraN', each with an 
+        |                                increasing value of N. The relevant data 
+        |                                seems to be in the highest numbered 
+        |                                Swept_Spectra.
+        |
+        +-Comments
+        | |
+        | +-PreScan
+        |
+        +-Headers
+          |
+          +-Beamline
+          | |
+          | +-[...]
+          | +-EPU_POL               <--- Polarization (Integer encoded)
+          | +-BL_E                  <--- Beamline energy (hv)
+          | +-[...]
+          | 
+          +-Computer
+          +-DAQ_Swept
+          | |
+          | +-[...]
+          | +-SSPE_0                <--- Pass energy (eV)
+          | +-[...]
+          | |
+          +-FileFormat
+          +-Low_Level_Scan
+          +-Main
+          +-Motors_Logical
+          +-Motors_Logical_Offset
+          +-Motors_Physical
+          +-Motors_Sample           <--- Contains sample coordinates (xyz & angles)
+          | |
+          | +-[...]
+          | +-SMOTOR3               <--- Theta
+          | +-SMOTOR5               <--- Phi
+          | +-[...]
+          |
+          +-Motors_Sample_Offset
+          +-Notebook
     """
     name = 'ALS'
 
     def get(self, group, field_name) :
         """
         Return the value of property *field_name* from h5File group *group*.
-        *field_name* must be a bytestring (e.g. b'some_string')!
+        *field_name* must be a bytestring (e.g. ``b'some_string'``)!
         This also returns a bytes object, remember to cast it correctly.
         Returns *None* if *field_name* was not found in *group*.
         """
@@ -929,8 +914,8 @@ class Dataloader_CASSIOPEE(Dataloader) :
     def load_data(self, filename) :
         """ 
         Single cuts are stored as two files: One file contians the data and 
-        the other the metadata. Maps, hv scans and other `external 
-        loop`-scans are stored as a directory containing these two files for 
+        the other the metadata. Maps, hv scans and other *external 
+        loop*-scans are stored as a directory containing these two files for 
         each cut/step of the external loop. Thus, this dataloader 
         distinguishes between directories and single files and changes its 
         behaviour accordingly.
@@ -944,16 +929,17 @@ class Dataloader_CASSIOPEE(Dataloader) :
     def load_from_dir(self, dirname) :
         """
         Load 3D data from a directory as it is output by the IGOR macro used 
-        at CASSIOPEE. The dir is assumed to contain two files for each cut:
+        at CASSIOPEE. The dir is assumed to contain two files for each cut::
 
             BASENAME_INDEX_i.txt     -> beamline related metadata
             BASENAME_INDEX_ROI1_.txt -> data and analyzer related metadata
 
         To be more precise, the assumptions made on the filenames in the 
         directory are:
-            - the INDEX is surrounded by underscores (`_`) and appears after 
+
+            * the INDEX is surrounded by underscores (`_`) and appears after 
               the first underscore.
-            - the string `ROI` appears in the data filename.
+            * the string ``ROI`` appears in the data filename.
         """
         # Get the all filenames in the dir
         all_filenames = os.listdir(dirname)
@@ -1103,9 +1089,10 @@ class Dataloader_CASSIOPEE(Dataloader) :
         """ 
         Extract some of the metadata stored in a CASSIOPEE output text file. 
         Also try to detect the line number below which the data starts (for 
-        np.loadtxt's skiprows.
+        np.loadtxt's skiprows.)
 
-        Returns:
+        **Returns**
+
         ======  ================================================================
         i       int; last line number still containing metadata.
         energy  1D np.array; energy (y-axis) values.
@@ -1134,11 +1121,13 @@ class Dataloader_CASSIOPEE(Dataloader) :
         """
         Try to determine the scantype and the corresponding z-axis scale from 
         the additional metadata textfiles. These follow the assumptions made 
-        in :func: `self.load_from_dir`. Additionally, the MONOCHROMATOR 
-        section must come before the UNDULATOR section as in both sections we 
-        have a key `hv` but only the former makes sense.
+        in :meth:`self.load_from_dir 
+        <arpys.dataloaders.Dataloader_CASSIOPEE.load_from_dir>`. 
+        Additionally, the MONOCHROMATOR section must come before the 
+        UNDULATOR section as in both sections we have a key `hv` but only the 
+        former makes sense.
         Return a string for the scantype, the extracted z-scale and the value 
-        for hv for of non-hv-scans (scantype, zscale, hvs[0]) or (None, 
+        for hv for non-hv-scans (scantype, zscale, hvs[0]) or (None, 
         None, hvs[0]) in case of failure.
         """
         # Step 1) Extract metadata from metadata file
@@ -1216,7 +1205,7 @@ all_dls = [
 # Function to try all dataloaders in all_dls
 def load_data(filename, exclude=None, suppress_warnings=False) :
     """
-    Try to load some dataset 'filename' by iterating through `all_dls` 
+    Try to load some dataset *filename* by iterating through `all_dls` 
     and appliyng the respective dataloader's load_data method. If it works: 
     great. If not, try with the next dataloader. 
     Collects and prints all raised exceptions in case that no dataloader 
@@ -1275,8 +1264,10 @@ def load_data(filename, exclude=None, suppress_warnings=False) :
 
 # Function to create a python pickle file from a data namespace
 def dump(D, filename, force=False) :
-    """ Wrapper for :func: `pickle.dump()`. Does not overwrite if a file of 
-    the given name already exists, unless :param: `force` is True.
+    """ Wrapper for :func:`pickle.dump`. Does not overwrite if a file of 
+    the given name already exists, unless *force* is True.
+
+    **Parameters**
 
     ========  ==================================================================
     D         python object to be stored.
@@ -1301,6 +1292,8 @@ def dump(D, filename, force=False) :
 def load_pickle(filename) :
     """ Shorthand for loading python objects stored in pickle files.
 
+    **Parameters**
+
     ========  ==================================================================
     filename  str; name of file to load.
     ========  ==================================================================
@@ -1309,7 +1302,9 @@ def load_pickle(filename) :
         return pickle.load(f)
 
 def update_namespace(D, *attributes) :
-    """ Add arbitrary attributes to a :class: `Namespace <argparse.Namespace>`.
+    """ Add arbitrary attributes to a :class:`Namespace <argparse.Namespace>`.
+
+    **Parameters**
 
     ==========  ================================================================
     D           argparse.Namespace; the namespace holding the data and 
@@ -1325,8 +1320,10 @@ def update_namespace(D, *attributes) :
 def add_attributes(filename, *attributes) :
     """ Add arbitrary attributes to an argparse.Namespace that is stored as a 
     python pickle file. Simply opens the file, updates the namespace with 
-    :func: `update_namespace <arpys.dataloaders.update_namespace>` and writes 
+    :func:`update_namespace <arpys.dataloaders.update_namespace>` and writes 
     back to file.
+  
+    **Parameters**
 
     ==========  ================================================================
     filename    str; name of the file to update.

@@ -2,36 +2,39 @@
 """
 http://www.workwithcolor.com/hsl-color-schemer-01.htm
 
-cdict = {'red':     ((),
-                     ()),
-         'green':   ((),
-                     ()),
-         'blue':    ((),
-                     ())}
+::
 
-white
-FFFFFF  255,255,255
-EBCCFF  235,204,255
-D699FF  214,153,255
-C266FF  194,102,255
-AD33FF  173, 51,255
-9900FF  153,  0,255
-7A00CC  122,  0,204
-5C0099   92,  0,153
-3D0066   61,  0,102
-1F0033   31,  0, 51
-purple-black
-000000    0,  0,  0
-333300   51, 51,  0
-666600  102,102,  0
-999900  153,153,  0
-CCCC00  204,204,  0
-FFFF00  255,255,  0
-FFFF33  255,255, 51
-FFFF66  255,255,102
-FFFF99  255,255,153
-FFFFCC  255,255,204
-white-yellow
+    cdict = {'red':     ((),
+                         ()),
+             'green':   ((),
+                         ()),
+             'blue':    ((),
+                         ())}
+
+    white
+    FFFFFF  255,255,255
+    EBCCFF  235,204,255
+    D699FF  214,153,255
+    C266FF  194,102,255
+    AD33FF  173, 51,255
+    9900FF  153,  0,255
+    7A00CC  122,  0,204
+    5C0099   92,  0,153
+    3D0066   61,  0,102
+    1F0033   31,  0, 51
+    purple-black
+    000000    0,  0,  0
+    333300   51, 51,  0
+    666600  102,102,  0
+    999900  153,153,  0
+    CCCC00  204,204,  0
+    FFFF00  255,255,  0
+    FFFF33  255,255, 51
+    FFFF66  255,255,102
+    FFFF99  255,255,153
+    FFFFCC  255,255,204
+    white-yellow
+
 """
 
 import matplotlib.pyplot as plt
@@ -129,8 +132,6 @@ for i, color in enumerate(colors2) :
     blue.append(b)
     green.append(g)
 """
-#print(red)
-print(np.array(red)[:,0])
 
 # Create the new colormap
 cdict = dict(red=tuple([r for r in red]),

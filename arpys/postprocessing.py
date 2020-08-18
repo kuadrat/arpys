@@ -59,21 +59,23 @@ def make_slice(data, d, i, integrate=0, silent=False) :
     """ Create a slice out of the 3d data (l x m x n) along dimension d 
     (0,1,2) at index i. Optionally integrate around i.
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    =========  =================================================================
     data       array-like; map data of the shape (l x m x n)
     d          int, d in (0, 1, 2); dimension along which to slice
     i          int, 0 <= i < data.size[d]; The index at which to create the slice
-    integrate  int, 0 <= integrate < |i - n|; the number of slices above 
+    integrate  int, ``0 <= integrate < |i - n|``; the number of slices above 
                and below slice i over which to integrate
     silent     bool; toggle warning messages
-    ============================================================================
+    =========  =================================================================
 
-    *Returns*
-    ============================================================================
-    res        np.array; Slice at index with dimensions shape[:d] + shape[d+1:]
-               where shape = (l, m, n).
-    ============================================================================
+    **Returns**
+
+    ===  =======================================================================
+    res  np.array; Slice at index with dimensions ``shape[:d] + shape[d+1:]``
+         where shape = (l, m, n).
+    ===  =======================================================================
     """
     # Get the relevant dimensions
     shape = data.shape
@@ -113,23 +115,26 @@ def make_map(data, i, integrate=0) :
     If the values of i or integrate are bigger than what is possible, they 
     are automatically reduced to the maximum possible.
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    =========  =================================================================
     data       array-like; map data of the shape (l x m x n) where l 
                corresponds to the number of energy values
     i          int, 0 <= i < n; The index at which to create the slice
-    integrate  int, 0 <= integrate < |i - n|; the number of slices above 
+    integrate  int, ``0 <= integrate < |i - n|``; the number of slices above 
                and below slice i over which to integrate
-    ============================================================================
+    =========  =================================================================
 
-    *Returns*
-    ============================================================================
-    res        np.array; Map at given energy with dimensions (m x n)
-    ============================================================================
+    **Returns**
 
-    .. :see also:
-        `make_slice <arpys.postprocessing.make_slice>`. `make_map` is 
-        basically a special case of `make_slice`.
+    ===  =======================================================================
+    res  np.array; Map at given energy with dimensions (m x n)
+    ===  =======================================================================
+
+    :see also:
+        :func:`make_slice <arpys.postprocessing.make_slice>`. 
+
+    `make_map` is basically a special case of `make_slice`.
     """
     # Prepare the start and stop indices for slicing of the map data
     l, m, n = data.shape
@@ -161,7 +166,8 @@ def arbitrary_slice_discrete(data, p0, p1, xunits=None, yunits=None) :
     points *p0* and *p1* and parallel to the z-axis, taking only discrete 
     values at the pixels (as opposed to using an interpolation).
 
-    *Parameters*
+    **Parameters**
+
     ======  ====================================================================
     data    3d array of shape (z, y, x); the data cube to slice from.
     p0      2d array-like; starting point in the xy plane.
@@ -170,7 +176,8 @@ def arbitrary_slice_discrete(data, p0, p1, xunits=None, yunits=None) :
     yunits  1d array of length y; units used along the y axis.
     ======  ====================================================================
 
-    *Returns*
+    **Returns**
+
     ===  =======================================================================
     cut  2d array of shape (z, h); the extracted cut. h is the distance in 
          pixels between p0 and p1.
@@ -223,16 +230,18 @@ def normalize_globally(data, minimum=True) :
     """ The simplest approach: normalize the whole dataset by the global min- 
     or maximum.
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    =======  ===================================================================
     data     array-like; the input data of arbitrary dimensionality
     minimum  boolean; if True, use the min, otherwise the max function
-    ============================================================================
+    =======  ===================================================================
 
-    *Returns*
-    ============================================================================
-    res      np.array; normalized version of input data
-    ============================================================================
+    **Returns**
+
+    ===  =======================================================================
+    res  np.array; normalized version of input data
+    ===  =======================================================================
     """
     # Select whether to use the minimum or the maximum for normalization
     min_or_max = 'min' if minimum else 'max'
@@ -264,7 +273,8 @@ def convert_data(data) :
 
 def convert_data_back(data, d, m, n) :
     """ Helper function to convert data back to the original shape which is 
-    determined by the values of d, m and n (outputs of :func: convert_data).
+    determined by the values of d, m and n (outputs of :func:`convert_data 
+    <arpys.postprocessing.convert_data>`).
     """
     if d == 2 :
         data = data.reshape(m, n)
@@ -273,18 +283,20 @@ def convert_data_back(data, d, m, n) :
 def normalize_per_segment(data, dim=0, minimum=False) :
     """ Normalize each column/row by its respective max value.
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    =======  ===================================================================
     data     array-like; the input data with shape (m x n) or 
              (1 x m x n)
     dim      int; along which dimension to normalize (0 or 1)
     minimum  boolean; if True, use the min, otherwise the max function
-    ============================================================================
+    =======  ===================================================================
 
-    *Returns*
-    ============================================================================
-    res      np.array; normalized version of input data in same shape
-    ============================================================================
+    **Returns**
+
+    ===  =======================================================================
+    res  np.array; normalized version of input data in same shape
+    ===  =======================================================================
     """
     # Select whether to use the minimum or the maximum for normalization
     min_or_max = 'min' if minimum else 'max'
@@ -316,13 +328,14 @@ def normalize_per_integrated_segment(data, dim=0, profile=False,
                                      in_place=True) :
     """ Normalize each MDC/EDC by its integral.
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    ========  ==================================================================
     data      array-like; the input data with shape (m x n) or 
               (1 x m x n).
     dim       int; along which dimension to normalize (0 or 1)
     profile   boolean; if True return a tuple (res, norm) instead of just 
-                  res.
+              res.
     in_place  boolean; whether or not to update the input data in place. 
               This can be used if one is only interested in the 
               normalization profile and does not want to spend 
@@ -330,16 +343,17 @@ def normalize_per_integrated_segment(data, dim=0, profile=False,
               be the case when processing FSMs). If this is False `data` 
               will not be in the output.
               TODO This doesn't make sense.
-    ============================================================================
+    ========  ==================================================================
 
-    *Returns*
-    ============================================================================
-    res       np.array; normalized version of input data in same shape. 
-              Only given if `in_place` is True.
-    norms     np.array; 1D array of length X for dim=0 and Y for dim=1 of 
-              normalization factors for each channel. Only given if 
-              `profile` is True.
-    ============================================================================
+    **Returns**
+
+    =====  =====================================================================
+    res    np.array; normalized version of input data in same shape. Only 
+           given if `in_place` is True.
+    norms  np.array; 1D array of length X for dim=0 and Y for dim=1 of 
+           normalization factors for each channel. Only given if `profile` is 
+           True.
+    =====  =====================================================================
     """
     # Convert data if necessary
     data, d, m, n = convert_data(data)
@@ -412,7 +426,7 @@ def normalize_per_integrated_segment(data, dim=0, profile=False,
 
 def norm_int_edc(data, profile=False) :
     """ 
-    Shorthand for :func: `normalize_per_integrated_segment 
+    Shorthand for :func:`normalize_per_integrated_segment 
     <arpys.postprocessing.normalize_per_integrated_segment>` with 
     arguments
     `dim=1, profile=False, in_place=True`.
@@ -425,29 +439,31 @@ def normalize_above_fermi(data, ef_index, n_pts=10, dist=0, inverted=False,
     """ Normalize data to the mean of the n_pts smallest values above the Fermi 
     level.
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    ========  ==================================================================
     data      array-like; data of shape (m x n) or (1 x m x n)
     ef_index  int; index of the Fermi level in the EDCs
     n         int; number of points above the Fermi level to average over
     dist      int; distance from Fermi level before starting to take points 
               for the normalization. The points taken correspond to 
-              EDC[ef_index+d:ef_index+d+n] (in the non-inverted case)
+              ``EDC[ef_index+d:ef_index+d+n]`` (in the non-inverted case)
     dim       either 1 or 2; 1 if EDCs have length n, 2 if EDCs have length m
     inverted  boolean; this should be set to True if higher energy values 
               come first in the EDCs
     profile   boolean; if True, the list of normalization factors is returned
               additionally
-    ============================================================================
+    ========  ==================================================================
 
-    *Returns*
-    ============================================================================
-    data      array-like; normalized data of same shape as input data
-    profile   1D-array; only returned as a tuple with data (`data, profile`) 
-              if argument `profile` was set to True. Contains the 
-              normalization profile, i.e. the normalization factor for each 
-              channel. Its length is m if dim==2 and l if dim==1.
-    ============================================================================
+    **Returns**
+
+    =======  ===================================================================
+    data     array-like; normalized data of same shape as input data
+    profile  1D-array; only returned as a tuple with data (`data, profile`) 
+             if argument `profile` was set to True. Contains the 
+             normalization profile, i.e. the normalization factor for each 
+             channel. Its length is m if dim==2 and l if dim==1.
+    =======  ===================================================================
     """
     # Prevent input data from being overwritten by creating a copy and 
     # convert data shape if necessary
@@ -509,24 +525,26 @@ def norm_to_smooth_mdc(data, mdc_index, integrate, dim=1, n_box=15,
     Normalize a cut to a smoothened average MDC of the intensity above the 
     Fermi level.
 
-    *Parameters*
-    ============================================================================
-    data       array of shape (1 x m x n) or (m x n);
-    mdc_index  int; index in data at which to take the mdc
-    integrate  int; number of MDCs above and below `mdc_index` over which to 
-               integrate
-    dim        either 1 or 2; 1 if EDCs have length n, 2 if EDCs have length m
-    n_box      int; box size of linear smoother. Confer :func: 
-               `<arpys.postprocessing.smooth>`
-    recursion_level
-               int; number of times to iteratively apply the smoother. Confer
-               :func: `<arpys.postprocessing.smooth>`
-    ============================================================================
+    **Parameters**
 
-    *Returns*
-    ============================================================================
-    result     normalized data in same shape
-    ============================================================================
+    ===============  ===========================================================
+    data             array of shape (1 x m x n) or (m x n);
+    mdc_index        int; index in data at which to take the mdc
+    integrate        int; number of MDCs above and below `mdc_index` over 
+                     which to integrate
+    dim              either 1 or 2; 1 if EDCs have length n, 2 if EDCs have 
+                     length m
+    n_box            int; box size of linear smoother. Confer :func:`smooth 
+                     <arpys.postprocessing.smooth>`
+    recursion_level  int; number of times to iteratively apply the smoother. 
+                     Confer :func:`smooth <arpys.postprocessing.smooth>`
+    ===============  ===========================================================
+
+    **Returns**
+
+    ======  ====================================================================
+    result  normalized data in same shape
+    ======  ====================================================================
     """
     data, d, m, n = convert_data(data)
     i0 = mdc_index - integrate
@@ -563,18 +581,20 @@ def subtract_bg_fermi(data, n_pts=10, ef=None, ef_index=None) :
     level is specified, do the same as <func> subtract_bg_matt() but along EDCs
     instead of MDCs.
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    =====  =====================================================================
     data   array-like; the input data with shape (m x n) or (1 x m x n) 
            containing momentum in y (n momentum points (?)) and energy along x 
            (m energy points) (plotting amazingly inverts x and y)
     n_pts  int; number of smallest points to take in order to determine bg
-    ============================================================================
+    =====  =====================================================================
 
-    *Returns*
-    ============================================================================
-    res    np.array; bg-subtracted  version of input data in same shape
-    ============================================================================
+    **Returns**
+
+    ===  =======================================================================
+    res  np.array; bg-subtracted  version of input data in same shape
+    ===  =======================================================================
     """
     # Reshape input
     shape = data.shape
@@ -617,8 +637,9 @@ def subtract_bg_matt(data, n_pts=5, profile=False) :
     Use the mean of the n_pts smallest points in the spectrum for each energy 
     (i.e. each MDC).
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    =======  ===================================================================
     data     array-like; the input data with shape (m x n) or (1 x m x n) 
              containing momentum in y (n momentum points) and energy along x 
              (m energy points) (plotting amazingly inverts x and y)
@@ -626,15 +647,16 @@ def subtract_bg_matt(data, n_pts=5, profile=False) :
              determine bg
     profile  boolean; if True, a list of the background values for each MDC 
              is returned additionally.
-    ============================================================================
+    =======  ===================================================================
 
-    *Returns*
-    ============================================================================
+    **Returns**
+
+    =======  ===================================================================
     res      np.array; bg-subtracted version of input data in same shape
     profile  1D-array; only returned as a tuple with data (`data, profile`) 
              if argument `profile` was set to True. Contains the 
              background profile, i.e. the background value for each MDC.
-    ============================================================================
+    =======  ===================================================================
     """
     # Prevent original data from being overwritten by retaining a copy
     data = data.copy()
@@ -682,7 +704,7 @@ def subtract_bg_matt(data, n_pts=5, profile=False) :
 def subtract_bg_shirley(data, dim=0, profile=False, normindex=0) :
     """ Use an iterative approach for the background of an EDC as described in
     DOI:10.1103/PhysRevB.5.4709. Mathematically, the value of the EDC after 
-    BG subtraction for energy E EDC'(E) can be expressed as follows :
+    BG subtraction for energy E EDC'(E) can be expressed as follows::
 
                                E1
                                /
@@ -701,8 +723,9 @@ def subtract_bg_shirley(data, dim=0, profile=False, normindex=0) :
     practice this convergence is reached in 4-5 iterations at most and even a 
     single iteration may suffice.
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    =======  ===================================================================
     data     np.array; input data with shape (m x n) or (1 x m x n) containing 
              an E(k) cut
     dim      int; either 0 or 1. Determines whether the input is aranged as 
@@ -710,16 +733,16 @@ def subtract_bg_shirley(data, dim=0, profile=False, normindex=0) :
              dim=1)
     profile  boolean; if True, a list of the background values for each MDC 
              is returned additionally.
-    normindex  TESTING
-    ============================================================================
+    =======  ===================================================================
 
-    *Returns*
-    ============================================================================
+    **Returns**
+
+    =======  ===================================================================
     data     np.array; has the same dimensions as the input array.
     profile  1D-array; only returned as a tuple with data (`data, profile`) 
              if argument `profile` was set to True. Contains the 
              background profile, i.e. the background value for each MDC.
-    ============================================================================
+    =======  ===================================================================
     """
     # Prevent original data from being overwritten by retaining a copy
     data = data.copy()
@@ -761,7 +784,7 @@ def subtract_bg_shirley(data, dim=0, profile=False, normindex=0) :
 def subtract_bg_shirley_old(data, dim=0, normindex=0) :
     """ Use an iterative approach for the background of an EDC as described in
     DOI:10.1103/PhysRevB.5.4709. Mathematically, the value of the EDC after 
-    BG subtraction for energy E EDC'(E) can be expressed as follows :
+    BG subtraction for energy E EDC'(E) can be expressed as follows::
 
                                E1
                                /
@@ -780,19 +803,20 @@ def subtract_bg_shirley_old(data, dim=0, normindex=0) :
     practice this convergence is reached in 4-5 iterations at most and even a 
     single iteration may suffice.
 
-    *Parameters*
-    ============================================================================
-    data : np.array; input data with shape (l x m) or (1 x l x m) containing 
-           an E(k) cut
-    dim  : int; either 0 or 1. Determines whether the input is aranged as 
-           E(k) (m EDCs of length l, dim=0) or k(E) (l EDCs of length m, dim=1) 
-    normindex : TESTING
-    ============================================================================
+    **Parameters**
 
-    *Returns*
-    ============================================================================
-    data : np.array; has the same dimensions as the input array.
-    ============================================================================
+    ====  ======================================================================
+    data  np.array; input data with shape (l x m) or (1 x l x m) containing 
+          an E(k) cut
+    dim   int; either 0 or 1. Determines whether the input is aranged as 
+          E(k) (m EDCs of length l, dim=0) or k(E) (l EDCs of length m, dim=1) 
+    ====  ======================================================================
+
+    **Returns**
+
+    ====  ======================================================================
+    data  np.array; has the same dimensions as the input array.
+    ====  ======================================================================
     """
     # Prevent original data from being overwritten by retaining a copy
     data = data.copy()
@@ -826,22 +850,22 @@ def subtract_bg_shirley_old(data, dim=0, normindex=0) :
 
 def subtract_bg_kaminski(data) :
     """ 
-    *Unfinished*
+    **Unfinished**
+
     Use the method of Kaminski et al. (DOI: 10.1103/PhysRevB.69.212509) 
     to subtract background. The principle is as follows:
     A lorentzian + a linear background y(x) = ax + b is fitted to momentum
     distribution curves. One then uses the magnitude of the linear component 
     at every energy as the background at that energy for a given k point. 
 
-    *Parameters*
-    ============================================================================
-    data     array-like; the input data with shape (l x m) or 
-             (l x m x 1) containing momentum in y (m momentum points) 
-             and energy along x (l energy points) (plotting amazingly 
-             inverts x and y)
-    ============================================================================
+    **Parameters**
 
-    *Returns*
+    ====  ======================================================================
+    data  array-like; the input data with shape (l x m) or 
+          (l x m x 1) containing momentum in y (m momentum points) 
+          and energy along x (l energy points) (plotting amazingly 
+          inverts x and y)
+    ====  ======================================================================
     """
     pass
     ## Get the number of energies
@@ -861,7 +885,8 @@ def apply_to_map(data, func, dim=1, output=True, fargs=(), fkwargs={}) :
     Apply a postprocessing function `func` which is designed to be 
     applied to an `energy vs k` cut to each cut of a map. 
 
-    *Parameters*
+    **Parameters**
+
     =======  ===================================================================
     data     array; 3D array of shape (l x m x n) representing the data.
     func     function; a function that can be applied to 2D data
@@ -876,7 +901,8 @@ def apply_to_map(data, func, dim=1, output=True, fargs=(), fkwargs={}) :
     fkwargs  dict; keyword arguments to be passed on to `func`.
     =======  ===================================================================
 
-    *Returns*
+    **Returns**
+
     =======  ===================================================================
     returns  list; contains the return value of every call to `func` that was 
              made in the order they were made.
@@ -910,14 +936,16 @@ def _derivatives(data, dx, dy) :
     """ Helper function to caluclate first and second partial derivatives of 
     2D data.
 
-    *Parameters*
+    **Parameters**
+
     ============================================================================
     data  array-like; the input data with shape (m x n) or (1 x m x n)
     dx    float; distance at x axis
     dy    float; distance at y axis
     ============================================================================
 
-    *Returns*
+    **Returns**
+
     ============================================================================
     grad_x, grad_y, grad2_x, grad2_y
           np.arrays; first and second derivatives of data along x/y
@@ -941,7 +969,8 @@ def _derivatives(data, dx, dy) :
 def laplacian(data, dx=1, dy=1, a=None) :
     """ Apply the second derivative (Laplacian) to the data.
 
-    *Parameters*
+    **Parameters**
+
     ====  ======================================================================
     data  array-like; the input data with shape (m x n) or (1 x m x n)
     dx    float; distance at x axis
@@ -950,7 +979,8 @@ def laplacian(data, dx=1, dy=1, a=None) :
           Should be close to dx/dy. 
     ====  ======================================================================
 
-    *Returns*
+    **Returns**
+
     ===  =======================================================================
     res  np.array; second derivative of input array in same dimensions
     ===  =======================================================================
@@ -968,7 +998,8 @@ def laplacian(data, dx=1, dy=1, a=None) :
 def curvature(data, dx=1, dy=1, cx=1, cy=1) :
     """ Apply the curvature method (DOI: 10.1063/1.3585113) to the data.
  
-    *Parameters*
+    **Parameters**
+
     ====  ======================================================================
     data  array-like; the input data with shape (m x n) or (1 x m x n)
     dx    float; distance at x axis
@@ -977,7 +1008,8 @@ def curvature(data, dx=1, dy=1, cx=1, cy=1) :
     cy    float; weight of gradient in y direction
     ====  ======================================================================
 
-    *Returns*
+    **Returns**
+
     ===  =======================================================================
     res  np.array; curvature of input array in same dimensions
     ===  =======================================================================
@@ -1020,20 +1052,22 @@ def smooth(x, n_box, recursion_level=1) :
     [1,1,2,3,5,8,13] becomes [1,1,1,1,2,3,5,8,13,13,13] for a box with 
     n_box=5.  
 
-    *Parameters*
-    ============================================================================
-    x      1D array-like; the data to smooth
-    n_box  int; size of the smoothing box (i.e. number of points around the 
-           central point over which to take the mean).  Should be an odd 
-           number - otherwise the next lower odd number is taken.
-    recursion_level
-           int; equals the number of times the smoothing is applied.
-    ============================================================================
+    **Parameters**
 
-    *Returns*
-    ============================================================================
-    res    np.array; smoothed data points of same shape as input.
-    ============================================================================
+    ===============  ===========================================================
+    x                1D array-like; the data to smooth
+    n_box            int; size of the smoothing box (i.e. number of points 
+                     around the central point over which to take the mean).  
+                     Should be an odd number - otherwise the next lower odd 
+                     number is taken.
+    recursion_level  int; equals the number of times the smoothing is applied.
+    ===============  ===========================================================
+
+    **Returns**
+
+    ===  =======================================================================
+    res  np.array; smoothed data points of same shape as input.
+    ===  =======================================================================
     """
     # Ensure odd n_box
     if n_box%2 == 0 :
@@ -1063,11 +1097,12 @@ def smooth_derivative(x, n_box=15, n_smooth=3) :
     smoothed curve, smooth that derivative and take the derivative again. 
     Finally, apply a last round of smoothing.
     
-    *Parameters*
-    ============================================================================
-    Same as in `func:arpys.postprocessing.smooth`.
+    **Parameters**
+
+    ===============================================  ==========================
+    Same as in :func:`arpys.postprocessing.smooth`.
     `n_smooth` corresponds to `recursion_level`.
-    ============================================================================
+    ===============================================  ==========================
     """
     # Smoothing 1
     res = smooth(x, n_box, n_smooth)
@@ -1087,16 +1122,18 @@ def zero_crossings(x, direction=0) :
     (direction=1) or both (direction=0). This is detected simply by a change 
     of sign between two subsequent points.
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    =========  =================================================================
     x          1D array-like; data in which to find zero crossings
     direction  int, one of (-1, 0, 1); see above for explanation
-    ============================================================================
+    =========  =================================================================
 
-    *Returns*
-    ============================================================================
+    **Returns**
+
+    =========  =================================================================
     crossings  list; list of indices of the elements just before the crossings
-    ============================================================================
+    =========  =================================================================
     """
     # Initiate the container
     crossings = []
@@ -1143,7 +1180,8 @@ def fermi_fit_func(E, E_F, sigma, a, b, T=10) :
     """ Fermi Dirac distribution with an additional linear inelastic 
     background and convoluted with a Gaussian for the instrument resolution.
 
-    *Parameters*
+    **Parameters**
+
     =====  =====================================================================
     E      1d-array; energy values in eV
     E_F    float; Fermi energy in eV
@@ -1169,7 +1207,8 @@ def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
     (simulating the instrument resolution) plus a linear component on the 
     side with E<E_F to a given energy distribution curve.
 
-    *Parameters*
+    **Parameters**
+
     ========  ==================================================================
     energies  1D array of float; energy values.
     edc       1D array of float; corresponding intensity counts.
@@ -1182,7 +1221,8 @@ def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
     b0        float; starting guess for the linear offset.
     ========  ==================================================================
 
-    *Returns*
+    **Returns**
+
     ========  ==================================================================
     p         list of float; contains the fit results for [E_F, sigma, a, b].
     res_func  callable; the fit function with the optimized parameters. With 
@@ -1251,7 +1291,7 @@ def fit_gold(D, e_0=None, T=10) :
 def _fit_gold(gold, energies, e_0=None, T=10) :
     """ Apply a Fermi-Dirac fit to all EDCs of an ARPES Gold spectrum.
     
-    **Parameters**
+    ***Parameters***
 
     ========  ==================================================================
     gold      2d np.array; shape (n_angles, n_energies).
@@ -1264,7 +1304,7 @@ def _fit_gold(gold, energies, e_0=None, T=10) :
     ========  ==================================================================
 
 
-    **Returns**
+    ***Returns***
 
     ============  ==============================================================
     fermi_levels  list; Fermi energy for each EDC.
@@ -1297,18 +1337,20 @@ def _fit_gold(gold, energies, e_0=None, T=10) :
     return fermi_levels, sigmas, functions
 
 def adjust_fermi_level(energies, fermi_levels) :
-    """ Use the output from :func: `fit_gold <arpys.postprocessing.fit_gold>` 
+    """ Use the output from :func:`fit_gold <arpys.postprocessing.fit_gold>` 
     to create an adjusted energy mesh, useful for plotting.
 
-    *Parameters*
+    **Parameters**
+
     ============  ==============================================================
     energies      1d-array, length N; kinetic energies as output by most 
                   beamlines
     fermi_levels  1d-array, length M; detected Fermi steps in energy units, 
-                  as output by :func: `fit_gold <arpys.postprocessing.fit_gold>`
+                  as output by :func:`fit_gold <arpys.postprocessing.fit_gold>`
     ============  ==============================================================
 
-    *Returns*
+    **Returns**
+
     =================  =========================================================
     adjusted_energies  2d-array, NxM; 
     =================  =========================================================
@@ -1326,7 +1368,8 @@ def angle_to_k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='horizontal',
     Confer the sheet "ARPES angle to k-space conversion" [doc/a2k.pdf] for 
     detailed explanations.
 
-    *Parameters*
+    **Parameters**
+
     ===========  ===============================================================
     alpha        array of length *nkx*; angles in degrees along the 
                  independent rotation (often called "theta" or "polar" at 
@@ -1342,7 +1385,8 @@ def angle_to_k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='horizontal',
     work_func    float; value of the work function in eV.
     ===========  ===============================================================
 
-    *Returns*
+    **Returns**
+
     ==  ========================================================================
     KX  array of shape (nkx, nky); mesh of k values in parallel direction in 
         units of inverse Angstrom.
@@ -1381,15 +1425,15 @@ def angle_to_k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='horizontal',
 
 def best_a2k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='horizontal', 
              work_func=4) :
-    """ Alias for :func: `angle_to_k <arpys.postprocessing.angle_to_k>` """
+    """ Alias for :func:`angle_to_k <arpys.postprocessing.angle_to_k>` """
     return angle_to_k(alpha, beta, hv, dalpha=dalpha, dbeta=dbeta, 
                       orientation=orientation, work_func=work_func)
 
 def a2k(D, lattice_constant, dalpha=0, dbeta=0, orientation='horizontal') :
     """
-    Shorthand angle to k conversion that takes the output of a `Dataloader 
+    Shorthand angle to k conversion that takes the output of a :class:`Dataloader 
     <arpys.dataloaders.Dataloader>` object as input and passes all necessary 
-    information on to the actual converter (`angle_to_k 
+    information on to the actual converter (:func:`angle_to_k 
     <arpys.postprocessing.angle_to_k>`).
     """
     kx, ky = angle_to_k(D.xscale, D.yscale, hv=D.hv, dalpha=dalpha, dbeta=dbeta,
@@ -1404,10 +1448,12 @@ def alt_a2k(angle, tilt, theta, phi, hv, a, b=None, c=None, work_func=4) :
     *Unfinished*
     Alternative angle-to-k conversion approach using rotation matrices. 
     Determine the norm of the k vector from the kinetic energy using the 
-    relation:
+    relation::
+
                sqrt( 2*m_e*hv )
         k_F = ------------------
                      hbar
+
     Then initiate a k vector in the direction measured and rotate it with the 
     given tilt, theta and phi angles.
     
@@ -1444,20 +1490,21 @@ def alt_a2k(angle, tilt, theta, phi, hv, a, b=None, c=None, work_func=4) :
 # +---------+ #
 
 def step_function_core(x, step_x=0, flip=False) :
-    """ Implement a perfect step function f(x) with step at `step_x`:
+    """ Implement a perfect step function f(x) with step at `step_x`::
     
-            / 0   if x < step_x
-            |
-    f(x) = {  0.5 if x = step_x
-            |
-            \ 1   if x > step_x
+                / 0   if x < step_x
+                |
+        f(x) = {  0.5 if x = step_x
+                |
+                \ 1   if x > step_x
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    ======  ====================================================================
     x       array; x domain of function
     step_x  float; position of the step
     flip    boolean; Flip the > and < signs in the definition
-    ============================================================================
+    ======  ====================================================================
     """
     sign = -1 if flip else 1
     if sign*x < sign*step_x :
@@ -1477,13 +1524,14 @@ def step_function(x, step_x=0, flip=False) :
     return res.astype(float)
 
 def step_core(x, step_x=0, flip=False) :
-    """ Implement a step function f(x) with step at `step_x`:
+    """ Implement a step function f(x) with step at `step_x`::
 
                 / 0 if x < step_x
         f(x) = {
                 \ 1 if x >= step_x
 
-    Confer also :func: `step_function_core`.
+    :See also:
+        :func:`step_function_core <arpys.postprocessing.step_function_core>`.
     """
     sign = -1 if flip else 1
     if sign*x < sign*step_x :
@@ -1493,62 +1541,64 @@ def step_core(x, step_x=0, flip=False) :
     return result
 
 def step_ufunc(x, step_x=0, flip=False) :
-    """ np.ufunc wrapper for step_core. Confer corresponding 
-    documentation. 
+    """ np.ufunc wrapper for :func:`step_core 
+    <arpys.postprocessing.step_core>`. Confer corresponding documentation. 
     """
     res = \
     np.frompyfunc(lambda x : step_core(x, step_x, flip), 1, 1)(x)
     return res.astype(float)
 
 def lorentzian(x, a=1, mu=0, gamma=1) :
-    """ Implement a Lorentzian curve f(x) given by the expression
+    """ 
+    Implement a Lorentzian curve f(x) given by the expression::
 
+                            a
+               ----------------------------
+        f(x) =                         2
+                          /   /  x-mu \  \
+                pi*gamma*( 1+( ------- )  )
+                          \   \ gamma /  /
 
-                        a
-           ----------------------------
-    f(x) =                         2
-                      /   /  x-mu \  \
-            pi*gamma*( 1+( ------- )  )
-                      \   \ gamma /  /
+    **Parameters**
 
-
-    *Parameters*
-    ============================================================================
+    =====  =====================================================================
     x      array; variable at which to evaluate f(x)
     a      float; amplitude (maximum value of curve)
     mu     float; mean of curve (location of maximum)
     gamma  float; half-width at half-maximum (HWHM) of the curve
-    ============================================================================
+    =====  =====================================================================
 
-    *Returns*
-    ============================================================================
-    res    array containing the value of the Lorentzian at every point of 
-           input x 
-    ============================================================================
+    **Returns**
+
+    ===  =======================================================================
+    res  array containing the value of the Lorentzian at every point of input x 
+    ===  =======================================================================
     """
     return a/( np.pi*gamma*( 1 + ((x-mu)/gamma)**2 ) )
 
 def gaussian(x, a=1, mu=0, sigma=1) :
-    """ Implement a Gaussian bell curve f(x) given by the expression
+    """ 
+    Implement a Gaussian bell curve f(x) given by the expression::
 
-                                     2
-                      1    / (x-mu) \
-    f(x) = a * exp( - - * ( -------  ) )
-                      2    \ sigma  /
+                                         2
+                          1    / (x-mu) \
+        f(x) = a * exp( - - * ( -------  ) )
+                          2    \ sigma  /
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    =====  =====================================================================
     x      array; variable at which to evaluate f(x)
     a      float; amplitude (maximum value of curve)
     mu     float; mean of curve (location of maximum)
     sigma  float; standard deviation (`width` of the curve)
-    ============================================================================
+    =====  =====================================================================
 
-    *Returns*
-    ============================================================================
-    res    array containing the value of the Gaussian at every point of 
-           input x 
-    ============================================================================
+    **Returns**
+
+    ===  =======================================================================
+    res  array containing the value of the Gaussian at every point of input x 
+    ===  =======================================================================
     """
     return a * np.exp(-0.5 * (x-mu)**2 / sigma**2)
 
@@ -1572,16 +1622,17 @@ def gaussian(x, a=1, mu=0, sigma=1) :
 
 def gaussian_step(x, step_x=0, a=1, mu=0, sigma=1, flip=False, after_step=None) :
     """ Implement (as a broadcastable np.ufunc) a sort-of convolution of a 
-    step-function with a Gaussian bell curve, defined as follows :
+    step-function with a Gaussian bell curve, defined as follows ::
 
-            / g(x, a, mu, sigma) if x < step_x
-    f(x) = {
-            \ after_step         if x >= step_x
+                / g(x, a, mu, sigma) if x < step_x
+        f(x) = {
+                \ after_step         if x >= step_x
 
-    where g(x) is the :func: `gaussian`.
+    where g(x) is the :func:`gaussian <arpys.postprocessing.gaussian>`.
 
-    *Parameters*
-    ============================================================================
+    **Parameters**
+
+    ==========  ================================================================
     x           array; x domain of function
     step_x      float; position of the step
     a           float; prefactor of the Gaussian
@@ -1590,7 +1641,7 @@ def gaussian_step(x, step_x=0, a=1, mu=0, sigma=1, flip=False, after_step=None) 
     flip        boolean; Flip the > and < signs in the definition
     after_step  float; if not None, set a constant value that is assumed after 
                 the step. Else assume the value of the Gaussian at the step_x.   
-    ============================================================================
+    ==========  ================================================================
     """
     # If no specific step height is given, use the value of the Gaussian at 
     # x=step_x
@@ -1612,11 +1663,11 @@ def gaussian_step(x, step_x=0, a=1, mu=0, sigma=1, flip=False, after_step=None) 
 
 def fermi_dirac(E, mu=0, T=4.2) :
     """ Return the Fermi Dirac distribution with chemical potential *mu* at 
-    temperature *T* for energy *E*. The Fermi Dirac distribution is given by
+    temperature *T* for energy *E*. The Fermi Dirac distribution is given by::
 
-                     1
-    n(E) = ----------------------
-            exp((E-mu)/(kT)) + 1
+                         1
+        n(E) = ----------------------
+                exp((E-mu)/(kT)) + 1
 
     and assumes values from 0 to 1.
     """
@@ -1639,22 +1690,25 @@ def rotation_matrix(theta) :
 def rotate_XY(X, Y, theta=45) :
     """ Rotate a coordinate mesh of (n by m) points by angle *theta*. *X* and 
     *Y* hold the x and y components of the coordinates respectively, as if 
-    generated through :func: `np.meshgrid()`.
+    generated through :func:`np.meshgrid <numpy.meshgrid>`.
 
-    *Parameters*
+    **Parameters**
+
     =====  =====================================================================
     X      n by m array; x components of coordinates.
     Y      n by m array; y components of coordinates.
     theta  float; rotation angle in degrees
     =====  =====================================================================
 
-    *Returns*
+    **Returns**
+
     ===  =======================================================================
     U,V  n by m arrays; U (V) contains the x (y) components of the rotated 
-         coordinates. These can be used as arguments to :func: pcolormesh()
+         coordinates. These can be used as arguments to :func:`pcolormesh()`
     ===  =======================================================================
 
-    .. :see also: `<arpes.postprocessing.rotate_xy>`
+    :see also: 
+        :func:`arpes.postprocessing.rotate_xy`
     """
     if X.shape != Y.shape :
         message = '*X* {} and *Y* {} should have the same shape.'
@@ -1673,20 +1727,23 @@ def rotate_XY(X, Y, theta=45) :
 def rotate_xy(x, y, theta=45) :
     """ Rotate the x and y cooridnates of rectangular 2D data by angle theta.
 
-    *Parameters*
+    **Parameters**
+
     =====  =====================================================================
     x      1D array of length n; x values of the rectangular grid
     y      1D array of length m; y values of the rectangular grid
     theta  float; rotation angle in degrees
     =====  =====================================================================
 
-    *Returns*
+    **Returns**
+
     ===  =======================================================================
     U,V  n by m arrays; U (V) contains the x (y) components of the rotated 
-         coordinates. These can be used as arguments to :func: pcolormesh() 
+         coordinates. These can be used as arguments to :func:`pcolormesh()` 
     ===  =======================================================================
 
-    .. :see also: `<arpes.postprocessing.rotate_XY>`
+    :see also:
+        :func:`arpes.postprocessing.rotate_XY`
     """
     # Create a coordinate mesh
     X, Y = np.meshgrid(x, y)
@@ -1694,7 +1751,9 @@ def rotate_xy(x, y, theta=45) :
     return rotate_XY(X, Y, theta)
 
 def symmetrize_around(data, p0, p1) :
-    """ :UNFINISHED:
+    """ 
+    :unfinished:
+
     Symmetrize around the line connecting the points p0 and p1.
     p0, p1: indices of points 
     """
@@ -1785,7 +1844,8 @@ def symmetrize_rectangular(data, i, k=None) :
     """ Symmetrize a piece of rectangular *data* around column *i* by simply 
     mirroring the data at column *i* and overlaying it in the correct position. 
     
-    *Parameters*
+    **Parameters**
+
     ====  ======================================================================
     data  array of shape (ny, nx0); data to be symmetrized.
     i     int; index along x (0 <= i < nx0) around which to symmetrize.
@@ -1794,7 +1854,8 @@ def symmetrize_rectangular(data, i, k=None) :
           returned.
     ====  ======================================================================
 
-    *Returns*
+    **Returns**
+
     ======  ====================================================================
     result  array of shape (ny, nx1); the x dimension has expanded.
     sym_k   array of length nx1; the expanded k values (x scale to the 
@@ -1805,7 +1866,7 @@ def symmetrize_rectangular(data, i, k=None) :
     the case i < nx0/2. If i > nx0/2 we flip the data first such that we can 
     apply the same procedure and coordinates.
 
-    Original image:
+    Original image::
 
             +----------+
             |   |      |
@@ -1815,7 +1876,7 @@ def symmetrize_rectangular(data, i, k=None) :
             |   |      |
             +----------+
 
-    Mirrored image:
+    Mirrored image::
 
          x----------x
          |      |   |
@@ -1825,7 +1886,7 @@ def symmetrize_rectangular(data, i, k=None) :
          |      |   |
          x----------x
 
-    Overlay both images:
+    Overlay both images::
         
          x--+-------x--+
          |  |   |   |  |
@@ -1899,7 +1960,8 @@ def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4,
     This functions implements a couple of optimizations, leading to slightly 
     more complicated but faster running code.
 
-    *Parameters*
+    **Parameters**
+
     ===========  ===============================================================
     kx           n length array
     ky           m length array
@@ -1908,7 +1970,8 @@ def symmetrize_map(kx, ky, mapdata, clean=False, overlap=False, n_rot=4,
     clean        boolean; toggle whether or not to cut off unsymmetrized parts
     ===========  ===============================================================
 
-    *Returns*
+    **Returns**
+
     ===========  ===============================================================
     kx, ky       if `clean` is False, these are the same as the input kx and 
                  ky. If `clean` is True the arrays are cut to the right size
@@ -2044,7 +2107,8 @@ def find_symmetry_index(spectrum, eps=0.13, sub_ac=None) :
     Find the symmetry center of an ARPES spectrum (angle vs energy) by 
     autocorrelating it with its shifted mirror image.
 
-    *Parameters*
+    **Parameters**
+
     ========  ==================================================================
     spectrum  2d-array; shape (n_e, n_k) where *n_e* is the number of energy 
               channels and *n_k* the number of angular or k channels.
@@ -2056,7 +2120,8 @@ def find_symmetry_index(spectrum, eps=0.13, sub_ac=None) :
               autocorrelation should be subtracted. Overrides *eps*.
     ========  ==================================================================
 
-    *Returns*
+    **Returns**
+
     =====  =====================================================================
     imax   int; the index along the angular dimension (dimension 1 in 
            *spectrum*) at which the symmetry center is found to be.
@@ -2116,7 +2181,8 @@ def get_lines(data, n, dim=0, i0=0, i1=-1, offset=0.2, integrate='max',
     such that they can be nicely plotted close by each other - like for 
     example in a typical EDC or MDC plot.
 
-    *Parameters*
+    **Parameters**
+
     =========  =================================================================
     data       2d np.array; the data from which to extract lines.
     n          int; the number of lines to extract.
@@ -2132,7 +2198,8 @@ def get_lines(data, n, dim=0, i0=0, i1=-1, offset=0.2, integrate='max',
     kwargs     any other passed keyword arguments are discarded.
     =========  =================================================================
 
-    *Returns*
+    **Returns**
+
     =======  ===================================================================
     lines    list of 1d np.arrays; the extracted lines.
     indices  list of int; the indices at which the lines were extracted.
@@ -2183,10 +2250,11 @@ def plot_edcs(ax, data, energy, momenta=None, lw=0.5, color='k',
     """
     Create an EDC plot by plotting every *nth* EDC in *data* against *energy*.
     The EDCs are normalized to their overall maximum and shifted from each 
-    other by *offset*. See :func: `get_lines <arpys.postprocessing.get_lines>`
+    other by *offset*. See :func:`get_lines <arpys.postprocessing.get_lines>`
     for more options on the extraction of EDCs.
 
-    *Parameters*
+    **Parameters**
+
     ===============  ===========================================================
     ax               matplotlib.axes.Axes; the axes in which to plot.
     data             2d np.array; the data from which to extract EDCs.
@@ -2200,11 +2268,12 @@ def plot_edcs(ax, data, energy, momenta=None, lw=0.5, color='k',
     label_fmt        str; a format string for the ticklabels.
     n                int; number of lines to extract from *data*.
     offset           float; how far apart to space the lines from each other.
-    getlines_kwargs  other kwargs are passed to :func: `get_lines 
+    getlines_kwargs  other kwargs are passed to :func:`get_lines 
                      <arpys.postprocessing.get_lines>`
     ===============  ===========================================================
 
-    *Returns*
+    **Returns**
+
     ===========  ===============================================================
     lines2ds     list of Line2D objects; the drawn lines.
     xticks       list of float; locations of the 0 intensity value of each line
@@ -2238,7 +2307,8 @@ def plot_cuts(data, dim=0, zs=None, labels=None, max_ppf=16, max_nfigs=4,
     """ Plot all (or only the ones specified by `zs`) cuts along dimension `dim` 
     on separate subplots onto matplotlib figures.
 
-    *Parameters*
+    **Parameters**
+
     =========  =================================================================
     data       3D np.array with shape (z,y,x); the data cube.
     dim        int; one of (0,1,2). Dimension along which to take the cuts.
@@ -2246,12 +2316,12 @@ def plot_cuts(data, dim=0, zs=None, labels=None, max_ppf=16, max_nfigs=4,
                the given indices will be plotted.
     labels     1D array/list of length z. Optional labels to assign to the 
                different cuts
-    max_ppf    int; maximum number of *p*lots *p*er *f*igure.
+    max_ppf    int; maximum number of plots per figure.
     max_nfigs  int; maximum number of figures that are created. If more would 
                be necessary to display all plots, a warning is issued and 
                only every N'th plot is created, where N is chosen such that 
                the whole 'range' of plots is represented on the figures. 
-    kwargs     dict; keyword arguments passed on to :func: `pcolormesh 
+    kwargs     dict; keyword arguments passed on to :func:`pcolormesh 
                <matplotlib.axes._subplots.AxesSubplot.pcolormesh>`. 
                Additionally, the kwarg `gamma` for power-law color mapping 
                is accepted.
@@ -2338,7 +2408,8 @@ def k_abs(hv, E_B=0, phi=4, lattice_constant=None) :
     energy hv, electron binding energy E_B and work function phi (all given 
     in electronvolt).
 
-    *Parameters*
+    **Parameters**
+
     ================  ==========================================================
     hv                float or 1d-array; incident photon energy (eV)
     E_B               float; electron binding energy (eV)
@@ -2348,12 +2419,16 @@ def k_abs(hv, E_B=0, phi=4, lattice_constant=None) :
                       pi/*lattice_constant* instead of inverse Angstrom.
     ================  ==========================================================
 
-    *Returns*
+    **Returns**
+
     =====  =====================================================================
     k_abs  float or 1d-array; Absolute value of the photoelectron momentum 
            given either in units of inverse Angstrom (if *lattice_constant* 
            is *None*) or in pi/*lattice_constant*.
     =====  =====================================================================
+
+    :see also:
+        :func:`hv <arpys.postprocessing.hv>`
     """
     if lattice_constant is None :
         conversion = 1
@@ -2362,7 +2437,7 @@ def k_abs(hv, E_B=0, phi=4, lattice_constant=None) :
     return 0.5123 * np.sqrt(hv - E_B - phi) * conversion
 
 def hv(k, E_B=0, phi=4, lattice_constant=None) :
-    """ Inverse of `k_abs <arpys.postprocessing.k_abs>`. Refer to the 
+    """ Inverse of :func:`k_abs <arpys.postprocessing.k_abs>`. Refer to the 
     documentation there.
     """
     if lattice_constant is None :
@@ -2374,13 +2449,14 @@ def hv(k, E_B=0, phi=4, lattice_constant=None) :
 def kramers_kronig(f, omega, e0=-10, e1=10, points=[], verbosity=0) :
     """
     Directly calculate the Kramers-Kronig transform of a function 
-    *f(omega)*. This uses numerical integration as opposed to :func: `hilbert 
+    *f(omega)*. This uses numerical integration as opposed to :func:`hilbert 
     <scipy.signal.hilber>` which makes use of the Fourier transform.
     Performance-wise, this is therefore much slower, as a diverging integral 
     has to be calculated for every point *omega*. The result, however, should 
     be more precise.
 
-    *Parameters*
+    **Parameters**
+
     =========  =================================================================
     f          callable; the function on which the Kramer-Kronig transform is 
                applied.
