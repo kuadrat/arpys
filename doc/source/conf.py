@@ -13,6 +13,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../../'))
+sys.path.insert(0, os.path.abspath('_ext/'))
 
 import sphinx_rtd_theme
   
@@ -34,7 +35,9 @@ master_doc = 'index'
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
-    'sphinx_rtd_theme'
+    'sphinx.ext.intersphinx',
+    'sphinx_rtd_theme',
+    'signals'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -64,3 +67,12 @@ def setup(app) :
 
 # Autodoc config
 autodoc_member_order = 'bysource'
+
+# Intersphinx config
+intersphinx_mapping = {
+                       'pyqtgraph': 
+                       ('https://pyqtgraph.readthedocs.io/en/latest/', None),
+                       'python':
+                       ('https://docs.python.org/3', None)
+                      }
+

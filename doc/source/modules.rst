@@ -5,4 +5,3 @@ arpys
    :maxdepth: 4
 
    arpys
-   setup
