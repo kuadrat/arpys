@@ -14,18 +14,26 @@
 }
 
 /* Headers in code (class names, function names, etc.) */
-html.writer-html5 .rst-content 
+/* html.writer-html5 .rst-content 
 dl[class]:not(.option-list):not(.field-list):not(.footnote):not(.glossary):not(.simple) > dt {
     background: var(--my_color_light);
     border-top-color: var(--my_color);
 }
+*/
 
 /* Arguments in class names, function names, etc. */
-html.writer-html4 .rst-content dl:not(.docutils) > dt, html.writer-html5 
+/*html.writer-html4 .rst-content dl:not(.docutils) > dt, html.writer-html5 
 .rst-content 
 dl[class]:not(.option-list):not(.field-list):not(.footnote):not(.glossary):not(.simple) > dt {
     color: var(--my_color);
+} */
+
+.rst-content dl:not(.docutils) dt {
+    background: var(--my_color_light);
+    color: var(--my_color);
+    border-top-color: var(--my_color);
 }
+
 
 /* Headers in sidebar */
 .wy-menu-vertical header, .wy-menu-vertical p.caption {
