@@ -148,14 +148,14 @@ class Dataloader_i05(Dataloader) :
             data = data.T
         else :
             # Otherwise, extract third dimension from scan command
-            command = infile['entry1/scan_command']
+            command = infile['entry1/scan_command'][()]
 
             # Special case for 'pathgroup'
-            if command.value.split()[1] == 'pathgroup' :
+            if command.split()[1] == 'pathgroup' :
                 self.print_m('is pathgroup')
                 # Extract points from a ([polar, x, y], [polar, x, y], ...) 
                 # tuple
-                points = command.value.split('(')[-1].split(')')[0]
+                points = command.split('(')[-1].split(')')[0]
                 tuples = points.split('[')[1:]
                 xscale = []
                 for t in tuples :
@@ -169,11 +169,11 @@ class Dataloader_i05(Dataloader) :
 #                zscale = zscale[0]
 
             # Special case for 'scangroup'
-            elif command.value.split()[1] == 'scan_group' :
+            elif command.split()[1] == 'scan_group' :
                 self.print_m('is scan_group')
                 # Extract points from a ([polar, x, y], [polar, x, y], ...) 
                 # tuple
-                points = command.value.split('((')[-1].split('))')[0]
+                points = command.split('((')[-1].split('))')[0]
                 points = '((' + points + '))'
                 xscale = np.array(ast.literal_eval(points))[:,0]
 
@@ -184,13 +184,13 @@ class Dataloader_i05(Dataloader) :
 
            # "Normal" case
             else :
-                start_stop_step = command.value.split()[2:5]
+                start_stop_step = command.split()[2:5]
                 start, stop, step = [float(s) for s in start_stop_step] 
                 xscale = np.arange(start, stop+0.5*step, step)
 
         # What we usually call theta is tilt in this beamline
-        theta = infile['entry1/instrument/manipulator/satilt'].value[0]
-        phi = infile['entry1/instrument/manipulator/sapolar'].value[0]
+        theta = infile['entry1/instrument/manipulator/satilt'][0]
+        phi = infile['entry1/instrument/manipulator/sapolar'][0]
 
         # Take the mean of the given binding energies as an estimate
         E_b = -np.mean(infile['entry1/analyser/binding_energies'])
@@ -284,7 +284,7 @@ class Dataloader_ALS(Dataloader) :
         This also returns a bytes object, remember to cast it correctly.
         Returns *None* if *field_name* was not found in *group*.
         """
-        for entry in group.value :
+        for entry in group[()] :
             if entry[1].strip() == field_name :
                 return entry[2]
 
