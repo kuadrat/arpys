@@ -1246,7 +1246,7 @@ def load_data(filename, exclude=None, suppress_warnings=False) :
 
             # Reaching this point must mean we succeeded. Print warnings from 
             # this dataloader, if any occurred
-            print('Loaded data with {}.'.format(dl))
+            print('[arpys]Loaded data with {}.'.format(dl))
             try :
                 print(dl, ': ', exceptions[dl])
             except KeyError :
@@ -1256,9 +1256,9 @@ def load_data(filename, exclude=None, suppress_warnings=False) :
 
     # Reaching this point means something went wrong. Print all exceptions.
     for dl in exceptions :
-        print(dl)
+        print('[arpys]', dl)
         e = exceptions[dl]
-        print('Exception {}: {}'.format(type(e), e))
+        print('[arpys]Exception {}: {}'.format(type(e), e))
 
     raise Exception('Could not load data {}.'.format(filename))
 

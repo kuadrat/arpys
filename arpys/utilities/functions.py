@@ -86,6 +86,22 @@ def stretched_exponential(t, A, tau, h) :
     """
     return A * np.exp(-(t/tau)**(1./h))
 
+def lorentzian(x, a0, xmax, gamma) :
+    r"""
+    .. math::
+        a_0 \cdot \frac{\Gamma^2}{(x-x_\mathrm{max})^2 + \Gamma^2}
+
+    **Parameters**
+
+    =====  =====================================================================
+    x      float or array; the variable.
+    a0     float; normalization factor.
+    xmax   float; peak position of the Lorentzian in *x* units. 
+    gamma  float; peak width in *x* units.
+    =====  =====================================================================
+    """
+    return a0 * gamma*2 / ((x - xmax)**2 + gamma**2)
+
 def chi2(y, f, sigma, normalize=True) :
     """
     Return the chi-square value for a series of measured values y and 

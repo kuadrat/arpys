@@ -1336,6 +1336,99 @@ def _fit_gold(gold, energies, e_0=None, T=10) :
 
     return fermi_levels, sigmas, functions
 
+def get_pixel_shifts(energies, fermi_levels, reference=None) :
+    """ Use the output from :func:`fit_gold <arpys.postprocessing.fit_gold>` 
+    to create a list of integers, indicating how many pixels each channel 
+    should be shifted by.
+
+    **Parameters**
+
+    ============  ==============================================================
+    energies      1d-array, length N; kinetic energies as output by most 
+                  beamlines
+    fermi_levels  1d-array, length M; detected Fermi steps in energy units, 
+                  as output by :func:`fit_gold <arpys.postprocessing.fit_gold>`
+    reference     None or int; index of the reference channel to use. If 
+                  *None*, use the mean shift (rounded down) as a reference.
+    ============  ==============================================================
+
+    **Returns**
+
+    ============  ==============================================================
+    pixel_shifts  1d-array, length M; number of pixels (positive or negative) 
+                  each channel should be shifted by.
+    ============  ==============================================================
+
+    .. seealso::
+        :func: `~arpys.postprocessing.apply_pixel_shifts`
+    """
+    raw_shifts = np.array([af.indexof(f, energies) for f in fermi_levels], 
+                          dtype=int)
+    if reference is None :
+        # Make all shifts relative to the mean shift
+        zero = int(np.mean(raw_shifts))
+    elif isinstance(reference, int) :
+        zero = raw_shifts[reference]
+    else :
+        raise TypeError('`reference` has to be an integer or None.')
+    return raw_shifts - zero
+
+def apply_pixel_shifts(data, shifts, dim=None) :
+    """ Shift the arrays in *data* along dimension *dim* by a number of 
+    pixels as specified by *sifts*. len(shifts) has to be equal to 
+    ``data.shape[dim]``. If *dim* is not specified, the axis of data that has 
+    the same length as *shifts* is automatically chosen.
+
+    **Parameters**
+
+    ======  ====================================================================
+    data    2d-array of shape ``(N x M)``;
+    shifts  1d-array of shape ``(len(data.shape[dim]))``;
+    dim     int or *None*; can be given to specify along which axis the shifts 
+            should be applied (e.g. for square arrays).
+    ======  ====================================================================
+
+    **Returns**
+
+    ============  ==============================================================
+    shifted_data  2d-array of same shape as input *data*, except that 
+                  ``shifted_data[dim] = data[dim] - cutoff`` where *cutoff* is 
+                  equal to the maximum shift.
+    ============  ==============================================================
+
+
+    .. seealso::
+        :func: `~arpys.postprocessing.get_pixel_shifts`
+    """
+    cutoff = max(shifts)
+    n_shifts = len(shifts)
+    N, M = data.shape
+    if dim is None :
+        if n_shifts == N :
+            dim = 0
+        elif n_shifts == M :
+            dim = 1
+        else :
+            raise ValueError('Dimension of ``data`` ({}, {}) does not match '
+                             'length of ``shifts`` ({})'.format(N, M, n_shifts))
+    # Transpose if necessary and switch M with N
+    if dim == 1 :
+        data = data.T
+        M = N
+    # Create the shifted data
+    new_data = []
+    for i in range(n_shifts) :
+        channel = data[i]
+        shift = shifts[i]
+        i0, i1 = cutoff+shift, M-cutoff+shift
+        new_channel = channel[i0:i1]
+        new_data.append(new_channel)
+    # Convert to array and transpose back, if necessary
+    shifted_data = np.array(new_data)
+    if dim == 1 :
+        shifted_data = shifted_data.T
+    return shifted_data
+
 def adjust_fermi_level(energies, fermi_levels) :
     """ Use the output from :func:`fit_gold <arpys.postprocessing.fit_gold>` 
     to create an adjusted energy mesh, useful for plotting.
