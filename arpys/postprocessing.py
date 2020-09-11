@@ -1275,21 +1275,27 @@ def fit_gold(D, e_0=None, T=10) :
     sigmas        list; standard deviations of instrument resolution Gaussian 
                   for each EDC. This is in units of energy steps. To convert 
                   to energy, just multiply by the energy step in *D*.
+    slopes        array; slopes of the linear background in the Fermi fit 
+                  function.
+    offsets       array; offsets of the linear background in the Fermi fit 
+                  function.
     functions     list of callables; functions of energy that produce the fit 
                   for each EDC.
     ============  ==============================================================
 
-    :see also:
-        :func:`_fit_gold <arpys.postprocessing._fit_gold>`
+    .. see also::
+        :func:`fit_gold_array <arpys.postprocessing.fit_gold_array>`
+        :func:`~arpys.postprocessing.fermi_fit_func`
     """
     # Extract data
     gold = D.data[0]
     n_pixels, n_energies = gold.shape
     energies = D.xscale
-    return _fit_gold(gold, energies, e_0, T)
+    return fit_gold_array(gold, energies, e_0, T)
 
-def _fit_gold(gold, energies, e_0=None, T=10) :
-    """ Apply a Fermi-Dirac fit to all EDCs of an ARPES Gold spectrum.
+def fit_gold_array(gold, energies, e_0=None, T=10) :
+    """ Apply a Fermi-Dirac fit to all EDCs of an ARPES Gold spectrum, 
+    represented by a numpy array.
     
     ***Parameters***
 
@@ -1307,13 +1313,21 @@ def _fit_gold(gold, energies, e_0=None, T=10) :
     ***Returns***
 
     ============  ==============================================================
-    fermi_levels  list; Fermi energy for each EDC.
-    sigmas        list; standard deviations of instrument resolution Gaussian 
+    fermi_levels  array; Fermi energy for each EDC.
+    sigmas        array; standard deviations of instrument resolution Gaussian 
                   for each EDC. This is in units of energy steps. To convert 
                   to energy, just multiply by the energy step in *D*.
+    slopes        array; slopes of the linear background in the Fermi fit 
+                  function.
+    offsets       array; offsets of the linear background in the Fermi fit 
+                  function.
     functions     list of callables; functions of energy that produce the fit 
                   for each EDC.
     ============  ==============================================================
+    
+    .. seealso::
+        :func:`~arpys.postprocessing.fit_gold`
+        :func:`~arpys.postprocessing.fermi_fit_func`
     """
     # If no hint for the Fermi energy is given, try to detect it from the 
     # gradient of the integrated spectrum
@@ -1333,8 +1347,16 @@ def _fit_gold(gold, energies, e_0=None, T=10) :
     params = np.array(params)
     fermi_levels = params[:,0]
     sigmas = params[:,1]
+    slopes = params[:,2]
+    offsets = params[:,3]
 
-    return fermi_levels, sigmas, functions
+    return fermi_levels, sigmas, slopes, offsets, functions
+
+def _fit_gold(gold, energies, e_0=None, T=10) :
+    """ Alias for :func:`arpys.postprocessing.fit_gold_array` for backwards 
+    compatibility.
+    """
+    return fit_gold_array(gold, energies, e_0=None, T=10)
 
 def get_pixel_shifts(energies, fermi_levels, reference=None) :
     """ Use the output from :func:`fit_gold <arpys.postprocessing.fit_gold>` 
@@ -1360,7 +1382,7 @@ def get_pixel_shifts(energies, fermi_levels, reference=None) :
     ============  ==============================================================
 
     .. seealso::
-        :func: `~arpys.postprocessing.apply_pixel_shifts`
+        :func:`~arpys.postprocessing.apply_pixel_shifts`
     """
     raw_shifts = np.array([af.indexof(f, energies) for f in fermi_levels], 
                           dtype=int)
@@ -1392,15 +1414,17 @@ def apply_pixel_shifts(data, shifts, dim=None) :
 
     ============  ==============================================================
     shifted_data  2d-array of same shape as input *data*, except that 
-                  ``shifted_data[dim] = data[dim] - cutoff`` where *cutoff* is 
-                  equal to the maximum shift.
+                  ``shifted_data[dim] = data[dim] - *cutoff`` where *cutoff* is 
+                  equal to the twice the absolute maximum shift.
+    cutoff        int; the number of pixels that had to be cut off at the end 
+                  of each array.
     ============  ==============================================================
 
-
     .. seealso::
-        :func: `~arpys.postprocessing.get_pixel_shifts`
+        :func:`~arpys.postprocessing.get_pixel_shifts`
     """
-    cutoff = max(shifts)
+#    cutoff_sign = np.sign(max(shifts) + min(shifts))
+    cutoff = max(np.abs(shifts))
     n_shifts = len(shifts)
     N, M = data.shape
     if dim is None :
@@ -1427,7 +1451,7 @@ def apply_pixel_shifts(data, shifts, dim=None) :
     shifted_data = np.array(new_data)
     if dim == 1 :
         shifted_data = shifted_data.T
-    return shifted_data
+    return shifted_data, 2*cutoff
 
 def adjust_fermi_level(energies, fermi_levels) :
     """ Use the output from :func:`fit_gold <arpys.postprocessing.fit_gold>` 
@@ -1666,7 +1690,11 @@ def lorentzian(x, a=1, mu=0, gamma=1) :
     ===  =======================================================================
     res  array containing the value of the Lorentzian at every point of input x 
     ===  =======================================================================
+
+    .. warning::
+        Deprecated. Use :func:`~arpys.utilities.functions.lorentzian` instead.
     """
+    raise DeprecationWarning('Use arpys.utilities.functions.lorentzian instead.')
     return a/( np.pi*gamma*( 1 + ((x-mu)/gamma)**2 ) )
 
 def gaussian(x, a=1, mu=0, sigma=1) :
@@ -1933,6 +1961,114 @@ def symmetrize_around(data, p0, p1) :
     return transformed[::-1,::-1]
 #    return transformed
 
+def flip_linear(data, i, x=None) :
+    """ Flip an array around pixel *i*.
+
+    **Parameters**
+
+    =====  =====================================================================
+    data   1d-array of length ``n0``;
+    i      int; index around which to flip.
+    x      1d-array of length ``n0``; optional; equidistantly spaced 
+           monotonically in- or decreasing independent variable 
+           corresponding to *data*.
+    =====  =====================================================================
+
+    **Results**
+
+    =======  ===================================================================
+    flipped  1d-array of length ``2*i + 2``.
+    new_x    1d-array of same length as *flipped*. The extrapolated *x* values.
+    =======  ===================================================================
+
+    .. seealso::
+        :func:`~arpys.postprocessing.symmetrize_linear`
+
+        :func:`~arpys.postprocessing.symmetrize_rectangular`
+    """
+    left = list(data[:i])
+    center = [data[i]]
+    right = left[::-1]
+    flipped = np.array(left + center + right)
+    # Extrapolate the flipped x values
+    if x is not None :
+        x0 = x[0]
+        dx = x[1] - x[0]
+        x1 = x0 + (2*i+1)*dx
+        x = np.arange(x0, x1, dx)
+    return flipped, x
+
+def symmetrize_linear(data, i, x=None, valid=True) :
+    """ Symmetrize an array around pixel *i*.
+
+    **Parameters**
+
+    =====  =====================================================================
+    data   1d-array of length ``n0``;
+    i      int; index around which to symmetrize.
+    x      `d-array of length ``n0``; optional; equidistantly spaced 
+            monotonically in- or decreasing independent variable 
+            corresponding to *data*.
+    valid  bool; if True, cut the result to the region where the original and 
+           flipped data are overlayed (``length=2*(n0-i)``), otherwise return 
+           the full array (``length=2*(i+1)``).
+    =====  =====================================================================
+
+    **Results**
+
+    ===========  ===============================================================
+    symmetrized  1d-array; the symmetrized data. Its length depends on the 
+                 value of the parameter *valid*.
+    new_x        1d-array of same length as *symmetrized*. The extrapolated 
+                 *x* values.
+    ===========  ===============================================================
+
+    .. seealso::
+        :func:`~arpys.postprocessing.flip_linear`: the difference to this is 
+        that here the array values are being summed up, which leads to a 
+        *valid* and less valid region.
+
+        :func:`~arpys.postprocessing.symmetrize_rectangular`
+    """
+    n0 = len(data)
+    # Flip the starting data if the original index is on the "left"
+    if i < n0/2 :
+        flipped = True
+        data = data[::-1]
+        i = n0-i
+    else :
+        flipped = False
+    # Size of the full result
+    n1 = 2*(i+1)
+    # Distance from mirror point to edge of valid region
+    delta = n0-i
+    # Prepare full output container
+    symmetrized = np.zeros(n1)
+    # Fill in original data
+    symmetrized[:n0] += data
+    # Fill in mirrored data
+    symmetrized[-n0:] += data[::-1]
+
+    # Construct the corresponding x scale
+    if x is not None :
+        dx = x[1] - x[0]
+        if flipped :
+            # Extend to the left
+            x0 = x[-1]
+            dx = -dx
+        else :
+            # Extend to the right
+            x0 = x[0]
+        x1 = x0 + n1*dx
+        x = np.arange(x0, x1, dx)
+
+    if valid :
+        # Cut to valid region
+        symmetrized = symmetrized[i-delta:i+delta+1]
+        x = x[i-delta:i+delta+1]
+
+    return symmetrized, x
+
 def symmetrize_rectangular(data, i, k=None) :
     """ Symmetrize a piece of rectangular *data* around column *i* by simply 
     mirroring the data at column *i* and overlaying it in the correct position. 
@@ -1993,6 +2129,9 @@ def symmetrize_rectangular(data, i, k=None) :
             |          |
          nx0-2*i      nx1 = 2*(nx0-i)
 
+
+    .. seealso::
+        :func:`~arpys.postprocessing.symmetrize_linear`
     """
     # Flip the image if i>nx0/2
     ny, nx0 = data.shape
