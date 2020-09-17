@@ -1962,7 +1962,7 @@ def symmetrize_around(data, p0, p1) :
 #    return transformed
 
 def flip_linear(data, i, x=None) :
-    """ Flip an array around pixel *i*.
+    """ Flip an array around pixel *i* to the right.
 
     **Parameters**
 
@@ -1977,7 +1977,7 @@ def flip_linear(data, i, x=None) :
     **Results**
 
     =======  ===================================================================
-    flipped  1d-array of length ``2*i + 2``.
+    flipped  1d-array of length ``2*i + 1``.
     new_x    1d-array of same length as *flipped*. The extrapolated *x* values.
     =======  ===================================================================
 
