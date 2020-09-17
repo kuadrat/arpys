@@ -2010,8 +2010,9 @@ def symmetrize_linear(data, i, x=None, valid=True) :
             monotonically in- or decreasing independent variable 
             corresponding to *data*.
     valid  bool; if True, cut the result to the region where the original and 
-           flipped data are overlayed (``length=2*(n0-i)``), otherwise return 
-           the full array (``length=2*(i+1)``).
+           flipped data are overlayed (``length=2*(n0-i)-1 if i>=n0/2 or 
+           length=2(i+1)-1 if i<n0/2``), otherwise return the full array 
+           (``length=2*i+1 if i>=n0/2 or length=2*n0-i)-1 if i<n/2``).
     =====  =====================================================================
 
     **Results**
@@ -2031,17 +2032,21 @@ def symmetrize_linear(data, i, x=None, valid=True) :
         :func:`~arpys.postprocessing.symmetrize_rectangular`
     """
     n0 = len(data)
+    # Sanity check
+    if i >= n0 :
+        message = 'i ({}) should be smaller than the length of *data* ({}).'
+        raise ValueError(message.format(i, n0))
     # Flip the starting data if the original index is on the "left"
     if i < n0/2 :
         flipped = True
         data = data[::-1]
-        i = n0-i
+        i = n0-(i+1)
     else :
         flipped = False
     # Size of the full result
-    n1 = 2*(i+1)
+    n1 = 2*i+1
     # Distance from mirror point to edge of valid region
-    delta = n0-i
+    delta = n1-n0
     # Prepare full output container
     symmetrized = np.zeros(n1)
     # Fill in original data
@@ -2061,11 +2066,14 @@ def symmetrize_linear(data, i, x=None, valid=True) :
             x0 = x[0]
         x1 = x0 + n1*dx
         x = np.arange(x0, x1, dx)
+        if flipped :
+            x = x[::-1]
 
-    if valid :
+    if valid and delta != 0 :
         # Cut to valid region
-        symmetrized = symmetrized[i-delta:i+delta+1]
-        x = x[i-delta:i+delta+1]
+        symmetrized = symmetrized[delta:-delta]
+        if x is not None :
+            x = x[delta:-delta]
 
     return symmetrized, x
 
