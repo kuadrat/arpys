@@ -7,9 +7,15 @@ Welcome to arpys's documentation!
 =================================
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
+   :caption: Examples
 
+   gap_analysis
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Code reference
+   
    modules
 
 

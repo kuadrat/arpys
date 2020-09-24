@@ -70,6 +70,10 @@ autodoc_member_order = 'bysource'
 
 # Intersphinx config
 intersphinx_mapping = {
+                       'matplotlib':
+                       ('https://matplotlib.org', None),
+                       'scipy':
+                       ('https://docs.scipy.org/doc/scipy/reference', None),
                        'pyqtgraph': 
                        ('https://pyqtgraph.readthedocs.io/en/latest/', None),
                        'python':
