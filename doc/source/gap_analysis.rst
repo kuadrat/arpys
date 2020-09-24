@@ -187,7 +187,7 @@ Here are two common possibilities:
 Finally, you can use :func:`arpys.postprocessing.symmetrize_linear` to 
 symmetrize the EDC around :math:`E_\mathrm{F}`::
    
-   sym_edc, sym_energy = pp.symmetrize_linear(edc, ef_index, D.xscale)
+   sym_edc, sym_energy = pp.symmetrize_linear(edc, ef_index, energies)
 
 .. figure:: ../img/symmetrized.png
    :alt: Image not found.
