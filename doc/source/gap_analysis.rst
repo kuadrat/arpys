@@ -72,6 +72,9 @@ for checking whether the fit worked reasonably.
    Of course you can store more than just the levels.
    This is a nice way of storing arbitrary python objects (however, some 
    objects cannot be *pickled*, like for example the ``functions``).
+   
+   ``arpys`` provides two convenience functions to save you some typing:
+   :func:`~arpys.dataloaders.dump` and :func:`~arpys.dataloaders.load_pickle`.
 
 .. _sec_smoothing:
 
