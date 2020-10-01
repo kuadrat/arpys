@@ -8,6 +8,12 @@ Welcome to arpys's documentation!
 
 .. toctree::
    :maxdepth: 1
+   :caption: arpys
+
+   installing
+
+.. toctree::
+   :maxdepth: 1
    :caption: Examples
 
    gap_analysis

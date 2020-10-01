@@ -8,7 +8,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="arpys",
-    version="0.2.1",
+    version="0.2.2",
 #    version="0.1.7beta",
     author="Kevin Kramer",
     author_email="kevin.kramer@uzh.ch",
