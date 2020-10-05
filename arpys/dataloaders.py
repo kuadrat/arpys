@@ -60,9 +60,7 @@ from warnings import catch_warnings, simplefilter, warn
 
 import h5py
 import numpy as np
-with catch_warnings() :
-    simplefilter("ignore")
-    import pyfits
+import astropy.io.fits as pyfits
 from igor import binarywave
 
 # Fcn to build the x, y (, z) ranges (maybe outsource this fcn definition)

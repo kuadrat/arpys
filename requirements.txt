@@ -4,4 +4,4 @@ igor>=0.3
 matplotlib>=2.1.0
 numpy>=1.8.0
 scipy>=0.19.1
-pyfits>=3.4
+astropy>=4.0.1
