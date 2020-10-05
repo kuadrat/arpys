@@ -11,6 +11,7 @@ Welcome to arpys's documentation!
    :caption: arpys
 
    installing
+   pit_plugin
 
 .. toctree::
    :maxdepth: 1
