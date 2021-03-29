@@ -55,6 +55,42 @@ from arpys.utilities import functions as af
 # | ARPES processing | # ======================================================
 # +------------------+ #
 
+def make_slice_nd(data, dimension, index, integrate=0) :
+    """ Create a slice at index *index*, integrating +- *integrate* pixels along 
+    dimension *dimension* of some N-dimensional array *data*.
+
+    **Parameters**
+
+    =========  =================================================================
+    data       N-dimensional np.array; the data to take a slice from
+    dimension  int; the dimension along which to slice.
+    index      int; index along *dimension* at which to slice.
+    integrate  int; optionally integrate by +- *integrate* pixels around 
+               *index*.
+    =========  =================================================================
+
+    **Returns**
+
+    ======  ====================================================================
+    result  (N-1)-dimensional np.array; the resulting data slice.
+    ======  ====================================================================
+    """
+    # Set the integration indices and adjust them if they go out of scope
+    start = i - integrate
+    stop = i + integrate + 1
+    if start < 0 :
+        if not silent :
+            warnings.warn(
+            'i - integrate ({}) < 0, setting start=0'.format(start))       
+        start = 0
+    if stop > n_slices :
+        if not silent :
+            warning = ('i + integrate ({}) > n_slices ({}), setting '
+                       'stop=n_slices').format(stop, n_slices)       
+            warnings.warn(warning)
+
+    return data.take(indices=range(start, stop), axis=d).sum(d)
+
 def make_slice(data, d, i, integrate=0, silent=False) :
     """ Create a slice out of the 3d data (l x m x n) along dimension d 
     (0,1,2) at index i. Optionally integrate around i.
