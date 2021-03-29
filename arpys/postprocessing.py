@@ -75,9 +75,10 @@ def make_slice_nd(data, dimension, index, integrate=0) :
     result  (N-1)-dimensional np.array; the resulting data slice.
     ======  ====================================================================
     """
+    n_slices = data.shape[dimension]
     # Set the integration indices and adjust them if they go out of scope
-    start = i - integrate
-    stop = i + integrate + 1
+    start = index - integrate
+    stop = index + integrate + 1
     if start < 0 :
         if not silent :
             warnings.warn(
@@ -89,7 +90,8 @@ def make_slice_nd(data, dimension, index, integrate=0) :
                        'stop=n_slices').format(stop, n_slices)       
             warnings.warn(warning)
 
-    return data.take(indices=range(start, stop), axis=d).sum(d)
+    return data.take(indices=range(start, stop), axis=dimension).sum(dimension)
+
 
 def make_slice(data, d, i, integrate=0, silent=False) :
     """ Create a slice out of the 3d data (l x m x n) along dimension d 
