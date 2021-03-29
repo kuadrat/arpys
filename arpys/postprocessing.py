@@ -92,6 +92,7 @@ def make_slice_nd(data, dimension, index, integrate=0) :
 
     return data.take(indices=range(start, stop), axis=dimension).sum(dimension)
 
+
 def make_slice(data, d, i, integrate=0, silent=False) :
     """ Create a slice out of the 3d data (l x m x n) along dimension d 
     (0,1,2) at index i. Optionally integrate around i.
