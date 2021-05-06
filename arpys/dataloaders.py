@@ -721,8 +721,16 @@ class Dataloader_SIS(Dataloader) :
         attributes = h5_data.attrs
 
         # Convert to array and make 3 dimensional if necessary
-        data = np.array(h5_data)
-        shape = data.shape
+        shape = h5_data.shape
+        # Access data chunk-wise, which is much faster.
+        # This improvement has been contributed by Wojtek Pudelko and makes data 
+        # loading from SIS Ultra orders of magnitude faster!
+        if len(shape) == 3:
+            data = np.zeros(shape)
+            for i in range(shape[2]):
+                data[:, :, i] = h5_data[:, :, i]
+        else:
+            data = array(h5_data)
         # How the data needs to be arranged depends on the scan type: cut, 
         # map, hv scan or a sequence of cuts
         # Case cut
