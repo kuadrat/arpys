@@ -1567,12 +1567,14 @@ def angle_to_k(alpha, beta, hv, dalpha=0, dbeta=0, orientation='horizontal',
             KX[i] = np.sin(b) * np.cos(a[i])
             KY[i] = np.sin(a[i])
     elif slit == 'v' :
-        cos_da = np.cos(c*dalpha)
-        sin_theta_cos_beta = np.sin(c*dalpha) * np.cos(b)
+        # Precalculate outside the loop
+        theta_k = c*beta
+        cos_theta = np.cos(theta_k)
+        sin_theta_cos_beta = np.sin(theta_k) * np.cos(c*dbeta) 
         for i in range(nkx) :
-            KX[i] = sin_theta_cos_beta + cos_da * np.cos(a[i]) * \
-                    np.sin(b) 
-            KY[i] = cos_da * np.sin(a[i])
+            KX[i] = sin_theta_cos_beta + cos_theta * np.cos(a[i]) * \
+                    np.sin(c*dbeta)
+            KY[i] = cos_theta * np.sin(a[i])
     else :
         raise ValueError(('Orientation "{}" not '
                           'understood.').format(orientation)) 
@@ -1829,6 +1831,14 @@ def fermi_dirac(E, mu=0, T=4.2) :
                 exp((E-mu)/(kT)) + 1
 
     and assumes values from 0 to 1.
+
+    **Parameters**
+
+    ==  ========================================================================
+    E   1d-array of float; the energy values in electronvolt.
+    mu  float; the chemical potential in electronvolt.
+    T   float; temperature in Kelvin
+    ==  ========================================================================
     """
     kT = constants.k_B * T / constants.eV
     res = 1 / (np.exp((E-mu)/kT) + 1)
@@ -2769,4 +2779,42 @@ def kramers_kronig(f, omega, e0=-10, e1=10, points=[], verbosity=0) :
 # +---------+ #
 
 if __name__ == '__main__' :    
-    pass
+    slit_angles = np.linspace(-15, 15, 111)
+    dependent = np.arange(-5, 20.5, 0.5)
+    hv = 55
+    dalpha = 5
+    dbeta = 10
+    n_slit = len(slit_angles)
+    n_dependent = len(dependent)
+
+    KX, KY = angle_to_k(slit_angles, dependent, hv, dalpha=dalpha, 
+                        dbeta=dbeta, orientation='v')
+    print(KX)
+    print(80*'=')
+    print(KY)
+
+    import matplotlib.pyplot as plt
+    fig = plt.figure(num='foo')
+    fig.clear()
+    ax = fig.add_subplot(111)
+
+    data = np.zeros((n_slit, n_dependent))
+    n_steps = 20
+    istep = int(n_slit/n_steps)
+    jstep = int(n_dependent/n_steps)
+    for i in range(n_slit) :
+        for j in range(n_dependent) :
+            if i%istep==0 or j%jstep==0 :
+                data[i,j] = 1
+
+    for i in range(n_slit) :
+        if i%istep==0 :
+            ax.plot(KX[i], KY[i], 'r', lw=1)
+    for j in range(n_dependent) :
+        if j%jstep==0 :
+            ax.plot(KX[:,j], KY[:,j], 'r', lw=1)
+
+    ax.plot([0], [0], 'bo')
+#    ax.pcolormesh(KX, KY, data)
+    plt.show()
+

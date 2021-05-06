@@ -42,6 +42,32 @@ def describe(obj) :
             print('{k} => {v!r}'.format(k=key, v=val))
         print(80*'-')
 
+def polynomial(n=1) :
+    """ Return a polynomial function of order *n*. 
+    
+    **Parameters**
+
+    =  =========================================================================
+    n  positive integer; the degree of the returned polynomial function.
+    =  =========================================================================
+
+    **Returns**
+
+    =  =========================================================================
+    p  callable; a function that takes an independent variable *x* as its 
+       first argument and *n* more arguments representing the coefficients of 
+       the *n*'th order polynomial in increasing order.
+    =  =========================================================================
+    """
+    def p(x, *a) :
+        """ Polynomial function of order *n* of the variable *x* with 
+        parameters *a*.
+        *a* is a list of length *n* corresponding to the coefficients of of 
+        the different terms in increasing order.
+        """
+        return sum([a[i]*x**i for i in range(n)])
+    return p
+        
 def multiple_exponential(t, i=0, *A_TAU) :
     """
     Recursively build a function of the form::
