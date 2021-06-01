@@ -1454,8 +1454,8 @@ def apply_pixel_shifts(data, shifts, dim=None) :
     shifted_data  2d-array of same shape as input *data*, except that 
                   ``shifted_data[dim] = data[dim] - *cutoff`` where *cutoff* is 
                   equal to the twice the absolute maximum shift.
-    cutoff        int; the number of pixels that had to be cut off at the end 
-                  of each array.
+    cutoff        int; the number of pixels that had to be cut off at the 
+                  start and end of each array.
     ============  ==============================================================
 
     .. seealso::
@@ -1489,7 +1489,7 @@ def apply_pixel_shifts(data, shifts, dim=None) :
     shifted_data = np.array(new_data)
     if dim == 1 :
         shifted_data = shifted_data.T
-    return shifted_data, 2*cutoff
+    return shifted_data, cutoff
 
 def adjust_fermi_level(energies, fermi_levels) :
     """ Use the output from :func:`fit_gold <arpys.postprocessing.fit_gold>` 
