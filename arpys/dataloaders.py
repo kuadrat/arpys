@@ -191,7 +191,10 @@ class Dataloader_i05(Dataloader) :
         phi = infile['entry1/instrument/manipulator/sapolar'][0]
 
         # Take the mean of the given binding energies as an estimate
-        E_b = -np.mean(infile['entry1/analyser/binding_energies'])
+        try :
+            E_b = -np.mean(infile['entry1/analyser/binding_energies'])
+        except KeyError :
+            E_b = -np.mean(infile['entry1/analyser/energies'])
 
         res = Namespace(
            data = data,
@@ -730,7 +733,7 @@ class Dataloader_SIS(Dataloader) :
             for i in range(shape[2]):
                 data[:, :, i] = h5_data[:, :, i]
         else:
-            data = array(h5_data)
+            data = np.array(h5_data)
         # How the data needs to be arranged depends on the scan type: cut, 
         # map, hv scan or a sequence of cuts
         # Case cut
