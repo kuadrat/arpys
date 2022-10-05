@@ -2,6 +2,8 @@ import os
 
 from pyqtgraph.Qt import QtGui, QtCore
 
+from arpys.visualizer.detailsview import DetailsView
+
 class Visualizer(QtGui.QMainWindow) :
     """ The main window of the arpys.visualizer application. Allows browsing 
     and inspecting files and opening them.
@@ -11,6 +13,7 @@ class Visualizer(QtGui.QMainWindow) :
         super().__init__()
         self.create_menu_bar()
         self.create_file_explorer()
+        self.create_details_view()
         self.align()
         # FIXME This does not have an effect here, needs to be called later on.
         self.resize_columns()
@@ -54,6 +57,10 @@ class Visualizer(QtGui.QMainWindow) :
 
         self.file_explorer = file_explorer
 
+    def create_details_view(self) :
+        """ Create a View that displays all found metadata of selected file. """
+        self.details_view = DetailsView()
+
     def align(self):
         """ Create window geometry. """
         self.resize(700, 600)
@@ -64,7 +71,7 @@ class Visualizer(QtGui.QMainWindow) :
 
         self.main_layout.setMenuBar(self.menu_bar)
         self.main_layout.addWidget(self.file_explorer, 0, 0)
-#        self.main_layout.addWidget(self.details_panel, 0, 1)
+        self.main_layout.addWidget(self.details_view, 0, 1)
 
         self.setCentralWidget(self.central_widget)
 
