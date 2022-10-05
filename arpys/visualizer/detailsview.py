@@ -12,6 +12,7 @@ class DetailsView(QtGui.QWidget) :
 
     def __init__(self) :
         super().__init__()
+        self.data = None
         # Create a bold font
         self.bold_font = QtGui.QFont()
         self.bold_font.setBold(True)
@@ -141,4 +142,30 @@ class DetailsView(QtGui.QWidget) :
         self.add_section('Beamline', self.beamline_layout)
         self.layout.addStretch()
 
+    def load_data(self, path) :
+        """ Use an :class:`~<arpys.dataloaders.Dataloader>` instance to load 
+        ARPES data at *path*.
+        """
+        selected_loader = self.dl_dropdown.currentText()
+        try:
+            if selected_loader == 'All':
+                data = dl.load_data(path)
+            else:
+                for loader in all_dls :
+                    if loader.name == selected_loader :
+                        data = loader.load_data(path)
+                        break
+        except Exception as e:
+            print('Couldn\'t load data {}.'.format(path))
+            raise(e)
+            return
+        self.data = data
 
+    def update_details(self, path) :
+        self.load_data(path)
+        if self.data is None :
+            print('Could not load data.')
+            return
+        else :
+            # Create a shorthand
+            data = self.data

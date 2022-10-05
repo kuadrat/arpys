@@ -18,6 +18,8 @@ class Visualizer(QtGui.QMainWindow) :
         # FIXME This does not have an effect here, needs to be called later on.
         self.resize_columns()
 
+        self.file_explorer.selectionModel().selectionChanged.connect(self.on_file_select)
+
     def create_menu_bar(self):
         """ Create the menu entries. """
         menu_bar = QtGui.QMenuBar()
@@ -80,8 +82,15 @@ class Visualizer(QtGui.QMainWindow) :
         for i in self.shown_columns :
             self.file_explorer.resizeColumnToContents(i)
 
-    def set_directory(self, path) :
-        pass
+    def on_file_select(self) :
+        """ Slot (=function to be executed) when user selects a new entry in 
+        the TreeView.
+        """
+        # Get the path of selected file as a string
+        index = self.file_explorer.currentIndex()
+        path = self.file_explorer.model().filePath(index)
+        print(path)
+        self.details_view.update_details(path)
 
 if __name__ == "__main__" :
     app = QtGui.QApplication([])
