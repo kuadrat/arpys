@@ -92,7 +92,6 @@ def make_slice_nd(data, dimension, index, integrate=0) :
 
     return data.take(indices=range(start, stop), axis=dimension).sum(dimension)
 
-
 def make_slice(data, d, i, integrate=0, silent=False) :
     """ Create a slice out of the 3d data (l x m x n) along dimension d 
     (0,1,2) at index i. Optionally integrate around i.
@@ -739,6 +738,24 @@ def subtract_bg_matt(data, n_pts=5, profile=False) :
     else :
         return data
 
+def shirley_core(edc, normindex=0) :
+    """ Calculate the Shirley background for a 1D intensity array *edc*.
+
+    .. seealso::
+        :func:`~arpys.postprocessing.subtract_bg_shirley`
+    """
+    # Calculate the "normalization" prefactor
+    s = np.abs(edc[normindex] - edc[-1]) / edc.sum()
+
+    ne = len(edc)
+    indices = np.arange(ne)
+
+    # Prepare a function that sums the EDC from a given index upwards
+    sum_from = np.frompyfunc(lambda e : edc[e:].sum(), 1, 1)
+    bg = s*sum_from(indices).astype(float)
+
+    return bg
+
 def subtract_bg_shirley(data, dim=0, profile=False, normindex=0) :
     """ Use an iterative approach for the background of an EDC as described in
     DOI:10.1103/PhysRevB.5.4709. Mathematically, the value of the EDC after 
@@ -799,13 +816,7 @@ def subtract_bg_shirley(data, dim=0, profile=False, normindex=0) :
     # Take shirley bg from the angle-averaged EDC
     average_edc = np.mean(data[0], dim+1) 
 
-    # Calculate the "normalization" prefactor
-    s = np.abs(average_edc[normindex] - average_edc[-1]) / average_edc.sum()
-
-    # Prepare a function that sums the EDC from a given index upwards
-    sum_from = np.frompyfunc(lambda e : average_edc[e:].sum(), 1, 1)
-    indices = np.arange(ne)
-    bg = s*sum_from(indices).astype(float)
+    bg = shirley_core(average_edc, normindex)
 
     # Subtract the bg profile from each EDC
     for k in range(nk) :
@@ -1240,7 +1251,8 @@ def fermi_fit_func(E, E_F, sigma, a, b, T=10) :
         y = ndimage.gaussian_filter(y, sigma)
     return y
 
-def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
+def fit_fermi_dirac(energies, edc, e_0, T=10, sigma=None, sigma0=10, a0=0, 
+                    b0=-0.1) :
     """ Try fitting a Fermi Dirac distribution convoluted by a Gaussian 
     (simulating the instrument resolution) plus a linear component on the 
     side with E<E_F to a given energy distribution curve.
@@ -1253,6 +1265,8 @@ def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
     e_0       float; starting guess for the Fermi energy. The fitting 
               procedure is quite sensitive to this.
     T         float; (fixed) temperature.
+    sigma     float; if not *None*, sigma will be fixed during the fit. Units 
+              as in *sigma0*.
     sigma0    float; starting guess for the standard deviation of the 
               Gaussian in units of pixels (i.e. the step size in *energies*).
     a0        float; starting guess for the slope of the linear component.
@@ -1282,6 +1296,13 @@ def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=10, a0=0, b0=-0.1) :
     def fit_func(E, E_F, sigma, a, b) :
         """ Wrapper around fermi_fit_func that fixes T. """
         return fermi_fit_func(E, E_F, sigma, a, b, T=T)
+    
+    # Fix sigma, if given
+    if sigma is not None :
+        def new_fit_func(E, E_F, a, b) :
+            """ Wrapper that fixes sigma. """
+            return fit_func(E, E_F, a=a, b=b, sigma=sigma)
+        fit_func = new_fit_func
 
     # Carry out the fit
     p, cov = curve_fit(fit_func, energies, edc, p0=p0, bounds=(lower, upper)) 
@@ -1331,7 +1352,7 @@ def fit_gold(D, e_0=None, T=10) :
     energies = D.xscale
     return fit_gold_array(gold, energies, e_0, T)
 
-def fit_gold_array(gold, energies, e_0=None, T=10) :
+def fit_gold_array(gold, energies, e_0=None, T=10, sigma=None) :
     """ Apply a Fermi-Dirac fit to all EDCs of an ARPES Gold spectrum, 
     represented by a numpy array.
     
@@ -1345,6 +1366,8 @@ def fit_gold_array(gold, energies, e_0=None, T=10) :
               estimated by detecting the step in the integrated spectrum using 
               :func:`detect_step <arpys.postprocessing.detect_step>`.
     T         float; Temperature.
+    sigma     float; instrument resolution in energy pixels. If *None* it is 
+              left as a fit parameter.
     ========  ==================================================================
 
 
@@ -1432,6 +1455,20 @@ def get_pixel_shifts(energies, fermi_levels, reference=None) :
     else :
         raise TypeError('`reference` has to be an integer or None.')
     return raw_shifts - zero
+#    if reference is None :
+#        ref = np.mean(fermi_levels)
+#    elif isinstance(reference, int) :
+#        ref = energies[reference]
+#    else :
+#        # Assume reference is an energy value
+#        ref = reference
+#    # Differences in energy units
+#    differences = ref - fermi_levels
+#    # Convert to pixels
+#    de = energies[1] - energies[0]
+#    shifts = differences / de
+#    # Cast to int (rounding down)
+#    return shifts.astype(int)
 
 def apply_pixel_shifts(data, shifts, dim=None) :
     """ Shift the arrays in *data* along dimension *dim* by a number of 
@@ -1452,8 +1489,8 @@ def apply_pixel_shifts(data, shifts, dim=None) :
 
     ============  ==============================================================
     shifted_data  2d-array of same shape as input *data*, except that 
-                  ``shifted_data[dim] = data[dim] - *cutoff`` where *cutoff* is 
-                  equal to the twice the absolute maximum shift.
+                  ``shifted_data[dim] = data[dim] - 2*cutoff`` where *cutoff* is 
+                  equal to the absolute maximum shift.
     cutoff        int; the number of pixels that had to be cut off at the 
                   start and end of each array.
     ============  ==============================================================

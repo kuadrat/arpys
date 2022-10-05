@@ -911,6 +911,65 @@ class Dataloader_ADRESS(Dataloader) :
         )
         return res
 
+class Dataloader_P04(Dataloader) :
+    """ P04 (possibly P22?) beamline at DESY synchrotron in Hamburg. """
+    name = 'DESY - P04'
+    date = '20.08.2021'
+
+    def load_data(self, filename) :
+        return self.load_Spectrum_Map(filename)
+
+    def load_Spectrum_Map(self, filepath) :
+        """
+        *filename* is assumed to be a directory containing the data and 
+        metadata (.ini) files.
+        """
+        # Read parameters from .ini file
+        params = self.read_ini(filepath + 'Spectrum_Map.ini')
+        dtype = 'f' + str(params['byteperpoint'].strip())
+        depth, height, width = [int(p) for p in [params['depth'], \
+                                                 params['height'], \
+                                                 params['width']]]
+
+        # Load in the data
+        data = np.fromfile(filepath + 'Spectrum_Map.bin', dtype=dtype)
+        data = data.reshape(depth, height, width)
+        
+        # Construct the axes
+        z = start_step_n(float(params['widthoffset']), 
+                         float(params['widthdelta']), width)
+        y = start_step_n(float(params['heightoffset']), 
+                         float(params['heightdelta']), 
+                         height)
+        x = start_step_n(float(params['depthoffset']), 
+                         float(params['depthdelta']), depth)
+
+        res = Namespace(
+            data=data,
+            xscale=x,
+            yscale=y,
+            zscale=z,
+            angles=y,
+            theta=z,
+            phi=0,
+            E_b=0,
+            hv=77.7
+        )
+        return res
+
+    def read_ini(self, ini_filename) :
+        """ Read (meta)data from a .ini file """
+        contents = dict()
+        with open(ini_filename, 'r') as f :
+            for line in f.readlines() :
+                # Skip comments
+                if line.startswith('[') :
+                    continue
+                key, val = line.split('=')
+                # Add key value pairs, stripping off newline characters
+                contents.update({key: val.strip()})
+        return contents
+
 class Dataloader_CASSIOPEE(Dataloader) :
     """ CASSIOPEE beamline at SOLEIL synchrotron, Paris. """
     name = 'CASSIOPEE'

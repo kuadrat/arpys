@@ -9,6 +9,7 @@ from datetime import datetime
 
 import numpy as np
 import scipy.integrate as integrate
+from scipy.fftpack import hilbert
 
 from arpys import pp
 import arpys.utilities.constants as const
@@ -112,6 +113,17 @@ def re_sigma(E, im_sig, e0=-5, e1=5) :
     res = integrate.quad(integrand, e0, e1, points=[E, 0], 
                           full_output=True)[0] / np.pi
     return res
+
+def re_sigma_hilbert(im_sig) :
+    """ Calculate the real part of the self-energy sigma by means of the 
+    Hilbert transform (which is effectively the Kramers Kroning transform.
+
+    **Parameters**
+    ======  ====================================================================
+    im_sig  1D-array; the values of the imaginary part of the self-energy
+    ======  ====================================================================
+    """
+    return hilbert(im_sig)
     
 def self_energy_factory(im_kwargs=dict(), re_kwargs=dict()) :
     """
