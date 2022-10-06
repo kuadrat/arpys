@@ -9,6 +9,7 @@ class DetailsView(QtGui.QWidget) :
     # Sizes of LineEdits
     LEN1 = 50
     LEN2 = 75
+    number_fmt = '{:.2f}'
 
     def __init__(self) :
         super().__init__()
@@ -27,10 +28,11 @@ class DetailsView(QtGui.QWidget) :
         # Analyzer
         labels = ['E[0]', 'E[-1]', 'step', 'PE', 'lens mode', 'acq mode', 
                   'sweeps', 'DT']
-        names = ['e0', 'e1', 'de'] + 5*[None]
+        names = ['e0', 'e1', 'de', 'PE', 'lens_mode', 'acq_mode', 'sweeps', 
+                 'dwell_time']
         self.analyzer_layout = self.create_grid(labels, names)
         # Beamline
-        labels = ['hv', 'exit', 'polarization', 'front end']
+        labels = ['hv', 'exit_slit', 'polarization', 'front_end']
         names = 4*[None]
         self.beamline_layout = self.create_grid(labels, names)
 
@@ -151,9 +153,9 @@ class DetailsView(QtGui.QWidget) :
             if selected_loader == 'All':
                 data = dl.load_data(path)
             else:
-                for loader in all_dls :
+                for loader in dl.all_dls :
                     if loader.name == selected_loader :
-                        data = loader.load_data(path)
+                        data = loader().load_data(path)
                         break
         except Exception as e:
             print('Couldn\'t load data {}.'.format(path))
@@ -162,6 +164,7 @@ class DetailsView(QtGui.QWidget) :
         self.data = data
 
     def update_details(self, path) :
+        """ Put all found metadata into the respective LineEdit fields. """
         self.load_data(path)
         if self.data is None :
             print('Could not load data.')
@@ -169,3 +172,19 @@ class DetailsView(QtGui.QWidget) :
         else :
             # Create a shorthand
             data = self.data
+        for key, line_edit in self.line_edits.items() :
+            # Try extracting the value
+            try :
+                value = data[key]
+            except AttributeError :
+                print('Attribute not found: {}'.format(key))
+                continue
+            # Skip "None"
+            if value is None : continue
+            # Try formatting as a number
+            try :
+                line_edit.setText(self.number_fmt.format(value))
+            except TypeError :
+                line_edit.setText('{}'.format(value.decode('utf-8')))
+
+
