@@ -11,6 +11,7 @@ class Visualizer(QtGui.QMainWindow) :
 
     def __init__(self) :
         super().__init__()
+        self.setWindowTitle('AT Data Browser')
         self.create_menu_bar()
         self.create_file_explorer()
         self.create_details_view()

@@ -10,6 +10,7 @@ class DetailsView(QtGui.QWidget) :
     LEN1 = 50
     LEN2 = 75
     number_fmt = '{:.2f}'
+    number_fmt_exp = '{:.2E}'
 
     def __init__(self) :
         super().__init__()
@@ -23,17 +24,17 @@ class DetailsView(QtGui.QWidget) :
         self.create_scan_info()
         # Manipulator
         labels = ['x', 'y', 'z', 'T [K]', 'alpha', 'beta', 'gamma', 'p [mbar]']
-        names = 3*[None] + ['temperature'] + 3*[None] + ['pressure']
+        names = ['x_pos', 'y_pos', 'z_pos', 'temperature'] + 3*[None] + ['pressure']
         self.manipulator_layout = self.create_grid(labels, names)
         # Analyzer
         labels = ['E[0]', 'E[-1]', 'step', 'PE', 'lens mode', 'acq mode', 
                   'sweeps', 'DT']
-        names = ['e0', 'e1', 'de', 'PE', 'lens_mode', 'acq_mode', 'sweeps', 
+        names = ['e0', 'e1', 'de', 'PE', 'lens_mode', 'acq_mode', 'n_sweeps', 
                  'dwell_time']
         self.analyzer_layout = self.create_grid(labels, names)
         # Beamline
-        labels = ['hv', 'exit_slit', 'polarization', 'front_end']
-        names = 4*[None]
+        labels = ['hv', 'exit_slit', 'polarization']
+        names = 3*[None]
         self.beamline_layout = self.create_grid(labels, names)
 
         self.align()
@@ -65,7 +66,7 @@ class DetailsView(QtGui.QWidget) :
         vlayout = QtGui.QVBoxLayout()
         # Top row
         top = QtGui.QHBoxLayout()
-        label, line_edit = self.make_entry('Scan type', self.LEN2, name='type')
+        label, line_edit = self.make_entry('Scan type', self.LEN2, name='scan_type')
         top.addWidget(label)
         top.addWidget(line_edit)
         top.addStretch()
@@ -144,28 +145,33 @@ class DetailsView(QtGui.QWidget) :
         self.add_section('Beamline', self.beamline_layout)
         self.layout.addStretch()
 
-    def load_data(self, path) :
+    def load_metadata(self, path) :
         """ Use an :class:`~<arpys.dataloaders.Dataloader>` instance to load 
         ARPES data at *path*.
         """
         selected_loader = self.dl_dropdown.currentText()
         try:
             if selected_loader == 'All':
-                data = dl.load_data(path)
+                data = dl.load_data(path, metadata_only=True)
             else:
                 for loader in dl.all_dls :
                     if loader.name == selected_loader :
-                        data = loader().load_data(path)
+                        data = loader().load_metadata(path)
                         break
         except Exception as e:
             print('Couldn\'t load data {}.'.format(path))
             raise(e)
             return
+        # Add some extra info
+        E = data.zscale
+        data.e0 = E[0]
+        data.e1 = E[-1]
+        data.de = E[1] - E[0]
         self.data = data
 
     def update_details(self, path) :
         """ Put all found metadata into the respective LineEdit fields. """
-        self.load_data(path)
+        self.load_metadata(path)
         if self.data is None :
             print('Could not load data.')
             return
@@ -181,10 +187,16 @@ class DetailsView(QtGui.QWidget) :
                 continue
             # Skip "None"
             if value is None : continue
-            # Try formatting as a number
+            # Try formatting as a number first
             try :
-                line_edit.setText(self.number_fmt.format(value))
+                txt = self.number_fmt.format(value)
+            except ValueError :
+                txt = '{}'.format(value)
             except TypeError :
-                line_edit.setText('{}'.format(value.decode('utf-8')))
-
+                txt = '{}'.format(value.decode('utf-8'))
+            # If we got zero, it might be worth displaying in scientific 
+            # notation
+            if txt == self.number_fmt.format(0.0) :
+                txt = self.number_fmt_exp.format(value)
+            line_edit.setText(txt)
 
