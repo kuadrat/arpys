@@ -1,0 +1,1 @@
+Currently: try instantiating a Viewer3D and see where a problem occurs.

@@ -3,6 +3,11 @@
 Provides several Dataloader objects which open different kinds of data files 
 - typically acquired at different sources (i.e. beamlines at various 
 synchrotrons) - and crunch them into the same shape and form.
+
+.. warning:: 
+    The data format is currently undergoing a change and below documentation 
+    is outdated.
+
 The output form is an :class:`argparse.Namespace` object like this::
 
     Namespace(data,
@@ -72,6 +77,71 @@ def start_step_n(start, step, n) :
     end = start + n*step
     return np.linspace(start, end, n)
 
+class ARPESDataset() :
+    """ The data structure in which ARPES data is represented within arpys.
+    Data access and assignment is supported both through indexing 
+    (`D['key']`) as well as through attribute access (`D.key`). In both 
+    cases, an AttributeError is thrown if the requested key is not found.
+    All typically used (meta)data attributes are listed in this class' `keys` 
+    attribute and are initialized to *None*.
+    """
+    keys = [
+        'data', 
+        'xscale',
+        'yscale',
+        'zscale',
+        'ekin',
+        'kxscale',
+        'kyscale',
+        'x_pos',
+        'y_pos',
+        'z_pos',
+        # Rotation along analyzer slit
+        'alpha',
+        # Dependent rotation
+        'beta',
+        # Azimuthal rotation
+        'gamma',
+        'temperature',
+        'pressure',
+        'hv',
+        'wf',
+        'Ef',
+        'polarization',
+        'PE',
+        'exit_slit',
+        'FE',
+        'scan_type',
+        'scan_dim',
+        'acq_mode',
+        'lens_mode',
+        'analyzer_slit',
+        'n_sweeps',
+        'dwell_time'
+    ]
+
+    def __init__(self, **kwargs) :
+        """ Initialize all values to *None*, then set all given key-value 
+        pairs as attributes. """
+        for key in self.keys :
+            self.__setattr__(key, None)
+        for key, value in kwargs.items() :
+            self.__setattr__(key, value)
+
+    def __getitem__(self, index) :
+        """ Route item indexing with the `[key]` notation to indexing the 
+        instance's `__dict__`.
+        """
+        try :
+            return self.__dict__[index]
+        except KeyError :
+            message = 'This {} has no attribute "{}".'
+            raise AttributeError(message.format(self.__class__, index))
+
+    def __setitem__(self, key, value) :
+        """ Allow item assignment throug `[key]` notation. """
+        self.__setattr__(key, value)
+
 class Dataloader() :
     """ 
     Base dataloader class (interface) from which others inherit some 
@@ -93,6 +163,17 @@ class Dataloader() :
         """ Print message to console, adding the dataloader name. """
         s = '[Dataloader {}]'.format(self.name)
         print(s, *messages)
+
+    def load_data(self, filename) :
+        """ Method stub to be overwritten by subclasses. """
+        pass
+
+    def load_metadata(self, filename) :
+        """ Method stub to be overwritten by subclasses. If it is not 
+        implemented by the respective subclass, revert to its `load_data` 
+        method. 
+        """
+        return self.load_data(filename)
 
 class Dataloader_Pickle(Dataloader) :
     """ 
@@ -623,12 +704,6 @@ class Dataloader_SIS(Dataloader) :
         Extract and return the actual 'data', i.e. the recorded map/cut. 
         Also return labels which provide some indications what the data means.
         """
-        # Note: x and y are a bit confusing here as the hd5 file has a 
-        # different notion of zero'th and first dimension as numpy and then 
-        # later pcolormesh introduces yet another layer of confusion. The way 
-        # it is written now, though hard to read, turns out to do the right 
-        # thing and leads to readable code from after this point.
-
         if filename.endswith('h5') :
             return self.load_h5(filename)
         elif filename.endswith('zip') :
@@ -636,24 +711,47 @@ class Dataloader_SIS(Dataloader) :
         else :
             raise NotImplementedError('File suffix not supported.')
 
-    def load_zip(self, filename) :
-        """ Load and store a deflector mode file from SIS-ULTRA. """
+    def load_metadata(self, filename) :
+        if filename.endswith('h5') :
+            return self.load_metadata_h5(filename)
+        elif filename.endswith('zip') :
+            return self.load_metadata_zip(filename)
+        else :
+            raise NotImplementedError('File suffix not supported.')
+
+    def load_metadata_zip(self, filename) :
+        """ Load and store metadata of a deflector mode file from SIS-ULTRA. 
+        """ 
         # Prepare metadata key-value pairs for the different metadata files
         # and their expected types
         keys1 = [
-                 ('width', 'n_energy', int),
-                 ('height', 'n_x', int),
-                 ('depth', 'n_y', int),
-                 ('first_full', 'first_energy', int),
-                 ('last_full', 'last_energy', int),
-                 ('widthoffset', 'start_energy', float),
-                 ('widthdelta', 'step_energy', float),
-                 ('heightoffset', 'start_x', float),
-                 ('heightdelta', 'step_x', float), 
-                 ('depthoffset', 'start_y', float),
-                 ('depthdelta', 'step_y', float)
-                ]
-        keys2 = [('Excitation Energy', 'hv', float)]
+             ('width', 'n_energy', int),
+             ('height', 'n_x', int),
+             ('depth', 'n_y', int),
+             ('first_full', 'first_energy', int),
+             ('last_full', 'last_energy', int),
+             ('widthoffset', 'start_energy', float),
+             ('widthdelta', 'step_energy', float),
+             ('heightoffset', 'start_x', float),
+             ('heightdelta', 'step_x', float), 
+             ('depthoffset', 'start_y', float),
+             ('depthdelta', 'step_y', float)
+        ]
+        keys2 = [
+            ('Excitation Energy', 'hv', float),
+            ('Acquisition Mode', 'acq_mode', str),
+            ('Pass Energy', 'PE', int),
+            ('Lens Mode', 'lens_mode', str),
+            ('Step Time', 'dwell_time', int),
+            ('Number of Sweeps', 'n_sweeps', int),
+            ('X', 'x', float),
+            ('Y', 'y', float),
+            ('Z', 'z', float),
+            ('A', 'gamma', float),
+            ('P', 'beta', float),
+            ('T', 'alpha', float),
+            ('Y', 'y', float)
+        ]
 
         # Load the zipfile
         with zipfile.ZipFile(filename, 'r') as z :
@@ -666,6 +764,48 @@ class Dataloader_SIS(Dataloader) :
             # Get additional metadata from a second metadata file...
             with z.open(file_id + '.ini') as metadata_file2 :
                 M2 = self.read_metadata(keys2, metadata_file2)
+                # Take care of additional metadata fields which might be 
+                # missing 
+                if not hasattr(M2, 'scan_type'):
+                    M2.__setattr__('scan_type', 'cut')
+                if not hasattr(M2, 'scan_start'):
+                    M2.__setattr__('scan_start', 0)
+                if not hasattr(M2, 'scan_stop'):
+                    M2.__setattr__('scan_stop', 0)
+                if not hasattr(M2, 'scan_step'):
+                    M2.__setattr__('scan_step', 0)
+                if hasattr(M2, 'scan_step'):
+                    n_dim_steps = np.abs(M2.scan_start - M2.scan_stop) / \
+                            M2.scan_step
+                    M2.n_sweeps //= n_dim_steps
+
+        # Create axes
+        xscale = start_step_n(M.start_x, M.step_x, M.n_x)
+        yscale = start_step_n(M.start_y, M.step_y, M.n_y)
+        energies = start_step_n(M.start_energy, M.step_energy, M.n_energy)
+        energies = energies[M.first_energy:M.last_energy+1]
+
+        res = ARPESDataset(
+            xscale=xscale,
+            yscale=yscale,
+            zscale=energies,
+            ekin=energies,
+            scan_dim=[M2.scan_start, M2.scan_stop, M2.scan_step]
+        )
+
+        # Pass on all additional metadata
+        for key, value in M2.__dict__.items() :
+            res['key'] = value
+
+        return res
+        
+    def load_zip(self, filename) :
+        """ Load and store a deflector mode file from SIS-ULTRA. """
+        # Load Metadata first
+        res = self.load_metadata_zip(filename)
+
+        # Load the zipfile
+        with zipfile.ZipFile(filename, 'r') as z :
             # Extract the binary data from the zipfile
             with z.open('Spectrum_' + file_id + '.bin') as f :
                 data_flat = np.frombuffer(f.read(), dtype='float32')
@@ -676,19 +816,8 @@ class Dataloader_SIS(Dataloader) :
         # Put into shape (energy, other angle, angle along analyzer)
         data = np.moveaxis(data, 2, 0)
 
-        # Create axes
-        xscale = start_step_n(M.start_x, M.step_x, M.n_x)
-        yscale = start_step_n(M.start_y, M.step_y, M.n_y)
-        energies = start_step_n(M.start_energy, M.step_energy, M.n_energy)
-        energies = energies[M.first_energy:M.last_energy+1]
-
-        res = Namespace(
-            data = data,
-            xscale = xscale,
-            yscale = yscale,
-            zscale = energies,
-            hv = M2.hv
-        )
+        # Add data to the ARPESDataset object and return it
+        res.data = data
         return res
         
     def read_viewer(self, viewer) :
@@ -715,6 +844,82 @@ class Dataloader_SIS(Dataloader) :
                     metadata.__setattr__(name, value)
         return metadata
 
+    def load_metadata_h5(self, filename) :
+        """ Load and return the metadata info from an h5 file. """
+        # Load the hdf5 file
+        self.datfile = h5py.File(filename, 'r')
+        h5_data = self.datfile['Electron Analyzer/Image Data']
+        attributes = h5_data.attrs
+
+        res = ARPESDataset()
+
+        # Extract shape information
+        shape = h5_data.shape
+
+        # How the data needs to be arranged depends on the scan type: cut, 
+        # map, hv scan or a sequence of cuts
+        # Case single scan
+        if len(shape) == 2 :
+            nx = 1
+            ny = shape[1]
+            ne = shape[0]
+            xlims = [1, 1]
+        # Case multiple scans
+        elif len(shape) == 3 :
+            nx = shape[1]
+            ny = shape[2]
+            ne = shape[0]
+            xlims = attributes['Axis2.Scale']
+
+        ylims = attributes['Axis1.Scale']
+        elims = attributes['Axis0.Scale']
+        # Construct x, y and energy scale (x/ylims[1] contains the step size)
+        xscale = start_step_n(*xlims, ny)
+        yscale = start_step_n(*ylims, nx)
+        energies = start_step_n(*elims, ne)
+ 
+        # Extract additional metadata
+        metadata = self.datfile['Other Instruments']
+        res.x_pos = metadata['X'][0]
+        res.y_pos = metadata['Y'][0]
+        res.z_pos = metadata['Z'][0]
+        res.beta = metadata['Theta'][0]
+        res.gamma = metadata['Phi'][0]
+        res.alpha = metadata['Tilt'][0]
+        res.temperature = metadata['Temperature B (Sample 1)'][0]
+        res.pressure = metadata['Pressure AC (ACMI)'][0]
+        res.hv = attributes['Excitation Energy (eV)']
+        res.wf = attributes['Work Function (eV)']
+        res.polarization = metadata['hv'].attrs['Mode'][10:]
+        res.PE = attributes['Pass Energy (eV)']
+        res.exit_slit = metadata['Exit Slit'][0]
+        res.FE = metadata['FE Horiz. Width'][0]
+#        res.ekin = energies + res.hv - res.wf
+        res.lens_mode = attributes['Lens Mode']
+        res.acq_mode = attributes['Acquisition Mode']
+        res.n_sweeps = attributes['Sweeps on Last Image']
+        res.dwell_time = attributes['Dwell Time (ms)']
+        if 'Axis2.Scale' in attributes:
+            res.scan_type = attributes['Axis2.Description'].decode('UTF-8')
+            res.scan_type += ' scan'
+            lims = attributes['Axis2.Scale']
+            res.start = lims[0]
+            res.step = lims[1]
+            res.stop = lims[0] + lims[1] * ny
+            res.scan_dim = [res.start, res.stop, res.step]
+        else:
+            res.scan_type = 'cut'
+            res.scan_dim = []
+
+        res.angles = xscale
+        res.E_b = min(energies)
+
+        res.xscale = xscale
+        res.yscale = yscale
+        res.zscale = energies
+
+        return res
+
     def load_h5(self, filename) :
         """ Load and store the full h5 file and extract relevant information. """
         # Load the hdf5 file
@@ -723,8 +928,6 @@ class Dataloader_SIS(Dataloader) :
         h5_data = self.datfile['Electron Analyzer/Image Data']
         attributes = h5_data.attrs
 
-        # Convert to array and make 3 dimensional if necessary
-        shape = h5_data.shape
         # Access data chunk-wise, which is much faster.
         # This improvement has been contributed by Wojtek Pudelko and makes data 
         # loading from SIS Ultra orders of magnitude faster!
@@ -732,80 +935,14 @@ class Dataloader_SIS(Dataloader) :
             data = np.zeros(shape)
             for i in range(shape[2]):
                 data[:, :, i] = h5_data[:, :, i]
+            data = rollaxis(data, 2, 0)
         else:
             data = np.array(h5_data)
-        # How the data needs to be arranged depends on the scan type: cut, 
-        # map, hv scan or a sequence of cuts
-        # Case cut
-        if len(shape) == 2 :
-            x = shape[0]
-            y = shape[1]
             # Make data 3D
-            data = data.reshape(1, x, y)
-#            N_E = y
-            N_E = 1
-            # Extract the limits
-            xlims = attributes['Axis1.Scale']
-            ylims = attributes['Axis0.Scale']
-#            elims = ylims
-            elims = [1, 1]
-        # shape[2] should hold the number of cuts. If it is reasonably large, 
-        # we have a map. Otherwise just a sequence of cuts.
-        # Case map
-        elif shape[2] > self.min_cuts_for_map :
-            self.print_m('Is a map?')
-            x = shape[1]
-            y = shape[2]
-            N_E = shape[0]
-            # Extract the limits
-            xlims = attributes['Axis2.Scale']
-            ylims = attributes['Axis1.Scale']
-            elims = attributes['Axis0.Scale']
-        # Case sequence of cuts
-        else :
-            x = shape[0]
-            y = shape[1]
-            N_E = y
-            z = shape[2]
-            # Reshape data
-            #new_data = np.zeros([z, x, y])
-            #for i in range(z) :
-            #    cut = data[:,:,i]
-            #    new_data[i] = cut
-            #data = new_data
-            data = np.rollaxis(data, 2, 0)
-            # Extract the limits
-            xlims = attributes['Axis1.Scale']
-            ylims = attributes['Axis0.Scale']
-            elims = ylims
+            data = data.reshape((1, y, N_E))
 
-        # Construct x, y and energy scale (x/ylims[1] contains the step size)
-        xscale = start_step_n(*xlims, y)
-        yscale = start_step_n(*ylims, x)
-        energies = start_step_n(*elims, N_E)
-#        xscale = self.make_scale(xlims, y)
-#        yscale = self.make_scale(ylims, x)
-#        energies = self.make_scale(elims, N_E)
-
-        # Extract some data for ang2k conversion
-        metadata = self.datfile['Other Instruments']
-        theta = metadata['Theta'][0]
-        #theta = metadata['Tilt'][0]
-        phi = metadata['Phi'][0]
-        hv = attributes['Excitation Energy (eV)']
-        angles = xscale
-        E_b = min(energies)
-        res = Namespace(
-               data = data,
-               xscale = xscale,
-               yscale = yscale,
-               zscale = energies,
-               angles = angles,
-               theta = theta,
-               phi = phi,
-               E_b = E_b,
-               hv = hv
-        )
+        res = self.load_metadata_h5(filename)
+        res.data = data
         return res
 
 #    def make_scale(self, limits, nstep) :
@@ -819,10 +956,10 @@ class Dataloader_SIS(Dataloader) :
 #        return np.linspace(start, end, nstep)
 
 class Dataloader_ADRESS(Dataloader) :
-   """ ADRESS beamline at SLS, PSI. """
-   name = 'ADRESS'
+    """ ADRESS beamline at SLS, PSI. """
+    name = 'ADRESS'
 
-   def load_data(self, filename) :
+    def load_data(self, filename) :
         h5file = h5py.File(filename, 'r')
         # The actual data is in the field: 'Matrix'
         matrix = h5file['Matrix']
@@ -910,6 +1047,65 @@ class Dataloader_ADRESS(Dataloader) :
                hv = hv
         )
         return res
+
+class Dataloader_P04(Dataloader) :
+    """ P04 (possibly P22?) beamline at DESY synchrotron in Hamburg. """
+    name = 'DESY - P04'
+    date = '20.08.2021'
+
+    def load_data(self, filename) :
+        return self.load_Spectrum_Map(filename)
+
+    def load_Spectrum_Map(self, filepath) :
+        """
+        *filename* is assumed to be a directory containing the data and 
+        metadata (.ini) files.
+        """
+        # Read parameters from .ini file
+        params = self.read_ini(filepath + 'Spectrum_Map.ini')
+        dtype = 'f' + str(params['byteperpoint'].strip())
+        depth, height, width = [int(p) for p in [params['depth'], \
+                                                 params['height'], \
+                                                 params['width']]]
+
+        # Load in the data
+        data = np.fromfile(filepath + 'Spectrum_Map.bin', dtype=dtype)
+        data = data.reshape(depth, height, width)
+        
+        # Construct the axes
+        z = start_step_n(float(params['widthoffset']), 
+                         float(params['widthdelta']), width)
+        y = start_step_n(float(params['heightoffset']), 
+                         float(params['heightdelta']), 
+                         height)
+        x = start_step_n(float(params['depthoffset']), 
+                         float(params['depthdelta']), depth)
+
+        res = Namespace(
+            data=data,
+            xscale=x,
+            yscale=y,
+            zscale=z,
+            angles=y,
+            theta=z,
+            phi=0,
+            E_b=0,
+            hv=77.7
+        )
+        return res
+
+    def read_ini(self, ini_filename) :
+        """ Read (meta)data from a .ini file """
+        contents = dict()
+        with open(ini_filename, 'r') as f :
+            for line in f.readlines() :
+                # Skip comments
+                if line.startswith('[') :
+                    continue
+                key, val = line.split('=')
+                # Add key value pairs, stripping off newline characters
+                contents.update({key: val.strip()})
+        return contents
 
 class Dataloader_CASSIOPEE(Dataloader) :
     """ CASSIOPEE beamline at SOLEIL synchrotron, Paris. """
@@ -1212,7 +1408,8 @@ all_dls = [
           ]
 
 # Function to try all dataloaders in all_dls
-def load_data(filename, exclude=None, suppress_warnings=False) :
+def load_data(filename, exclude=None, suppress_warnings=False, 
+              metadata_only=False) :
     """
     Try to load some dataset *filename* by iterating through `all_dls` 
     and appliyng the respective dataloader's load_data method. If it works: 
@@ -1238,6 +1435,10 @@ def load_data(filename, exclude=None, suppress_warnings=False) :
         for dataloader in all_dls :
             # Instantiate a dataloader object
             dl = dataloader()
+            if metadata_only :
+                load = dl.load_metadata
+            else :
+                load = dl.load_data
 
             # Skip to the next if this dl is excluded (continue brings us 
             # back to the top of the loop, starting with the next element)
@@ -1246,7 +1447,7 @@ def load_data(filename, exclude=None, suppress_warnings=False) :
 
             # Try loading the data
             try :
-                namespace = dl.load_data(filename)
+                namespace = load(filename)
             except Exception as e :
                 # Temporarily store the exception
                 exceptions.update({dl : e})
@@ -1352,6 +1553,15 @@ def add_attributes(filename, *attributes) :
 # +---------+ #
 
 if __name__ == '__main__' :
-    D = Dataloader_SIS().load_data('/home/kevin/qmap/experiments/2020_09_SIS/PrFeP_3P/PrFeP_3P_0001.zip')
-    print(D.data.shape)
-    print(D.xscale.shape)
+#    D = Dataloader_SIS().load_data('/home/kevin/qmap/experiments/2020_09_SIS/PrFeP_3P/PrFeP_3P_0001.zip')
+#    print(D.data.shape)
+#    print(D.xscale.shape)
+    a = ARPESDataset()
+    print(a['x'])
+    a.x = 2
+    a['x'] = 3
+    a['kev'] = 'foo'
+    print(a.x, a['x'])
+    print(a.kev)
+    a.foo = 'bar'
+    print(a.foo)

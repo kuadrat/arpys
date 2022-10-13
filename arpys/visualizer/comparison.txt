@@ -1,0 +1,372 @@
+10,11d8
+<         self.binning = False
+<         # self.erg_ax = erg_ax
+26,31c23,25
+<         # moved to get rid of warnings
+<         self.zmin = 0
+<         self.zmax = None
+<         self.integrated = None
+<         self.cut_y_data = None
+<         self.cut_x_data = None
+37,48c31,48
+<         if self.main_window.util_panel.image_normalize_edcs.isChecked():
+<             return self.norm_data
+<         else:
+<             return self.data.get_value()
+< 
+<     def set_data(self, data):
+<         """ Convenience `setter` method. Allows writing ``self.set_data(d)``
+<         instead of ``self.data.set_value(d)``.
+<         """
+<         self.data.set_value(data)
+<         with warnings.catch_warnings():
+<             self.norm_data = wp.normalize(data)
+---
+>         return self.data.get_value()
+> 
+>     def set_data(self, data=None, axes=None) :
+>         """ Convenience `setter` method. Allows writing ``self.set_data(d)`` 
+>         instead of ``self.data.set_value(d)``. 
+>         Additionally allows setting new *axes*. If *axes* is ``None``, the axes
+>         are reset to pixels.
+>         """
+>         if data is not None :
+>             self.data.set_value(data)
+>         if axes is not None :
+>             self.axes = axes
+>             self.main_window.set_axes()
+>         else :
+>             self.axes = EMPTY_AXES
+>         # Call on_z_dim_change here because it was not executed with the 
+>         # proper axes on the data change before
+>         self.on_z_dim_change()
+65,67c66,69
+<         self.axes = array(axes, dtype="object")
+<         with warnings.catch_warnings():
+<             self.norm_data = wp.normalize(data)
+---
+>         if axes is None :
+>             self.axes = np.array(3*[None])
+>         else :
+>             self.axes = np.array(axes)
+78,79c80,82
+<         # self.data.sig_value_changed.connect(self.on_data_change)
+---
+>         self.data.sig_value_changed.connect(self.on_data_change)
+84,85c87,99
+>     def load(self, filename) :
+>         """ Alias to :func:`open <data_slicer.pit.PITDataHandler.open>`. """ 
+>         self.open(filename)
+> 
+>     def open(self, filename) :
+>         """ Open a file that's readable by :mod:`dataloading 
+>         <data_slicer.dataloading>`.
+>         """
+>         D = dl.load_data(filename)
+>         self.prepare_data(D.data, D.axes)
+127c141,144
+<         self.zmax = self.get_data().shape[2]
+---
+>         self.zmax = self.get_data().shape[2] - 1
+> 
+>         self.z.set_allowed_values(range(self.zmin, self.zmax+1))
+> #        self.z.set_value(self.zmin)
+129c146,155
+<         self.z.set_allowed_values(range(self.zmin, self.zmax))
+---
+>     def reset_data(self) :
+>         """ Put all data and metadata into its original state, as if it was 
+>         just loaded from file.
+>         """
+>         logger.debug('reset_data()')
+>         self.set_data(copy(self.original_data))
+>         self.axes = copy(self.original_axes)
+>         self.prepare_axes()
+>         # Roll back to the view we had before reset_data was called
+>         self._roll_axes(self._roll_state, update=False)
+167,168c195
+<         with warnings.catch_warnings():
+<             ip.plot(wp.normalize(self.integrated))
+---
+>         ip.plot(self.integrated)
+171,175c198,205
+<         zscale = self.axes[erg_ax]
+<         zmin = zscale[0]
+<         zmax = zscale[-1]
+<         ip.set_secondary_axis(0, len(zscale))
+<         ip.set_ticks(zmin, zmax, ip.main_xaxis)
+---
+>         zscale = self.axes[2]
+>         if zscale is not None :
+>             zmin = zscale[0]
+>             zmax = zscale[-1]
+>         else :
+>             zmin = 0
+>             zmax = self.data.get_value().shape[2]
+>         ip.set_secondary_axis(zmin, zmax)
+187c218,219
+<         integrate_z = self.main_window.plot_z.width
+---
+>         integrate_z = \
+>         int(self.main_window.integrated_plot.slider_width.get_value()/2)
+189,219c221,233
+<         try:
+<             self.main_window.image_data = self.make_slice(data, dim=2, index=z, integrate=integrate_z)
+<         except IndexError:
+<             pass
+<         self.main_window.util_panel.energy_main.setValue(z)
+<         if self.main_window.new_energy_axis is None:
+<             self.main_window.util_panel.energy_main_value.setText('({:.4f})'.format(self.axes[erg_ax][z]))
+<         else:
+<             self.main_window.util_panel.energy_main_value.setText(
+<                 '({:.4f})'.format(self.main_window.new_energy_axis[z]))
+<         # self.main_window.update_z_binning_lines()
+< 
+<     @staticmethod
+<     def make_slice(data, dim, index, integrate=0, silent=True):
+<         """
+<         Take a slice out of an N dimensional dataset *data* at *index* along
+<         dimension *dim*. Optionally integrate by +- *integrate* channels around
+<         *index*.
+<         If *data* has shape::
+< 
+<             (n0, n1, ..., n(dim-1), n(dim), n(dim+1), ..., n(N-1))
+< 
+<         the result will be of dimension N-1 and have shape::
+< 
+<             (n0, n1, ..., n(dim-1), n(dim+1), ..., n(N-1))
+< 
+<         or in other words::
+< 
+<             shape(result) = shape(data)[:dim] + shape(data)[dim+1:]
+< 
+<         .
+---
+>         try :
+>             self.main_window.image_data = make_slice(data, dim=2, index=z, 
+>                                                      integrate=integrate_z) 
+>         except IndexError :
+>             logger.debug(('update_image_data(): z index {} out of range for '
+>                           'data of length {}.').format(
+>                              z, self.image_data.shape[0]))
+> 
+>     def roll_axes(self, i=1) :
+>         """ Change the way we look at the data cube. While initially we see 
+>         an Y vs. X slice in the main plot, roll it to Z vs. Y. A second call 
+>         would roll it to X vs. Z and, finally, a third call brings us back to 
+>         the original situation.
+223,275c237,261
+<         =========  =================================================================
+<         data       array-like; N dimensional dataset.
+<         dim        int, 0 <= d < N; dimension along which to slice.
+<         index      int, 0 <= index < data.size[d]; The index at which to create
+<                    the slice.
+<         integrate  int, ``0 <= integrate < |index|``; the number of slices above
+<                    and below slice *index* over which to integrate. A warning is
+<                    issued if the integration range would exceed the data (can be
+<                    turned off with *silent*).
+<         silent     bool; toggle warning messages.
+<         =========  =================================================================
+< 
+<         **Returns**
+< 
+<         ===  =======================================================================
+<         res  np.array; slice at *index* alond *dim* with dimensions shape[:d] +
+<              shape[d+1:].
+<         ===  =======================================================================
+<         """
+<         # Find the dimensionality and the number of slices along the specified dimension.
+<         shape = data.shape
+<         ndim = len(shape)
+<         try:
+<             n_slices = shape[dim]
+<         except IndexError:
+<             message = '*dim* ({}) needs to be smaller than the dimension of *data* ({})'.format(dim, ndim)
+<             raise IndexError(message)
+< 
+<         # Set the integration indices and adjust them if they go out of scope
+<         start = index - integrate
+<         stop = index + integrate + 1
+<         if start < 0:
+<             if not silent:
+<                 warnings.warn('i - integrate ({}) < 0, setting start=0'.format(start))
+<             start = 0
+<         if stop > n_slices:
+<             if not silent:
+<                 warning = 'i + integrate ({}) > n_slices ({}), setting stop=n_slices'.format(stop, n_slices)
+<                 warnings.warn(warning)
+<             stop = n_slices
+< 
+<         # Roll the original data such that the specified dimension comes first
+<         i_original = arange(ndim)
+<         i_rolled = np.roll(i_original, dim)
+<         data = np.moveaxis(data, i_original, i_rolled)
+<         # Take the slice
+<         sliced = data[start:stop].sum(0)
+<         # Bring back to more intuitive form. For that we have to remove the now
+<         # lost dimension from the index arrays and shift all indices.
+<         i_original = np.concatenate((i_original[:dim], i_original[dim + 1:]))
+<         i_original[i_original > dim] -= 1
+<         i_rolled = np.roll(i_original, dim)
+<         return np.moveaxis(sliced, i_rolled, i_original)
+---
+>         =  =====================================================================
+>         i  int; Number of dimensions to roll.
+>         =  =====================================================================
+>         """
+>         self._roll_axes(i, update=True)
+> 
+>     def _roll_axes(self, i=1, update=True) :
+>         """ Backend for :func:`roll_axes <arpys.pit.PITDataHandler.roll_axes>`
+>         that allows suppressing updating the roll-state, which is useful for
+>         :func:`reset_data <arpys.pit.PITDataHandler.reset_data>`.
+>         """
+>         logger.debug('roll_axes()')
+>         data = self.get_data()
+>         res = np.roll([0, 1, 2], i)
+>         self.axes = np.roll(self.axes, -i)
+>         self.set_data(np.moveaxis(data, [0, 1, 2], res), axes=self.axes)
+>         # Setting the data triggers a call to self.redraw_plots()
+>         self.on_z_dim_change()
+>         # Reset cut_plot's axes
+>         cp = self.main_window.cut_plot
+> #        cp.xlim = None
+> #        cp.ylim = None
+>         self.main_window.set_axes()
+>         if update :
+>             self._roll_state = (self._roll_state + i) % NDIM
+339a325,458
+>     def plot_all_slices(self, dim=2, integrate=0, zs=None, labels='default', 
+>                         max_ppf=16, max_nfigs=2, **kwargs) :
+>         """ Wrapper for :func:`plot_cuts <data_slicer.utilities.plot_cuts>`.
+>         Plot all (or only the ones specified by `zs`) slices along dimension 
+>         `dim` on separate suplots onto matplotlib figures.
+> 
+>         **Parameters**
+> 
+>         =========  ============================================================
+>         dim        int; one of (0,1,2). Dimension along which to take the cuts.
+>         integrate  int or 'full'; number of slices to integrate around each 
+>                    extracted cut. If 'full', take the maximum number possible, 
+>                    depending on *zs* and whether the number of cuts is reduced 
+>                    due to otherwise exceeding *max_nfigs*.
+>         zs         1D np.array; selection of indices along dimension `dim`. 
+>                    Only the given indices will be plotted.
+>         labels     1D array/list of length z. Optional labels to assign to the 
+>                    different cuts. By default the values of the respective axis
+>                    are used. Set to *None* to suppress labels.
+>         max_ppf    int; maximum number of plots per figure.
+>         max_nfigs  int; maximum number of figures that are created. If more 
+>                    would be necessary to display all plots, a warning is 
+>                    issued and only every N'th plot is created, where N is 
+>                    chosen such that the whole 'range' of plots is represented 
+>                    on the figures. 
+>         kwargs     dict; keyword arguments passed on to :func:`pcolormesh 
+>                    <matplotlib.axes._subplots.AxesSubplot.pcolormesh>`. 
+>                    Additionally, the kwarg `gamma` for power-law color mapping 
+>                    is accepted.
+>         =========  ============================================================
+> 
+>         .. seealso::
+>             :func:`~data_slicer.utilities.plot_cuts`
+>         """
+>         data = self.get_data()
+>         if labels == 'default' :
+>             # Use the values of the respective axis as default labels
+>             labels = self.axes[dim]
+> 
+>         # The default values for the colormap are taken from the main_window 
+>         # settings
+>         gamma = self.main_window.gamma
+>         vmax = self.main_window.vmax * data.max()
+>         cmap = convert_ds_to_matplotlib(self.main_window.cmap, 
+>                                         self.main_window.cmap_name)
+>         plot_cuts(data, dim=dim, integrate=integrate, zs=zs, labels=labels, 
+>                   cmap=cmap, vmax=vmax, gamma=gamma, max_ppf=max_ppf, 
+>                   max_nfigs=max_nfigs)
+> 
+>     def overlay_model(self, model) :
+>         """ Display a model over the data. *model* should be function of two 
+>         variables, namely the currently displayed x- and y-axes.
+> 
+>         **Parameters**
+> 
+>         =====  =================================================================
+>         model  callable or :class:`Model <data_slicer.model.Model>`;
+>         =====  =================================================================
+> 
+>         .. seealso::
+>             :class:`Model <data_slicer.model.Model>`
+>         """
+>         if isinstance(model, FunctionType) :
+>             model = Model(model)
+>         elif not isinstance(model, Model) :
+>             raise ValueError('*model* has to be a function or a '
+>                              'data_slicer.Model instance')
+>         # Remove the old model
+>         self.remove_model()
+> 
+>         # Calculate model data in the required range and get an isocurve
+>         self.model = model
+>         # Bypass the minimum axes size limitation
+>         self.model.MIN_AXIS_LENGTH = 0
+>         model_axes = [self.axes[i] for i in self.displayed_axes]
+>         # Invert order for transposed view
+>         if self.main_window.main_plot.transposed.get_value() :
+>             self.model.set_axes(model_axes[::-1])
+>         else :
+>             self.model.set_axes(model_axes)
+>         self._update_isocurve()
+>         self._update_model_cut()
+> 
+>         # Connect signal handling
+>         self.z.sig_value_changed.connect(self._update_isocurve)
+>         self.main_window.cutline.sig_region_changed.connect(self._update_model_cut)
+> 
+>     def remove_model(self) :
+>         """ Remove the current model's visible and invisible parts. """
+>         # Remove the visible items from the plots
+>         try :
+>             self.main_window.main_plot.removeItem(self.iso)
+>             self.iso = None
+>             self.model = None
+>         except AttributeError :
+>             logger.debug('remove_model(): no model to remove found.')
+>             return
+>         # Remove signal handling
+>         try :
+>             self.z.sig_value_changed.disconnect(self._update_isocurve)
+>         except TypeError as e :
+>             logger.debug(e)
+>         try :
+>             self.main_window.cutline.sig_region_changed.disconnect(
+>                 self._update_model_cut)
+>         except TypeError as e :
+>             logger.debug(e)
+> 
+>         # Redraw clean plots
+>         self.main_window.redraw_plots()
+> 
+>     def _update_isocurve(self) :
+>         try :
+>             self.iso = self.model.get_isocurve(self.z.get_value(), 
+>                                                axisOrder='row-major')
+>         except AttributeError :
+>             logger.debug('_update_isocurve(): no model found.')
+>             return
+>         # Make sure the isocurveItem is above the plot and add it to the main 
+>         # plot
+>         self.iso.setZValue(10)
+>         self.iso.setParentItem(self.main_window.main_plot.image_item)
+> 
+>     def _update_model_cut(self) :
+>         try :
+>             model_cut = self.main_window.cutline.get_array_region(
+>                             self.model.data.T,
+>                             self.main_window.main_plot.image_item,
+>                             self.displayed_axes)
+>         except AttributeError :
+>             logger.debug('_update_model_cut(): model or data not found.')
+>             return
+>         self.model_cut = self.main_window.cut_plot.plot(model_cut, 
+>                                                         pen=self.iso.pen)
