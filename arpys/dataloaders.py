@@ -61,7 +61,7 @@ from warnings import catch_warnings, simplefilter, warn
 import h5py
 import numpy as np
 import astropy.io.fits as pyfits
-from igor import binarywave
+from igor2 import binarywave
 
 # Fcn to build the x, y (, z) ranges (maybe outsource this fcn definition)
 def start_step_n(start, step, n) :
@@ -1352,6 +1352,6 @@ def add_attributes(filename, *attributes) :
 # +---------+ #
 
 if __name__ == '__main__' :
-    D = Dataloader_SIS().load_data('/home/kevin/qmap/experiments/2020_09_SIS/PrFeP_3P/PrFeP_3P_0001.zip')
+    D = Dataloader_CASSIOPEE().load_data('/home/kevin/documents/qmap/CeRu2Si2/2019_12_CASSIOPEE/FSM_6')
     print(D.data.shape)
     print(D.xscale.shape)

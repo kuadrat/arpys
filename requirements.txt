@@ -1,6 +1,6 @@
 cycler>=0.10.0
 h5py>=2.7.1
-igor>=0.3
+igor2>=0.5.2
 matplotlib>=2.1.0
 numpy>=1.8.0
 scipy>=0.19.1
