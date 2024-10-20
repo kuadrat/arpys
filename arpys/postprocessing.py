@@ -1647,7 +1647,7 @@ def alt_a2k(angle, tilt, theta, phi, hv, a, b=None, c=None, work_func=4) :
 # +---------+ #
 
 def step_function_core(x, step_x=0, flip=False) :
-    """ Implement a perfect step function f(x) with step at `step_x`::
+    r""" Implement a perfect step function f(x) with step at `step_x`::
     
                 / 0   if x < step_x
                 |
@@ -1681,7 +1681,7 @@ def step_function(x, step_x=0, flip=False) :
     return res.astype(float)
 
 def step_core(x, step_x=0, flip=False) :
-    """ Implement a step function f(x) with step at `step_x`::
+    r""" Implement a step function f(x) with step at `step_x`::
 
                 / 0 if x < step_x
         f(x) = {
@@ -1706,7 +1706,7 @@ def step_ufunc(x, step_x=0, flip=False) :
     return res.astype(float)
 
 def lorentzian(x, a=1, mu=0, gamma=1) :
-    """ 
+    r""" 
     Implement a Lorentzian curve f(x) given by the expression::
 
                             a
@@ -1738,7 +1738,7 @@ def lorentzian(x, a=1, mu=0, gamma=1) :
     return a/( np.pi*gamma*( 1 + ((x-mu)/gamma)**2 ) )
 
 def gaussian(x, a=1, mu=0, sigma=1) :
-    """ 
+    r""" 
     Implement a Gaussian bell curve f(x) given by the expression::
 
                                          2
@@ -1764,7 +1764,7 @@ def gaussian(x, a=1, mu=0, sigma=1) :
     return a * np.exp(-0.5 * (x-mu)**2 / sigma**2)
 
 #def merge_functions(f, g, x0) :
-#    """ Return a function F(x) which is defined by:
+#    r""" Return a function F(x) which is defined by:
 #                / f(x) if x < x0
 #        F(x) = {
 #                \ g(x) if x >= x0
@@ -1782,7 +1782,7 @@ def gaussian(x, a=1, mu=0, sigma=1) :
 #    return F
 
 def gaussian_step(x, step_x=0, a=1, mu=0, sigma=1, flip=False, after_step=None) :
-    """ Implement (as a broadcastable np.ufunc) a sort-of convolution of a 
+    r""" Implement (as a broadcastable np.ufunc) a sort-of convolution of a 
     step-function with a Gaussian bell curve, defined as follows ::
 
                 / g(x, a, mu, sigma) if x < step_x
